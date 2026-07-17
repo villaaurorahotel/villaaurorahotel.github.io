@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prenota — Hotel Villa Aurora, San Martino di Castrozza</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --cream:#FAF6F0; --paper:#FFFFFF;
+    --pine:#22392F; --pine-light:#3C5C4E;
+    --glow:#E0917A; --glow-deep:#C5613F;
+    --stone:#8A8478; --stone-light:#D8D2C5;
+    --line:#E6DFD2;
+    --radius:14px;
+    --shadow:0 10px 30px rgba(34,57,47,.10);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--cream);color:var(--pine);font-family:'Source Sans 3',sans-serif;line-height:1.5}
+  h1,h2,h3{font-family:'Fraunces',serif;font-weight:600;margin:0 0 .3em;color:var(--pine)}
+  a{color:inherit}
+
+  /* ── Hero: gradiente enrosadira (il rosa al tramonto sulle Pale di San Martino) ── */
+  .hero{
+    position:relative;overflow:hidden;
+    background:linear-gradient(180deg,#2A3F52 0%,#5C5468 32%,#B97567 58%,#E0917A 78%,#F3C9A8 100%);
+    padding:52px 20px 0;color:#fff;text-align:center;
+  }
+  .hero::after{
+    content:'';display:block;position:absolute;left:0;right:0;bottom:0;height:70px;
+    background:var(--cream);
+    clip-path:polygon(0% 100%,0% 40%,6% 55%,13% 22%,20% 48%,27% 12%,35% 42%,42% 5%,50% 38%,58% 15%,66% 46%,74% 10%,82% 40%,89% 20%,96% 50%,100% 30%,100% 100%);
+  }
+  .hero-inner{position:relative;z-index:2;max-width:720px;margin:0 auto;padding-bottom:120px}
+  .eyebrow{font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;opacity:.85;margin-bottom:14px}
+  .hero h1{font-size:clamp(30px,5vw,46px);line-height:1.08;color:#fff;text-shadow:0 2px 18px rgba(0,0,0,.18)}
+  .hero p{font-size:16px;opacity:.92;max-width:480px;margin:14px auto 0}
+
+  /* ── Barra di ricerca (il "thesis" della pagina: cercare disponibilità è l'azione centrale) ── */
+  .search-card{
+    max-width:880px;margin:-96px auto 0;position:relative;z-index:3;
+    background:var(--paper);border-radius:var(--radius);box-shadow:var(--shadow);
+    padding:22px;display:grid;grid-template-columns:repeat(4,1fr) auto;gap:14px;align-items:end;
+  }
+  .field label{display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--stone);margin-bottom:6px}
+  .field input,.field select{
+    width:100%;padding:10px 11px;border:1.5px solid var(--line);border-radius:9px;font-size:14.5px;
+    font-family:inherit;color:var(--pine);background:var(--paper);
+  }
+  .field input:focus,.field select:focus{outline:none;border-color:var(--glow)}
+  .btn-search{
+    background:var(--pine);color:#fff;border:none;border-radius:9px;padding:12px 22px;
+    font-size:14.5px;font-weight:600;cursor:pointer;white-space:nowrap;transition:background .15s;
+  }
+  .btn-search:hover{background:var(--pine-light)}
+  .search-msg{max-width:880px;margin:14px auto 0;padding:0 22px;font-size:13.5px;color:var(--glow-deep);min-height:1.3em}
+
+  /* ── Corpo pagina ── */
+  main{max-width:960px;margin:0 auto;padding:56px 20px 80px}
+  .section-label{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--glow-deep);font-weight:700;margin-bottom:8px}
+  .results{margin-top:18px}
+  .empty-hint{color:var(--stone);font-size:15px;text-align:center;padding:50px 20px}
+
+  .room-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;margin-top:20px}
+  .room-card{
+    background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);
+    padding:22px;display:flex;flex-direction:column;gap:10px;transition:transform .15s,box-shadow .15s;
+  }
+  .room-card:hover{transform:translateY(-3px);box-shadow:var(--shadow)}
+  .room-card h3{font-size:20px}
+  .room-photos{display:flex;gap:6px;overflow-x:auto;margin:-4px 0 2px;padding-bottom:2px}
+  .room-photos img{width:88px;height:66px;object-fit:cover;border-radius:8px;flex:0 0 auto;background:var(--line)}
+  .room-card .desc{color:var(--stone);font-size:13.5px;flex:1}
+  .room-price{font-size:22px;font-weight:700;color:var(--pine)}
+  .room-price span{font-size:12.5px;font-weight:400;color:var(--stone)}
+  .btn-book{
+    background:var(--glow-deep);color:#fff;border:none;border-radius:9px;padding:11px;
+    font-size:14px;font-weight:600;cursor:pointer;margin-top:6px;transition:background .15s;
+  }
+  .btn-book:hover{background:#a94e33}
+
+  /* ── Modale di richiesta ── */
+  .modal-bg{position:fixed;inset:0;background:rgba(34,57,47,.55);display:none;align-items:center;justify-content:center;padding:16px;z-index:100}
+  .modal-bg.show{display:flex}
+  .modal{background:var(--paper);border-radius:var(--radius);max-width:440px;width:100%;padding:28px;max-height:90vh;overflow-y:auto}
+  .modal h2{font-size:22px}
+  .modal .sub{color:var(--stone);font-size:13.5px;margin-bottom:18px}
+  .modal label{display:block;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--stone);margin:12px 0 5px}
+  .modal input,.modal textarea{width:100%;padding:10px 11px;border:1.5px solid var(--line);border-radius:9px;font-size:14.5px;font-family:inherit;color:var(--pine)}
+  .modal input:focus,.modal textarea:focus{outline:none;border-color:var(--glow)}
+  .modal-actions{display:flex;gap:10px;margin-top:20px}
+  .btn-secondary{background:transparent;border:1.5px solid var(--line);color:var(--pine);border-radius:9px;padding:11px 16px;font-size:14px;font-weight:600;cursor:pointer}
+  .btn-primary{flex:1;background:var(--pine);color:#fff;border:none;border-radius:9px;padding:11px 16px;font-size:14px;font-weight:600;cursor:pointer}
+  .btn-primary:disabled{opacity:.6;cursor:default}
+  .form-err{color:var(--glow-deep);font-size:13px;margin-top:10px;display:none}
+
+  .success-view{text-align:center;padding:20px 4px}
+  .success-view .icon{font-size:44px;margin-bottom:8px}
+
+  footer{text-align:center;padding:30px 20px 40px;color:var(--stone);font-size:12.5px}
+
+  @media (max-width:720px){
+    .search-card{grid-template-columns:1fr 1fr;margin-top:-70px;padding:18px}
+    .btn-search{grid-column:1/-1}
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="eyebrow">San Martino di Castrozza · Dolomiti UNESCO</div>
+    <h1>Hotel Villa Aurora</h1>
+    <p>Prenota direttamente con noi: stessa disponibilità in tempo reale della reception, nessuna commissione, e un contatto diretto con noi appena la richiesta arriva.</p>
+  </div>
+</div>
+
+<div class="search-card">
+  <div class="field">
+    <label for="f-checkin">Arrivo</label>
+    <input type="date" id="f-checkin">
+  </div>
+  <div class="field">
+    <label for="f-checkout">Partenza</label>
+    <input type="date" id="f-checkout">
+  </div>
+  <div class="field">
+    <label for="f-adults">Adulti</label>
+    <select id="f-adults">
+      <option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option>
+    </select>
+  </div>
+  <div class="field">
+    <label for="f-children">Bambini</label>
+    <select id="f-children">
+      <option value="0" selected>0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option>
+    </select>
+  </div>
+  <button class="btn-search" onclick="cercaDisponibilita()">Verifica disponibilità</button>
+</div>
+<div class="search-msg" id="search-msg"></div>
+
+<main>
+  <div class="results" id="results">
+    <div class="empty-hint">Scegli le date del tuo soggiorno per vedere le camere disponibili, con i prezzi aggiornati in tempo reale.</div>
+  </div>
+</main>
+
+<footer>
+  Hotel Villa Aurora · Via Val di Roda, 56 · San Martino di Castrozza (TN) · CIN IT022245A17EFMQYIR<br>
+  Tel. +39 0439 026271 · villaaurorahoteldolomiti@gmail.com
+</footer>
+
+<!-- Modale richiesta di prenotazione -->
+<div class="modal-bg" id="modal-bg">
+  <div class="modal">
+    <div id="modal-form-view">
+      <h2 id="modal-title">Richiedi la prenotazione</h2>
+      <div class="sub" id="modal-sub"></div>
+      <label>Nome e cognome *</label>
+      <input type="text" id="g-nome" placeholder="Mario Rossi">
+      <label>Email *</label>
+      <input type="email" id="g-email" placeholder="mario.rossi@email.it">
+      <label>Telefono</label>
+      <input type="text" id="g-telefono" placeholder="+39 333 1234567">
+      <label>Note (facoltativo)</label>
+      <textarea id="g-note" rows="3" placeholder="Richieste particolari, orario di arrivo previsto…"></textarea>
+      <div class="form-err" id="modal-err"></div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="chiudiModale()">Annulla</button>
+        <button class="btn-primary" id="btn-invia" onclick="inviaRichiesta()">Invia richiesta</button>
+      </div>
+    </div>
+    <div class="success-view" id="modal-success-view" style="display:none">
+      <div class="icon">🏔️</div>
+      <h2>Richiesta inviata!</h2>
+      <p style="color:var(--stone)">Grazie! Abbiamo ricevuto la tua richiesta per <strong id="success-room"></strong>. Ti contatteremo a breve per confermarla — di solito entro poche ore.</p>
+      <button class="btn-primary" style="width:100%;margin-top:10px" onclick="chiudiModale()">Chiudi</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ============================================================
+   CONFIGURAZIONE — compila questi valori prima di pubblicare
+   ============================================================ */
+const SUPABASE_URL = 'https://surkplkjhrnheulzfaxv.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN1cmtwbGtqaHJuaGV1bHpmYXh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MjQwNTcsImV4cCI6MjA5OTQwMDA1N30.4wmz67Xj38f6DfeVCZx6zBrQjOPIWqs2yUGHpVwXucs';
+
+// Facoltativo: se compilati, al ricevimento di una richiesta parte anche una email automatica alla reception.
+// Sono gli stessi identici valori già inseriti in SmartPMS → Impostazioni → "Invio email reale (EmailJS)".
+const EMAILJS_SERVICE_ID  = 'service_4nr3qv6';   // es. service_xxxxxxx
+const EMAILJS_TEMPLATE_ID = 'template_edf3nul';   // es. template_xxxxxxx
+const EMAILJS_PUBLIC_KEY  = 'ih0Adihj-h66qk9uJ';   // Public Key del tuo account EmailJS
+const HOTEL_NOTIFY_EMAIL  = 'villaaurorahoteldolomiti@gmail.com';
+
+/* ============================================================ */
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let camereSelezionabili = []; // ultimo risultato di ricerca, per tipologia
+let cameraScelta = null;
+
+function today(){ const n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); }
+function addDays(s,n){ const p=s.split('-'); const d=new Date(+p[0],+p[1]-1,+p[2]+n); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function nights(a,b){ return Math.round((new Date(b)-new Date(a))/86400000); }
+function uid(){ return 'w_'+Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
+
+document.getElementById('f-checkin').value = today();
+document.getElementById('f-checkout').value = addDays(today(),2);
+document.getElementById('f-checkin').min = today();
+document.getElementById('f-checkin').addEventListener('change', function(){
+  const co = document.getElementById('f-checkout');
+  if (co.value <= this.value) co.value = addDays(this.value,1);
+  co.min = addDays(this.value,1);
+});
+
+// Applica i contenuti/colori/sezioni gestiti da SmartPMS → Sito web, se presenti su Supabase.
+// Se la tabella non esiste ancora o è vuota, la pagina resta con i testi/colori scritti qui di default.
+function shadeColor(hex, percent) {
+  try {
+    let h = hex.replace('#','');
+    if (h.length === 3) h = h.split('').map(c=>c+c).join('');
+    const num = parseInt(h, 16);
+    let r = (num >> 16) + Math.round(255 * percent);
+    let g = ((num >> 8) & 0x00FF) + Math.round(255 * percent);
+    let b = (num & 0x0000FF) + Math.round(255 * percent);
+    r = Math.max(0, Math.min(255, r)); g = Math.max(0, Math.min(255, g)); b = Math.max(0, Math.min(255, b));
+    return '#' + (r.toString(16).padStart(2,'0')) + (g.toString(16).padStart(2,'0')) + (b.toString(16).padStart(2,'0'));
+  } catch (e) { return hex; }
+}
+
+async function applySiteContent() {
+  try {
+    const { data, error } = await sb.from('site_content').select('*').eq('id','config').maybeSingle();
+    if (error || !data) return;
+    const c = data.data || {};
+
+    if (c.propertyName) {
+      document.title = 'Prenota — ' + c.propertyName;
+      const h1 = document.querySelector('.hero h1'); if (h1) h1.textContent = c.propertyName;
+    }
+    if (c.eyebrow) { const e = document.querySelector('.eyebrow'); if (e) e.textContent = c.eyebrow; }
+    if (c.heroSubtitle) { const p = document.querySelector('.hero-inner p'); if (p) p.textContent = c.heroSubtitle; }
+    if (c.heroImage) {
+      const hero = document.querySelector('.hero');
+      if (hero) { hero.style.backgroundImage = 'linear-gradient(180deg, rgba(20,30,25,.35), rgba(20,30,25,.55)), url("'+c.heroImage.replace(/"/g,'')+'")'; hero.style.backgroundSize = 'cover'; hero.style.backgroundPosition = 'center'; }
+    }
+    if (c.colorPrimary) {
+      document.documentElement.style.setProperty('--pine', c.colorPrimary);
+      document.documentElement.style.setProperty('--pine-light', shadeColor(c.colorPrimary, 0.18));
+    }
+    if (c.colorAccent) {
+      document.documentElement.style.setProperty('--glow', c.colorAccent);
+      document.documentElement.style.setProperty('--glow-deep', shadeColor(c.colorAccent, -0.15));
+    }
+    if (c.showWelcome && (c.welcomeTitle || c.welcomeText)) {
+      const main = document.querySelector('main');
+      if (main) {
+        const sec = document.createElement('div');
+        sec.style.cssText = 'max-width:720px;margin:0 auto 30px;padding:0 20px;text-align:center';
+        sec.innerHTML = (c.welcomeTitle ? '<h2>'+c.welcomeTitle.replace(/</g,'&lt;')+'</h2>' : '') +
+          (c.welcomeText ? '<p style="color:var(--stone);line-height:1.6">'+c.welcomeText.replace(/</g,'&lt;')+'</p>' : '');
+        main.parentNode.insertBefore(sec, main);
+      }
+    }
+    const footerEl = document.querySelector('footer');
+    if (footerEl) {
+      if (c.showFooterContacts === false) {
+        footerEl.style.display = 'none';
+      } else {
+        const parts = [c.propertyName, c.address, c.cin ? 'CIN '+c.cin : ''].filter(Boolean).join(' · ');
+        const parts2 = [c.phone ? 'Tel. '+c.phone : '', c.email].filter(Boolean).join(' · ');
+        if (parts || parts2) footerEl.innerHTML = parts + (parts && parts2 ? '<br>' : '') + parts2;
+      }
+    }
+  } catch (e) {
+    console.warn('Contenuti sito personalizzati non disponibili, resto sui valori di default della pagina.', e);
+  }
+}
+applySiteContent();
+
+// Calcola il prezzo per notte di una camera (tariffa Standard), replicando la stessa logica di SmartPMS
+function prezzoCamera(listino, roomId, pax, checkin) {
+  const e = listino.find(l => l.room_id === roomId && (l.tariffa_id||'standard') === 'standard');
+  if (!e) return 0;
+  const pk = 'PAX'+(pax||1);
+  const prezzi = e.prezzi || {};
+  const periodi = e.periodi || [];
+  const giorno = periodi.find(p => p.dal === checkin && p.al === checkin);
+  if (giorno && giorno.prezzi[pk]) return parseFloat(giorno.prezzi[pk]);
+  for (const p of periodi) {
+    if (p.dal === checkin && p.al === checkin) continue;
+    if (p.dal <= checkin && p.al >= checkin) {
+      if (p.prezzi[pk]) return parseFloat(p.prezzi[pk]);
+      if (p.prezzi.PAX1) return parseFloat(p.prezzi.PAX1);
+    }
+  }
+  if (prezzi[pk]) return parseFloat(prezzi[pk]);
+  if (prezzi.PAX1) return parseFloat(prezzi.PAX1);
+  return 0;
+}
+
+async function cercaDisponibilita() {
+  const checkin = document.getElementById('f-checkin').value;
+  const checkout = document.getElementById('f-checkout').value;
+  const adults = parseInt(document.getElementById('f-adults').value);
+  const children = parseInt(document.getElementById('f-children').value);
+  const msg = document.getElementById('search-msg');
+  const results = document.getElementById('results');
+  msg.textContent = '';
+
+  if (!checkin || !checkout || checkout <= checkin) { msg.textContent = 'Seleziona date valide (partenza dopo l\'arrivo).'; return; }
+
+  results.innerHTML = '<div class="empty-hint">Verifica disponibilità in corso…</div>';
+
+  try {
+    const totPax = adults + children;
+    const [{data:occ, error:e1}, {data:rooms, error:e2}, {data:listino, error:e3}, {data:tipiInfo, error:e4}] = await Promise.all([
+      sb.rpc('get_camere_occupate', {dal: checkin, al: checkout}),
+      sb.from('rooms').select('*').eq('status','disponibile'),
+      sb.from('listino').select('*'),
+      sb.from('room_type_info').select('*').then(r => r).catch(() => ({data: [], error: null}))
+    ]);
+    if (e1) throw e1; if (e2) throw e2; if (e3) throw e3;
+    const infoPerTipo = {};
+    (tipiInfo || []).forEach(row => { const d = row.data || row; infoPerTipo[d.id] = d; });
+
+    const occupateIds = new Set((occ||[]).map(r => r.room_id));
+    const nn = nights(checkin, checkout);
+    const disponibili = (rooms||[]).filter(r => !occupateIds.has(r.id) && (r.capacity||2) >= totPax && (r.cap_min||1) <= totPax);
+
+    // Raggruppa per tipologia, tenendo la camera più economica di ciascun tipo
+    const perTipo = {};
+    disponibili.forEach(r => {
+      const prezzoNotte = prezzoCamera(listino||[], r.id, adults, checkin) || Number(r.price)||0;
+      const tipo = r.type || 'Camera';
+      if (!perTipo[tipo] || prezzoNotte < perTipo[tipo].prezzoNotte) {
+        perTipo[tipo] = { room: r, prezzoNotte, tipo, info: infoPerTipo[tipo] || null };
+      }
+    });
+    camereSelezionabili = Object.values(perTipo);
+
+    if (!camereSelezionabili.length) {
+      results.innerHTML = '<div class="empty-hint">Nessuna camera disponibile per queste date e questo numero di ospiti.<br>Prova con date diverse, oppure scrivici direttamente.</div>';
+      return;
+    }
+
+    results.innerHTML =
+      '<div class="section-label">Disponibile per le tue date</div>' +
+      '<div class="room-grid">' +
+      camereSelezionabili.map((c,i) => {
+        const totale = c.prezzoNotte * nn;
+        const descrizione = (c.info && c.info.descrizione) ? c.info.descrizione : 'Camera confortevole con Wi-Fi gratuito.';
+        const foto = (c.info && c.info.foto && c.info.foto.length) ? c.info.foto : [];
+        const gallery = foto.length ? (
+          '<div class="room-photos">' +
+          foto.slice(0,5).map(url => '<img src="'+url.replace(/"/g,'&quot;')+'" alt="'+c.tipo.replace(/"/g,'&quot;')+'" loading="lazy" onerror="this.style.display=\'none\'">').join('') +
+          '</div>'
+        ) : '';
+        return '<div class="room-card">' +
+          '<h3>'+c.tipo+'</h3>' +
+          gallery +
+          '<div class="desc">'+descrizione+'</div>' +
+          '<div class="room-price">€'+c.prezzoNotte.toFixed(0)+' <span>/ notte</span></div>' +
+          '<div style="color:var(--stone);font-size:12.5px">Totale '+nn+' nott'+(nn===1?'e':'i')+': <strong style="color:var(--pine)">€'+totale.toFixed(0)+'</strong></div>' +
+          '<button class="btn-book" onclick="apriModale('+i+', \''+checkin+'\', \''+checkout+'\', '+adults+', '+children+')">Richiedi questa camera</button>' +
+          '</div>';
+      }).join('') +
+      '</div>';
+  } catch (err) {
+    console.error(err);
+    results.innerHTML = '<div class="empty-hint">Non riusciamo a verificare la disponibilità in questo momento.<br>Chiamaci al +39 0439 026271 o scrivici — ce ne occupiamo noi.</div>';
+  }
+}
+
+function apriModale(idx, checkin, checkout, adults, children) {
+  const c = camereSelezionabili[idx];
+  cameraScelta = Object.assign({}, c, {checkin, checkout, adults, children, notti: nights(checkin,checkout)});
+  document.getElementById('modal-sub').textContent =
+    c.tipo+' · '+checkin+' → '+checkout+' · '+adults+' adulti'+(children?(' + '+children+' bambini'):'')+' · Totale stimato €'+(c.prezzoNotte*nights(checkin,checkout)).toFixed(0);
+  document.getElementById('modal-form-view').style.display = '';
+  document.getElementById('modal-success-view').style.display = 'none';
+  document.getElementById('modal-err').style.display = 'none';
+  document.getElementById('g-nome').value = '';
+  document.getElementById('g-email').value = '';
+  document.getElementById('g-telefono').value = '';
+  document.getElementById('g-note').value = '';
+  document.getElementById('modal-bg').classList.add('show');
+}
+function chiudiModale() { document.getElementById('modal-bg').classList.remove('show'); }
+
+async function inviaRichiesta() {
+  const nome = document.getElementById('g-nome').value.trim();
+  const email = document.getElementById('g-email').value.trim();
+  const telefono = document.getElementById('g-telefono').value.trim();
+  const note = document.getElementById('g-note').value.trim();
+  const err = document.getElementById('modal-err');
+  const btn = document.getElementById('btn-invia');
+  err.style.display = 'none';
+
+  if (!nome || !email) { err.textContent = 'Inserisci almeno nome ed email.'; err.style.display = 'block'; return; }
+
+  btn.disabled = true; btn.textContent = 'Invio in corso…';
+  try {
+    const c = cameraScelta;
+    const totale = c.prezzoNotte * c.notti;
+
+    // La richiesta viene registrata come "richiesta di preventivo" (non blocca subito la camera):
+    // lo staff la vede in SmartPMS → Preventivi → Richieste ricevute e la trasforma in preventivo
+    // verificando di nuovo la disponibilità, poi in prenotazione confermata.
+    const richiesta = {
+      id: uid(),
+      clientName: nome,
+      clientEmail: email,
+      clientPhone: telefono || '',
+      checkin: c.checkin,
+      checkout: c.checkout,
+      adults: c.adults,
+      children: c.children,
+      roomTypeWanted: c.tipo,
+      fonte: 'Sito web',
+      message: note ? note + '\n\n(Prezzo stimato sul sito: €' + totale.toFixed(0) + ' per ' + c.notti + ' nott' + (c.notti===1?'e':'i') + ')' : ('Prezzo stimato sul sito: €' + totale.toFixed(0) + ' per ' + c.notti + ' nott' + (c.notti===1?'e':'i')),
+      status: 'nuova',
+      createdAt: new Date().toISOString(),
+    };
+
+    const { error: rErr } = await sb.from('richieste_preventivo').insert({ id: richiesta.id, data: richiesta });
+    if (rErr) throw rErr;
+
+    if (EMAILJS_SERVICE_ID && EMAILJS_TEMPLATE_ID && EMAILJS_PUBLIC_KEY) {
+      try {
+        await caricaEmailJS();
+        await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+          to_email: HOTEL_NOTIFY_EMAIL,
+          to_name: 'Hotel Villa Aurora',
+          subject: 'Nuova richiesta di preventivo dal sito — '+c.tipo,
+          message: 'Nuova richiesta dal sito web:\n\nOspite: '+nome+'\nEmail: '+email+'\nTelefono: '+(telefono||'—')+
+                   '\n\nCamera: '+c.tipo+' ('+c.room.name+')\nCheck-in: '+c.checkin+'\nCheck-out: '+c.checkout+
+                   '\nOspiti: '+c.adults+' adulti'+(c.children?' + '+c.children+' bambini':'')+
+                   '\nTotale stimato: €'+totale.toFixed(0)+
+                   (note?'\n\nNote: '+note:'')+
+                   '\n\nVai su SmartPMS → Preventivi → Richieste ricevute per gestirla.',
+          from_name: 'Sito Hotel Villa Aurora'
+        }, EMAILJS_PUBLIC_KEY);
+      } catch (mailErr) { console.warn('Notifica email non riuscita (la richiesta è comunque salvata):', mailErr); }
+    }
+
+    document.getElementById('modal-form-view').style.display = 'none';
+    document.getElementById('success-room').textContent = c.tipo;
+    document.getElementById('modal-success-view').style.display = '';
+  } catch (e) {
+    console.error(e);
+    err.textContent = 'Non siamo riusciti a inviare la richiesta. Riprova, oppure chiamaci al +39 0439 026271.';
+    err.style.display = 'block';
+  }
+  btn.disabled = false; btn.textContent = 'Invia richiesta';
+}
+
+function caricaEmailJS() {
+  if (typeof emailjs !== 'undefined') return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js';
+    s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+</script>
+</body>
+</html>
