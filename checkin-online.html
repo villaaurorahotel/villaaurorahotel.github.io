@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Check-in online</title>
+<style>
+  :root{
+    --cream:#FAF6F0; --paper:#FFFFFF;
+    --pine:#22392F; --pine-light:#3C5C4E;
+    --glow:#E0917A; --glow-deep:#C5613F;
+    --stone:#8A8478; --stone-light:#D8D2C5;
+    --line:#E6DFD2;
+    --radius:14px;
+    --shadow:0 10px 30px rgba(34,57,47,.10);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--cream);color:var(--pine);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;line-height:1.5;padding-bottom:60px}
+  h1,h2{font-weight:700;margin:0 0 .3em;color:var(--pine)}
+  .wrap{max-width:640px;margin:0 auto;padding:0 18px}
+  .hero{background:var(--pine);color:#fff;text-align:center;padding:34px 20px 26px}
+  .hero h1{color:#fff;font-size:22px;margin-bottom:6px}
+  .hero p{color:rgba(255,255,255,.82);font-size:14px;margin:0}
+  .summary{background:var(--paper);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 20px;margin:-20px 0 22px;font-size:14px;display:flex;flex-wrap:wrap;gap:14px;justify-content:space-between}
+  .summary b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--stone);margin-bottom:3px;font-weight:700}
+  .card{background:var(--paper);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;margin-bottom:18px}
+  .card h2{font-size:16px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .badge{background:var(--glow);color:#fff;font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .full{grid-column:1/-1}
+  label{display:block;font-size:12px;font-weight:600;color:var(--stone);margin-bottom:5px}
+  input,select{width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:#fff;color:var(--pine);font-family:inherit}
+  input:focus,select:focus{outline:none;border-color:var(--glow)}
+  .req{color:var(--glow-deep)}
+  .hint{font-size:11px;color:var(--stone);margin-top:2px}
+  button.submit{width:100%;padding:14px;background:var(--glow-deep);color:#fff;border:none;border-radius:10px;font-size:15.5px;font-weight:700;cursor:pointer;margin-top:8px}
+  button.submit:disabled{opacity:.55}
+  .msg{margin:16px 0;padding:14px 16px;border-radius:10px;font-size:14px}
+  .msg.err{background:#fbe6e3;color:#9a3412}
+  .msg.ok{background:#e3f2e9;color:#1f6b3f;text-align:center}
+  .center{text-align:center;padding:60px 20px;color:var(--stone)}
+  @media (max-width:520px){ .grid{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1 id="hero-title">Check-in online</h1>
+  <p id="hero-sub">Completa i dati prima del tuo arrivo — bastano due minuti</p>
+</div>
+
+<div class="wrap">
+  <div id="loading" class="center">Caricamento…</div>
+  <div id="content" style="display:none">
+    <div class="summary" id="summary"></div>
+    <div id="msg-area"></div>
+    <form id="checkin-form"></form>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   CONFIGURAZIONE — stessi valori usati in prenota.html
+   ============================================================ */
+const SUPABASE_URL = 'https://surkplkjhrnheulzfaxv.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN1cmtwbGtqaHJuaGV1bHpmYXh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MjQwNTcsImV4cCI6MjA5OTQwMDA1N30.4wmz67Xj38f6DfeVCZx6zBrQjOPIWqs2yUGHpVwXucs';
+const FUNCTION_URL = SUPABASE_URL + '/functions/v1/checkin-online';
+/* ============================================================ */
+
+const NAZIONI = ['Italia','Afghanistan','Albania','Algeria','Andorra','Angola','Arabia Saudita','Argentina','Armenia','Australia','Austria','Azerbaigian','Bahamas','Bahrein','Bangladesh','Belgio','Bielorussia','Bolivia','Bosnia ed Erzegovina','Brasile','Bulgaria','Cambogia','Camerun','Canada','Cile','Cina','Cipro','Città del Vaticano','Colombia','Corea del Nord','Corea del Sud','Costa Rica','Croazia','Cuba','Danimarca','Ecuador','Egitto','Emirati Arabi Uniti','Estonia','Etiopia','Filippine','Finlandia','Francia','Georgia','Germania','Giappone','Giordania','Grecia','Guatemala','Honduras','India','Indonesia','Iran','Iraq','Irlanda','Islanda','Israele','Kazakistan','Kenya','Kuwait','Lettonia','Libano','Libia','Liechtenstein','Lituania','Lussemburgo','Malaysia','Malta','Marocco','Messico','Moldavia','Monaco','Mongolia','Montenegro','Nepal','Nicaragua','Nigeria','Norvegia','Nuova Zelanda','Oman','Paesi Bassi','Pakistan','Panama','Paraguay','Perù','Polonia','Portogallo','Qatar','Regno Unito','Repubblica Ceca','Repubblica Dominicana','Romania','Russia','San Marino','Senegal','Serbia','Singapore','Siria','Slovacchia','Slovenia','Spagna','Sri Lanka','Stati Uniti d\'America','Sudafrica','Svezia','Svizzera','Thailandia','Tunisia','Turchia','Ucraina','Ungheria','Uruguay','Venezuela','Vietnam'];
+const TIPI_DOC = [['IDENT',"Carta d'identità"],['IDELE',"Carta d'identità elettronica"],['PASOR','Passaporto ordinario'],['PATEN','Patente di guida']];
+
+function getToken(){ return new URLSearchParams(window.location.search).get('token'); }
+function fmtDateIt(iso){ if(!iso) return ''; const p=iso.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
+
+let bookingData = null;
+
+async function init(){
+  const token = getToken();
+  if (!token) { showFatal('Link non valido: manca il codice di accesso.'); return; }
+
+  try {
+    const res = await fetch(FUNCTION_URL + '?token=' + encodeURIComponent(token), {
+      headers: { 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY }
+    });
+    const data = await res.json();
+    if (!data.ok) { showFatal(data.errore || 'Prenotazione non trovata.'); return; }
+
+    bookingData = data.booking;
+    if (data.propertyName) {
+      document.getElementById('hero-title').textContent = 'Check-in online — ' + data.propertyName;
+      document.title = 'Check-in online — ' + data.propertyName;
+    }
+    renderPage();
+  } catch (e) {
+    showFatal('Errore di connessione. Riprova tra qualche minuto.');
+  }
+}
+
+function showFatal(msg){
+  document.getElementById('loading').innerHTML = '<div class="msg err" style="text-align:left">⚠ ' + msg + '</div>';
+}
+
+function renderPage(){
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('content').style.display = 'block';
+
+  const b = bookingData;
+  document.getElementById('summary').innerHTML =
+    '<div><b>Ospite</b>' + b.guestName + '</div>' +
+    '<div><b>Camera</b>' + (b.roomName||'—') + '</div>' +
+    '<div><b>Arrivo</b>' + fmtDateIt(b.checkin) + '</div>' +
+    '<div><b>Partenza</b>' + fmtDateIt(b.checkout) + '</div>' +
+    '<div><b>Ospiti</b>' + (b.adults||1) + ' adulti' + (b.children ? ' + ' + b.children + ' bambini' : '') + '</div>';
+
+  const totPersone = (parseInt(b.adults)||1);
+  const form = document.getElementById('checkin-form');
+  let html = '';
+  for (let i = 0; i < totPersone; i++) html += compCardHTML(i, i === 0);
+  html += '<button type="submit" class="submit">✓ Invia i dati</button>';
+  form.innerHTML = html;
+  form.addEventListener('submit', onSubmit);
+
+  // Mostra/nasconde comune di nascita in base a cittadinanza (Italia vs estero) — solo visivo
+  for (let i = 0; i < totPersone; i++) {
+    document.getElementById('naz-' + i).addEventListener('change', function(){});
+  }
+}
+
+function compCardHTML(i, isMain){
+  const prev = (bookingData.componenti || [])[i] || {};
+  const req = isMain ? ' <span class="req">*</span>' : '';
+  return '<div class="card">' +
+    '<h2>' + (isMain ? '👤 Intestatario' : '👥 Ospite ' + (i+1)) + (isMain ? '' : ' <span class="badge">facoltativo</span>') + '</h2>' +
+    '<div class="grid">' +
+      '<div><label>Cognome' + req + '</label><input type="text" id="cogn-'+i+'" value="'+(prev.cognome||'')+'"></div>' +
+      '<div><label>Nome' + req + '</label><input type="text" id="nome-'+i+'" value="'+(prev.nome||'')+'"></div>' +
+      '<div><label>Sesso' + req + '</label><select id="sesso-'+i+'"><option value="M"'+(prev.sesso!=='F'?' selected':'')+'>Maschio</option><option value="F"'+(prev.sesso==='F'?' selected':'')+'>Femmina</option></select></div>' +
+      '<div><label>Data di nascita' + req + '</label><input type="date" id="nasc-'+i+'" value="'+(prev.dataNascita||'')+'"></div>' +
+      '<div><label>Cittadinanza' + req + '</label><select id="naz-'+i+'">' + NAZIONI.map(function(n){ return '<option'+(n===(prev.cittadinanza||'Italia')?' selected':'')+'>'+n+'</option>'; }).join('') + '</select></div>' +
+      '<div><label>Comune di nascita</label><input type="text" id="luogonasc-'+i+'" value="'+(prev.luogoNascita||'')+'" placeholder="Es. Roma"></div>' +
+      '<div><label>Provincia di nascita</label><input type="text" id="provnasc-'+i+'" value="'+(prev.provNascita||'')+'" maxlength="2" placeholder="Es. RM" style="text-transform:uppercase"></div>' +
+      '<div><label>Comune di residenza</label><input type="text" id="res-'+i+'" value="'+(prev.residenza||'')+'"></div>' +
+      '<div class="full"><label>Tipo documento' + req + '</label><select id="tdoc-'+i+'"><option value="">— Seleziona —</option>' + TIPI_DOC.map(function(d){ return '<option value="'+d[0]+'"'+(d[0]===(prev.tipoDoc||(isMain?'IDENT':''))?' selected':'')+'>'+d[1]+'</option>'; }).join('') + '</select></div>' +
+      '<div><label>Numero documento' + req + '</label><input type="text" id="ndoc-'+i+'" value="'+(prev.numDoc||'')+'"></div>' +
+      '<div><label>Luogo di rilascio</label><input type="text" id="ldoc-'+i+'" value="'+(prev.luogoDoc||'')+'"></div>' +
+    '</div>' +
+  '</div>';
+}
+
+async function onSubmit(e){
+  e.preventDefault();
+  const msgArea = document.getElementById('msg-area');
+  msgArea.innerHTML = '';
+
+  const totPersone = (parseInt(bookingData.adults)||1);
+  const componenti = [];
+  for (let i = 0; i < totPersone; i++) {
+    const cognome = document.getElementById('cogn-'+i).value.trim();
+    const nome = document.getElementById('nome-'+i).value.trim();
+    if (i === 0 && (!cognome || !nome)) {
+      msgArea.innerHTML = '<div class="msg err">⚠ Inserisci almeno cognome e nome dell\'intestatario.</div>';
+      window.scrollTo(0,0);
+      return;
+    }
+    componenti.push({
+      cognome: cognome, nome: nome,
+      sesso: document.getElementById('sesso-'+i).value,
+      dataNascita: document.getElementById('nasc-'+i).value,
+      cittadinanza: document.getElementById('naz-'+i).value,
+      luogoNascita: document.getElementById('luogonasc-'+i).value.trim(),
+      provNascita: document.getElementById('provnasc-'+i).value.trim().toUpperCase(),
+      residenza: document.getElementById('res-'+i).value.trim(),
+      statoResidenza: document.getElementById('naz-'+i).value,
+      tipoDoc: document.getElementById('tdoc-'+i).value,
+      numDoc: document.getElementById('ndoc-'+i).value.trim(),
+      luogoDoc: document.getElementById('ldoc-'+i).value.trim(),
+    });
+  }
+
+  const btn = document.querySelector('button.submit');
+  btn.disabled = true; btn.textContent = 'Invio in corso…';
+
+  try {
+    const res = await fetch(FUNCTION_URL, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: getToken(), componenti: componenti })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.errore || 'Invio non riuscito');
+
+    document.getElementById('content').innerHTML =
+      '<div class="msg ok"><div style="font-size:32px;margin-bottom:8px">✓</div><strong>Check-in completato!</strong><br>Grazie, ci vediamo presto. Puoi chiudere questa pagina.</div>';
+  } catch (err) {
+    msgArea.innerHTML = '<div class="msg err">⚠ ' + (err.message || 'Si è verificato un errore, riprova.') + '</div>';
+    btn.disabled = false; btn.textContent = '✓ Invia i dati';
+    window.scrollTo(0,0);
+  }
+}
+
+init();
+</script>
+</body>
+</html>
