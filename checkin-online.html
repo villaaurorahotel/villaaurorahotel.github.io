@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Check-in online — Hotel Villa Aurora</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --cream:#FAF6F0; --paper:#FFFFFF;
+    --pine:#22392F; --pine-light:#3C5C4E;
+    --glow:#E0917A; --glow-deep:#C5613F;
+    --stone:#8A8478; --line:#E6DFD2;
+    --radius:14px; --shadow:0 10px 30px rgba(34,57,47,.10);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--cream);color:var(--pine);font-family:'Source Sans 3',sans-serif;line-height:1.5}
+  h1,h2,h3{font-family:'Fraunces',serif;font-weight:600;margin:0 0 .3em;color:var(--pine)}
+
+  .hero{
+    background:linear-gradient(180deg,#2A3F52 0%,#5C5468 32%,#B97567 58%,#E0917A 78%,#F3C9A8 100%);
+    padding:40px 20px 60px;color:#fff;text-align:center;
+  }
+  .hero .eyebrow{font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;opacity:.85;margin-bottom:10px}
+  .hero h1{color:#fff;font-size:clamp(24px,4.5vw,34px);text-shadow:0 2px 18px rgba(0,0,0,.18)}
+  .hero p{opacity:.92;max-width:460px;margin:10px auto 0;font-size:14.5px}
+
+  main{max-width:640px;margin:-30px auto 0;padding:0 18px 60px;position:relative;z-index:2}
+  .card{background:var(--paper);border-radius:var(--radius);box-shadow:var(--shadow);padding:22px;margin-bottom:18px}
+  .summary-row{display:flex;justify-content:space-between;padding:6px 0;font-size:13.5px;border-bottom:1px solid var(--line)}
+  .summary-row:last-child{border-bottom:none}
+  .summary-row span:first-child{color:var(--stone)}
+
+  .guest-card h3{font-size:17px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .guest-card h3 .num{background:var(--pine);color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12.5px}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .full{grid-column:1/-1}
+  label{display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--stone);margin-bottom:5px}
+  input,select{width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:9px;font-size:14px;font-family:inherit;color:var(--pine);background:var(--paper)}
+  input:focus,select:focus{outline:none;border-color:var(--glow)}
+
+  .btn-submit{width:100%;background:var(--pine);color:#fff;border:none;border-radius:9px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;margin-top:6px}
+  .btn-submit:hover{background:var(--pine-light)}
+  .btn-submit:disabled{opacity:.6;cursor:default}
+  .err{color:var(--glow-deep);font-size:13.5px;text-align:center;margin-top:10px;display:none}
+
+  .success-view{text-align:center;padding:40px 20px}
+  .success-view .icon{font-size:48px;margin-bottom:10px}
+
+  .loading, .not-found{text-align:center;padding:60px 20px;color:var(--stone)}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="eyebrow">San Martino di Castrozza · Dolomiti UNESCO</div>
+  <h1>Check-in online</h1>
+  <p>Compila i dati dei documenti prima di arrivare — risparmi tempo alla reception.</p>
+</div>
+
+<main>
+  <div id="app">
+    <div class="loading">Caricamento…</div>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL = 'https://surkplkjhrnheulzfaxv.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN1cmtwbGtqaHJuaGV1bHpmYXh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MjQwNTcsImV4cCI6MjA5OTQwMDA1N30.4wmz67Xj38f6DfeVCZx6zBrQjOPIWqs2yUGHpVwXucs';
+
+let sb = null;
+try {
+  if (typeof supabase === 'undefined') throw new Error('Libreria Supabase non caricata (verifica la connessione internet o riprova tra poco)');
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+} catch (e) {
+  document.addEventListener('DOMContentLoaded', function(){
+    document.getElementById('app').innerHTML = '<div class="not-found">⚠ Impossibile avviare la pagina.<br><span style="font-size:12px;opacity:.8">'+e.message+'</span></div>';
+  });
+}
+const NAZIONI = ['Italia','Francia','Germania','Spagna','Regno Unito','Stati Uniti d\'America','Svizzera','Austria','Belgio','Paesi Bassi','Portogallo','Polonia','Romania','Russia','Cina','Giappone','Brasile','Argentina','Australia','Canada','Irlanda','Danimarca','Svezia','Norvegia','Finlandia','Grecia','Ungheria','Repubblica Ceca','Slovacchia','Croazia','Slovenia','Turchia','India','Corea del Sud','Messico','Israele','Thailandia','Altro'];
+
+function fmtDate(s){ if(!s) return ''; var p=s.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
+function getToken(){ return new URLSearchParams(window.location.search).get('token'); }
+
+async function init() {
+  const app = document.getElementById('app');
+  if (!sb) return; // errore già mostrato dal blocco try/catch qui sopra
+  const token = getToken();
+  if (!token) { app.innerHTML = '<div class="not-found">Link non valido — controlla di aver copiato l\'indirizzo completo.</div>'; return; }
+
+  const { data, error } = await sb.rpc('get_booking_by_checkin_token', { p_token: token });
+  if (error) {
+    console.error('Errore Supabase:', error);
+    app.innerHTML = '<div class="not-found">⚠ Errore di collegamento al sistema.<br>'
+      + '<span style="font-size:12px;opacity:.8">Dettaglio tecnico: '+(error.message||JSON.stringify(error))+'</span><br><br>'
+      + '<span style="font-size:12.5px">Se il messaggio parla di una funzione "non esistente" (does not exist), lo script SQL non è ancora stato eseguito su Supabase. Contatta la struttura.</span></div>';
+    return;
+  }
+  if (!data || !data.length) {
+    app.innerHTML = '<div class="not-found">Nessuna prenotazione trovata con questo codice.<br>Il link potrebbe essere scaduto o già usato — contatta la struttura per un nuovo link.</div>';
+    return;
+  }
+  const b = data[0];
+  if (b.status !== 'confermata' && b.status !== 'attesa') {
+    app.innerHTML = '<div class="card"><div class="success-view"><div class="icon">✅</div><h2>Check-in già effettuato</h2><p style="color:var(--stone)">Per '+b.guest_name+', camera '+b.room_name+'. A presto!</p></div></div>';
+    return;
+  }
+
+  const totOspiti = (b.adults||1) + (b.children||0);
+  let guestCardsHTML = '';
+  for (let i = 0; i < totOspiti; i++) {
+    guestCardsHTML += guestCardHTML(i);
+  }
+
+  app.innerHTML =
+    '<div class="card">' +
+      '<div class="summary-row"><span>Intestatario</span><span><strong>'+b.guest_name+'</strong></span></div>' +
+      '<div class="summary-row"><span>Camera</span><span>'+b.room_name+'</span></div>' +
+      '<div class="summary-row"><span>Soggiorno</span><span>'+fmtDate(b.checkin)+' → '+fmtDate(b.checkout)+'</span></div>' +
+      '<div class="summary-row"><span>Ospiti</span><span>'+(b.adults||1)+' adulti'+(b.children?' + '+b.children+' bambini':'')+'</span></div>' +
+    '</div>' +
+    '<div class="card"><h2 style="font-size:19px">Dati dei documenti</h2>' +
+    '<p style="color:var(--stone);font-size:13px;margin-top:-6px">Servono per la registrazione obbligatoria in Questura — un modulo per ciascun ospite.</p>' +
+    guestCardsHTML +
+    '<div class="err" id="form-err"></div>' +
+    '<button class="btn-submit" id="btn-submit" onclick="inviaCheckin(\''+token+'\', '+totOspiti+')">Invia check-in</button>' +
+    '</div>';
+}
+
+function guestCardHTML(i) {
+  return '<div class="guest-card" style="margin-top:'+(i===0?'0':'22px')+';padding-top:'+(i===0?'0':'18px')+';border-top:'+(i===0?'none':'1px solid var(--line)')+'">' +
+    '<h3><span class="num">'+(i+1)+'</span> Ospite '+(i+1)+'</h3>' +
+    '<div class="form-grid">' +
+      '<div class="full"><label>Cognome *</label><input type="text" id="g-cognome-'+i+'"></div>' +
+      '<div class="full"><label>Nome *</label><input type="text" id="g-nome-'+i+'"></div>' +
+      '<div><label>Sesso</label><select id="g-sesso-'+i+'"><option value="M">Maschio</option><option value="F">Femmina</option></select></div>' +
+      '<div><label>Data di nascita</label><input type="date" id="g-nascita-'+i+'"></div>' +
+      '<div><label>Cittadinanza</label><select id="g-citt-'+i+'">'+NAZIONI.map(function(n){return '<option'+(n==='Italia'?' selected':'')+'>'+n+'</option>';}).join('')+'</select></div>' +
+      '<div><label>Comune di nascita</label><input type="text" id="g-luogonascita-'+i+'"></div>' +
+      '<div><label>Comune di residenza</label><input type="text" id="g-residenza-'+i+'"></div>' +
+      '<div><label>Stato di residenza</label><select id="g-statores-'+i+'">'+NAZIONI.map(function(n){return '<option'+(n==='Italia'?' selected':'')+'>'+n+'</option>';}).join('')+'</select></div>' +
+      '<div><label>Tipo documento</label><select id="g-tipodoc-'+i+'"><option value="CI">Carta d\'identità</option><option value="PAS">Passaporto</option><option value="PT">Patente</option></select></div>' +
+      '<div><label>N° documento</label><input type="text" id="g-numdoc-'+i+'"></div>' +
+    '</div>' +
+  '</div>';
+}
+
+async function inviaCheckin(token, totOspiti) {
+  const err = document.getElementById('form-err');
+  const btn = document.getElementById('btn-submit');
+  err.style.display = 'none';
+
+  const componenti = [];
+  for (let i = 0; i < totOspiti; i++) {
+    const cognome = document.getElementById('g-cognome-'+i).value.trim();
+    const nome = document.getElementById('g-nome-'+i).value.trim();
+    if (!cognome || !nome) { err.textContent = 'Compila almeno cognome e nome per ogni ospite (Ospite '+(i+1)+').'; err.style.display='block'; return; }
+    componenti.push({
+      cognome, nome,
+      sesso: document.getElementById('g-sesso-'+i).value,
+      dataNascita: document.getElementById('g-nascita-'+i).value,
+      luogoNascita: document.getElementById('g-luogonascita-'+i).value.trim(),
+      provNascita: '',
+      cittadinanza: document.getElementById('g-citt-'+i).value,
+      residenza: document.getElementById('g-residenza-'+i).value.trim(),
+      statoResidenza: document.getElementById('g-statores-'+i).value,
+      indirizzo: '', cap: '',
+      tipoDoc: document.getElementById('g-tipodoc-'+i).value,
+      numDoc: document.getElementById('g-numdoc-'+i).value.trim(),
+      enteDoc: '', luogoDoc: ''
+    });
+  }
+
+  btn.disabled = true; btn.textContent = 'Invio in corso…';
+  try {
+    const { data, error } = await sb.rpc('submit_checkin_online', { p_token: token, p_componenti: componenti });
+    if (error || !data) throw error || new Error('Link non più valido');
+    document.getElementById('app').innerHTML =
+      '<div class="card"><div class="success-view"><div class="icon">🏔️</div><h2>Check-in completato!</h2>' +
+      '<p style="color:var(--stone)">Grazie! I tuoi dati sono stati inviati alla struttura. Ci vediamo presto a San Martino di Castrozza.</p></div></div>';
+    // Avvisa la struttura via email — non blocca la conferma al cliente se questo invio fallisce,
+    // il check-in è comunque già salvato correttamente dalla riga sopra
+    avvisaStrutturaCheckinCompletato(componenti);
+  } catch (e) {
+    console.error('Errore invio check-in:', e);
+    err.textContent = 'Non siamo riusciti a inviare i dati. Riprova, oppure chiama la struttura.'
+      + (e && e.message ? ' (dettaglio: '+e.message+')' : '');
+    err.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Invia check-in';
+  }
+}
+
+// Manda una mail alla struttura quando un cliente ha completato il check-in online, così Gian lo sa
+// subito senza dover controllare DeskFlow — usa la stessa funzione Supabase già in uso per le altre
+// email reali dell'app (invio-ricevuta), stesso indirizzo mittente villaaurorahoteldolomiti@gmail.com
+async function avvisaStrutturaCheckinCompletato(componenti) {
+  try {
+    const nomi = componenti.map(function(c){ return c.cognome+' '+c.nome; }).join(', ');
+    const testo = 'Un cliente ha appena completato il check-in online.\n\n'
+      + 'Ospiti registrati: '+nomi+'\n\n'
+      + 'Controlla i dati completi su DeskFlow, nella scheda della prenotazione.';
+    await fetch(SUPABASE_URL + '/functions/v1/invio-ricevuta', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer '+SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY },
+      body: JSON.stringify({
+        to: 'villaaurorahoteldolomiti@gmail.com',
+        toName: 'Hotel Villa Aurora',
+        subject: '✅ Check-in online completato — '+nomi,
+        message: testo
+      })
+    });
+  } catch (e) {
+    console.warn('Avviso alla struttura non riuscito (il check-in del cliente resta comunque salvato):', e);
+  }
+}
+
+init();
+</script>
+</body>
+</html>
