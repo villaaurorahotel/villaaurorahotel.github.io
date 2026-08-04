@@ -1,16 +1,31 @@
-## Hi there 👋
+# DeskFlow
 
-<!--
-**villaaurorahotel/villaaurorahotel** is a ✨ _special_ ✨ repository because its `README.md` (this file) appears on your GitHub profile.
+## Versione
+0.9.0-alpha
 
-Here are some ideas to get you started:
+## Stato
 
-- 🔭 I’m currently working on ...
-- 🌱 I’m currently learning ...
-- 👯 I’m looking to collaborate on ...
-- 🤔 I’m looking for help with ...
-- 💬 Ask me about ...
-- 📫 How to reach me: ...
-- 😄 Pronouns: ...
-- ⚡ Fun fact: ...
--->
+- [x] PMS
+- [x] Planner
+- [x] Booking Engine
+- [x] Check-in Online
+- [x] Audit
+- [x] OTA Queue
+- [x] Dispatcher
+- [x] Monitor
+
+## In sviluppo
+
+- [ ] Booking API
+- [ ] Dashboard Reception
+- [ ] Core Engine
+- [ ] Booking.com API
+- [ ] AI Assistant
+
+## Repository
+
+Produzione:
+deskflow.html
+
+Test:
+deskflow-core-test.html
