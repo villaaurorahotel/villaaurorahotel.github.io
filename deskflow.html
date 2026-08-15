@@ -323,7 +323,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 13/08/2026 · 15:20</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 15/08/2026 · 10:20</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -24334,7 +24334,14 @@ function registraComunicazione(bookingId, info) {
     lettaAt: null
   };
   bookings[bi].comunicazioni.push(nuovoMessaggio);
-  DB.set('bookings', bookings);
+  // BUG TROVATO E CORRETTO (si sommava al problema già risolto sotto): DB.set('bookings', ...) fa
+  // SEMPRE partire anche il salvataggio normale di TUTTA la prenotazione (non solo i messaggi), che
+  // può arrivare dopo la scrittura mirata qui sotto e sovrascriverla con la versione di questo
+  // browser — annullando esattamente la protezione che stiamo per fare. Quando siamo collegati a
+  // Supabase, aggiorniamo quindi solo la cache locale (per l'interfaccia) senza innescare quel
+  // salvataggio parallelo; il salvataggio vero lo fa, in modo sicuro, il blocco subito sotto.
+  if (supabaseReady && supabaseClient) { _bookingsCache = bookings; }
+  else { DB.set('bookings', bookings); }
   // BUG TROVATO E CORRETTO ("in qualche prenotazione non vedo i messaggi anche se sono stati scambiati"):
   // il salvataggio sopra riscrive l'INTERA prenotazione con quello che questo browser ha in memoria in
   // quel momento — se un altro dispositivo aveva appena modificato la STESSA prenotazione (anche per un
@@ -24382,7 +24389,7 @@ function registraComunicazioneQuote(quoteId, info) {
   if (qi<0) return null;
   if (!quotes[qi].comunicazioni) quotes[qi].comunicazioni = [];
   const msgId = uid();
-  quotes[qi].comunicazioni.push({
+  const nuovoMessaggio = {
     id: msgId,
     data: new Date().toISOString(),
     canale: info.canale || '',
@@ -24393,8 +24400,40 @@ function registraComunicazioneQuote(quoteId, info) {
     tracciabile: info.canale === 'gmailreale',
     letta: false,
     lettaAt: null
-  });
-  DB.set('quotes', quotes);
+  };
+  quotes[qi].comunicazioni.push(nuovoMessaggio);
+  // Stessa correzione di registraComunicazione qui sopra: evitiamo il salvataggio normale (a
+  // rischio di corsa con la scrittura mirata e sicura del blocco sotto) quando siamo online.
+  if (supabaseReady && supabaseClient) { _quotesCache = quotes; }
+  else { DB.set('quotes', quotes); }
+  // Stessa identica protezione anti-corsa di registraComunicazione (vedi commenti lì sopra per il
+  // dettaglio del bug): quando Supabase è disponibile, il messaggio viene scritto rileggendo prima
+  // la versione più recente del SOLO campo comunicazioni, invece di riscrivere tutto il preventivo
+  // con quello che questo browser aveva in memoria — evita che due postazioni si cancellino a
+  // vicenda un messaggio/una modifica appena fatta altrove.
+  if (supabaseReady && supabaseClient) {
+    (async () => {
+      for (let tentativo = 0; tentativo < 3; tentativo++) {
+        try {
+          if (tentativo > 0) await new Promise(res => setTimeout(res, 700 * tentativo));
+          const { data: freshRow, error: errFetch } = await supabaseClient.from('quotes').select('data').eq('id', quoteId).single();
+          if (errFetch) throw errFetch;
+          const quotePreso = (freshRow && freshRow.data) || {};
+          const comunicazioniAttuali = quotePreso.comunicazioni || [];
+          if (!comunicazioniAttuali.some(m => m.id === msgId)) comunicazioniAttuali.push(nuovoMessaggio);
+          quotePreso.comunicazioni = comunicazioniAttuali;
+          const { error: errUpdate } = await supabaseClient.from('quotes').update({ data: quotePreso }).eq('id', quoteId);
+          if (errUpdate) throw errUpdate;
+          if (typeof _syncedMaps !== 'undefined' && _syncedMaps.quotes) {
+            _syncedMaps.quotes.set(quoteId, JSON.stringify(quoteToSupabase(quotePreso)));
+          }
+          break;
+        } catch (err) {
+          if (tentativo === 2) console.warn('Messaggio preventivo salvato solo in locale (sincronizzazione Supabase non riuscita dopo 3 tentativi):', err);
+        }
+      }
+    })();
+  }
   return msgId;
 }
 
