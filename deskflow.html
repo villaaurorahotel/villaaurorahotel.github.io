@@ -323,7 +323,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 15/08/2026 · 10:20</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 15/08/2026 · 11:05</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -10134,11 +10134,32 @@ function awStatoCodice(nome){
 }
 
 // Restituisce {codice, provincia} del comune italiano dato il nome (tollerante ad accenti/apostrofi/trattini)
+// Alias per nomi di comuni scritti nella forma comune/storica ma diversa da quella ufficiale usata
+// nell'elenco Alloggiati Web (chiavi già normalizzate con awNorm, per confronto diretto).
+const AW_COMUNI_ALIAS = {
+  'REGGIO NELL EMILIA': 'REGGIO EMILIA',
+  'REGGIO DI CALABRIA': 'REGGIO CALABRIA',
+};
 function awComuneInfo(nome){
   if (!nome) return null;
   const idx = awComuniIndex();
-  const c = idx[awNorm(nome)];
-  return c ? {codice:c.codice, provincia:c.provincia} : null;
+  const n = awNorm(nome);
+  if (idx[n]) { const c = idx[n]; return {codice:c.codice, provincia:c.provincia}; }
+  const aliasTarget = AW_COMUNI_ALIAS[n];
+  if (aliasTarget && idx[awNorm(aliasTarget)]) { const c = idx[awNorm(aliasTarget)]; return {codice:c.codice, provincia:c.provincia}; }
+  // Ultimo tentativo: molti comuni italiani hanno un nome ufficiale più corto di quello comunemente
+  // usato, che differisce solo per una parola di collegamento (es. "Reggio nell'Emilia" → ufficiale
+  // "Reggio Emilia", "Castiglione del Lago" scritto senza "del"). Confrontiamo togliendo queste
+  // parole da entrambe le parti, MA solo se il risultato è un unico comune senza ambiguità — altrimenti
+  // meglio segnalare "non riconosciuto" che rischiare di scegliere il comune sbagliato.
+  const senzaConnettivi = n.replace(/\b(NELL|NELLA|NEL|DELL|DELLA|DEL|DEI|DELLE|DI|IN|SUL|SULLA|SULLE|SUI)\b/g,'').replace(/\s+/g,' ').trim();
+  if (senzaConnettivi && senzaConnettivi !== n) {
+    const candidati = AW_COMUNI.filter(function(c){
+      return awNorm(c.nome).replace(/\b(NELL|NELLA|NEL|DELL|DELLA|DEL|DEI|DELLE|DI|IN|SUL|SULLA|SULLE|SUI)\b/g,'').replace(/\s+/g,' ').trim() === senzaConnettivi;
+    });
+    if (candidati.length === 1) return {codice:candidati[0].codice, provincia:candidati[0].provincia};
+  }
+  return null;
 }
 
 // Restituisce la descrizione ufficiale di un tipo documento dato il codice (es. 'IDENT' -> "CARTA DI IDENTITA'")
