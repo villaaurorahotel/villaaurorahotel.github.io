@@ -329,7 +329,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 21/08/2026 · 05:25</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 21/08/2026 · 06:07</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -13512,6 +13512,19 @@ function dashPrevPresetMese() {
   window._dashPrevA = (function(x){return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');})(new Date(n.getFullYear(), n.getMonth()+1, 0));
   renderDashboard();
 }
+// Ricarica la pagina forzando lo scaricamento dell'ultima versione da GitHub, ignorando qualsiasi
+// copia che il browser potrebbe aver salvato in cache — l'equivalente di premere Ctrl+Shift+R, ma
+// con un pulsante. Aggiungere un parametro sempre diverso all'indirizzo fa sì che il browser lo
+// tratti come un indirizzo "mai visto prima" e vada quindi a scaricarlo di nuovo da zero, invece di
+// usare una versione salvata. Avvisa prima se ci sono modifiche non salvate aperte in una scheda.
+function forzaAggiornamentoApp() {
+  if (typeof _supabaseSyncingCount !== 'undefined' && _supabaseSyncingCount > 0) {
+    if (!confirm('C\'è ancora un salvataggio in corso verso Supabase — se ricarichi ora rischi di perderlo. Vuoi ricaricare comunque?')) return;
+  }
+  var url = new URL(window.location.href);
+  url.searchParams.set('_agg', Date.now());
+  window.location.href = url.toString();
+}
 function renderDashboard() {
   var el = document.getElementById('page-dashboard');
   if(!el) return;
@@ -13615,7 +13628,10 @@ function renderDashboard() {
         '<input type="date" id="dash-date" value="'+tod+'" onchange="cambiaDataDashboard(this.value)" style="padding:3px 6px;border:.5px solid var(--border2);border-radius:6px;font-size:12px">'+
         (tod!==today() ? '<button class="btn btn-sm" onclick="cambiaDataDashboard(today())">Torna a oggi</button>' : '') +
       '</div></div>' +
-      '<button class="btn btn-primary" onclick="openNuovaPrenotazione()">+ Nuova prenotazione</button></div>' +
+      '<div style="display:flex;gap:8px;align-items:flex-start">' +
+      '<button class="btn" onclick="forzaAggiornamentoApp()" title="Ricarica la pagina scaricando l\'ultima versione del programma da GitHub, ignorando la copia salvata dal browser — la stessa cosa che fa Ctrl+Shift+R">🔄 Aggiorna app</button>' +
+      '<button class="btn btn-primary" onclick="openNuovaPrenotazione()">+ Nuova prenotazione</button>' +
+      '</div></div>' +
       '<div class="page-content">' +
       '<div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:16px">' + card1 + card2 + card3 + '</div>' +
       '<div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:8px">' + cardOccupazione + '</div>' +
@@ -15681,23 +15697,50 @@ function openNuovaPrenotazione(prefillDate, prefillRoom) {
         <label>Check-out</label>
         <input type="date" id="f-checkout" value="${addD(tod,1)}" onchange="updateTotalPrice();aggiornaNottiDisplay();aggiornaCamereDisponibiliNuovaPrenotazione()">
       </div>
-      <div class="form-group" style="grid-row:span 2">
+      <div class="form-group">
         <label>Fonte</label>
         <select id="f-source">
           <option>Diretto</option><option>Booking.com</option><option>Airbnb</option><option>Expedia</option><option>Telefono</option><option>Email</option><option>Altro</option>
         </select>
-        <label style="display:flex;align-items:center;gap:6px;margin-top:6px;margin-left:14px;font-size:12px;font-weight:500;text-transform:none">
+      </div>
+      <div class="form-group">
+        <label style="opacity:0">.</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;text-transform:none">
           <input type="checkbox" id="f-nonRimborsabile" style="width:auto">
           🔒 Tariffa non rimborsabile
         </label>
-        <label style="display:flex;align-items:center;gap:6px;margin-top:4px;margin-left:14px;font-size:12px;font-weight:500;text-transform:none">
+        <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;font-weight:500;text-transform:none">
           <input type="checkbox" id="f-colazione" checked style="width:auto">
           ☕ Colazione inclusa
         </label>
-        <label style="display:flex;align-items:center;gap:6px;margin-top:4px;margin-left:14px;font-size:12px;font-weight:500;text-transform:none" title="Impedisce di spostare questa prenotazione trascinandola nel Planning/Calendario">
+        <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;font-weight:500;text-transform:none" title="Impedisce di spostare questa prenotazione trascinandola nel Planning/Calendario">
           <input type="checkbox" id="f-bloccata" onchange="aggiornaBadgeBloccata()" style="width:auto">
           🔒 Blocca prenotazione (non spostabile nel planning)
         </label>
+      </div>
+      <div class="form-group">
+        <label>Adulti</label>
+        <input type="number" id="f-adults" value="2" min="1" max="20" oninput="updateTotalPrice();aggiornaTrattamentoAuto()">
+      </div>
+      <div class="form-group">
+        <label>Bambini</label>
+        <input type="number" id="f-children" value="0" min="0" max="20" oninput="document.getElementById('f-childrenUnderAge').max=this.value; if(+document.getElementById('f-childrenUnderAge').value>+this.value) document.getElementById('f-childrenUnderAge').value=this.value; updateTotalPrice();">
+      </div>
+      <div class="form-group">
+        <label>di cui fino a ${(DB.getObj('settings',{cityTaxChildAge:0}).cityTaxChildAge)||0} anni (tassa rid.)</label>
+        <input type="number" id="f-childrenUnderAge" value="0" min="0" max="20" oninput="updateTotalPrice()">
+      </div>
+      <div class="form-group">
+        <label>Stato <span id="f-stato-lock-badge" style="display:none;color:var(--amber);font-weight:700;margin-left:4px" title="Prenotazione bloccata — non spostabile nel Planning">🔒</span></label>
+        <select id="f-status" onchange="aggiornaColoreStatoPrenotazione(this)">
+          <option value="confermata">Confermata</option>
+          <option value="attesa">In attesa</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Prezzo totale (€)</label>
+        <input type="number" id="f-price" step="0.01" value="">
+        <div id="f-price-detail" style="font-size:11px;margin-top:4px;font-weight:500"></div>
       </div>
       <div class="form-group full">
         <label>Supplementi in camera (puoi sceglierne più di uno)</label>
@@ -15723,30 +15766,6 @@ function openNuovaPrenotazione(prefillDate, prefillRoom) {
           Colore personalizzato
         </label>
         ${colorSwatchPickerHTML('f-groupColor', '#9333ea', false)}
-      </div>
-      <div class="form-group">
-        <label>Adulti</label>
-        <input type="number" id="f-adults" value="2" min="1" max="20" oninput="updateTotalPrice();aggiornaTrattamentoAuto()">
-      </div>
-      <div class="form-group">
-        <label>Bambini</label>
-        <input type="number" id="f-children" value="0" min="0" max="20" oninput="document.getElementById('f-childrenUnderAge').max=this.value; if(+document.getElementById('f-childrenUnderAge').value>+this.value) document.getElementById('f-childrenUnderAge').value=this.value; updateTotalPrice();">
-      </div>
-      <div class="form-group">
-        <label>di cui fino a ${(DB.getObj('settings',{cityTaxChildAge:0}).cityTaxChildAge)||0} anni (tassa rid.)</label>
-        <input type="number" id="f-childrenUnderAge" value="0" min="0" max="20" oninput="updateTotalPrice()">
-      </div>
-      <div class="form-group">
-        <label>Stato <span id="f-stato-lock-badge" style="display:none;color:var(--amber);font-weight:700;margin-left:4px" title="Prenotazione bloccata — non spostabile nel Planning">🔒</span></label>
-        <select id="f-status" onchange="aggiornaColoreStatoPrenotazione(this)">
-          <option value="confermata">Confermata</option>
-          <option value="attesa">In attesa</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Prezzo totale (€)</label>
-        <input type="number" id="f-price" step="0.01" value="">
-        <div id="f-price-detail" style="font-size:11px;margin-top:4px;font-weight:500"></div>
       </div>
       <div class="form-group full">
         <label>Note</label>
@@ -15802,7 +15821,8 @@ function openNuovaPrenotazione(prefillDate, prefillRoom) {
       </div>
     </div>`,
     `<button class="btn" onclick="closeModal()">Annulla</button>
-     <button class="btn btn-primary" onclick="savePrenotazione()">Salva prenotazione</button>`
+     <button class="btn btn-primary" onclick="savePrenotazione()">Salva prenotazione</button>`,
+    '720px'
   );
   // Use setTimeout so modal is fully in DOM before calculating
   setTimeout(updateTotalPrice, 50);
