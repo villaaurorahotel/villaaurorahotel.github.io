@@ -329,7 +329,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 21/08/2026 · 06:32</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 21/08/2026 · 06:44</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -15663,7 +15663,7 @@ function openNuovaPrenotazione(prefillDate, prefillRoom) {
         <input type="text" id="f-newGuestName" placeholder="Nome Cognome" oninput="document.getElementById('f-guestNameDisplay').value=this.value; document.getElementById('f-guestSearch').value=this.value;">
       </div>
       <div class="form-group full">
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">
           <div class="form-group" style="margin:0">
             <label style="font-size:11px">Camera</label>
             <select id="f-roomId" onchange="updateTotalPrice()">
@@ -15687,6 +15687,12 @@ function openNuovaPrenotazione(prefillDate, prefillRoom) {
             <label style="font-size:11px">Notti</label>
             <input type="text" id="f-notti-display" value="1" readonly style="background:var(--surface2);font-weight:700;text-align:center">
           </div>
+          <div class="form-group" style="margin:0">
+            <label style="font-size:11px">Fonte</label>
+            <select id="f-source">
+              <option>Diretto</option><option>Booking.com</option><option>Airbnb</option><option>Expedia</option><option>Telefono</option><option>Email</option><option>Altro</option>
+            </select>
+          </div>
         </div>
       </div>
       <div class="form-group">
@@ -15697,26 +15703,29 @@ function openNuovaPrenotazione(prefillDate, prefillRoom) {
         <label>Check-out</label>
         <input type="date" id="f-checkout" value="${addD(tod,1)}" onchange="updateTotalPrice();aggiornaNottiDisplay();aggiornaCamereDisponibiliNuovaPrenotazione()">
       </div>
-      <div class="form-group">
-        <label>Fonte</label>
-        <select id="f-source">
-          <option>Diretto</option><option>Booking.com</option><option>Airbnb</option><option>Expedia</option><option>Telefono</option><option>Email</option><option>Altro</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label style="opacity:0">.</label>
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;text-transform:none">
-          <input type="checkbox" id="f-nonRimborsabile" style="width:auto">
-          🔒 Tariffa non rimborsabile
-        </label>
-        <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;font-weight:500;text-transform:none">
-          <input type="checkbox" id="f-colazione" checked style="width:auto">
-          ☕ Colazione inclusa
-        </label>
-        <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;font-weight:500;text-transform:none" title="Impedisce di spostare questa prenotazione trascinandola nel Planning/Calendario">
-          <input type="checkbox" id="f-bloccata" onchange="aggiornaBadgeBloccata()" style="width:auto">
-          🔒 Blocca prenotazione (non spostabile nel planning)
-        </label>
+      <div class="form-group full">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+          <div>
+            <label>Supplementi in camera (puoi sceglierne più di uno)</label>
+            <div id="f-supplemento-wrap" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">
+              ${getSupplementiCamera().map(s => `<label style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:500;text-transform:none;background:var(--surface2);padding:5px 10px;border-radius:6px;cursor:pointer"><input type="checkbox" value="${s.code}" onchange="toggleSupplementoExtra(this,'${s.code}','${(s.label||'').replace(/'/g,"\\'")}',${Number(s.prezzo)||0})" style="width:auto">${s.code} — ${s.label}${s.prezzo?' ('+Number(s.prezzo).toFixed(2)+' €/notte)':''}</label>`).join('')}
+            </div>
+          </div>
+          <div>
+            <label style="display:flex;align-items:center;gap:6px;margin-top:0;font-size:12px;font-weight:500;text-transform:none">
+              <input type="checkbox" id="f-nonRimborsabile" style="width:auto">
+              🔒 Tariffa non rimborsabile
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;font-weight:500;text-transform:none">
+              <input type="checkbox" id="f-colazione" checked style="width:auto">
+              ☕ Colazione inclusa
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;font-weight:500;text-transform:none" title="Impedisce di spostare questa prenotazione trascinandola nel Planning/Calendario">
+              <input type="checkbox" id="f-bloccata" onchange="aggiornaBadgeBloccata()" style="width:auto">
+              🔒 Blocca camera
+            </label>
+          </div>
+        </div>
       </div>
       <div class="form-group">
         <label>Adulti</label>
@@ -15741,12 +15750,6 @@ function openNuovaPrenotazione(prefillDate, prefillRoom) {
         <label>Prezzo totale (€)</label>
         <input type="number" id="f-price" step="0.01" value="">
         <div id="f-price-detail" style="font-size:11px;margin-top:4px;font-weight:500"></div>
-      </div>
-      <div class="form-group full">
-        <label>Supplementi in camera (puoi sceglierne più di uno)</label>
-        <div id="f-supplemento-wrap" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">
-          ${getSupplementiCamera().map(s => `<label style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:500;text-transform:none;background:var(--surface2);padding:5px 10px;border-radius:6px;cursor:pointer"><input type="checkbox" value="${s.code}" onchange="toggleSupplementoExtra(this,'${s.code}','${(s.label||'').replace(/'/g,"\\'")}',${Number(s.prezzo)||0})" style="width:auto">${s.code} — ${s.label}${s.prezzo?' ('+Number(s.prezzo).toFixed(2)+' €/notte)':''}</label>`).join('')}
-        </div>
       </div>
       <div class="form-group full" style="border-top:.5px solid var(--border);padding-top:14px;margin-top:2px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
