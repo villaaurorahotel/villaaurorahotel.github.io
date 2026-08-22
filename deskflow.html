@@ -329,7 +329,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 22/08/2026 · 11:54</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 22/08/2026 · 13:20</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -14474,6 +14474,7 @@ function renderPrenotazioni() {
       </div>
       <div style="display:flex;gap:8px;align-items:center">
         <label class="btn btn-sm" style="cursor:pointer" title="Importa prenotazioni future/in corso da un file esportato dal vecchio gestionale — quelle già concluse (check-out nel passato) vengono saltate automaticamente">📥 Importa prenotazioni (vecchio gestionale)<input type="file" accept=".xlsx,.csv" onchange="importPrenotazioniXLSX(event)" style="display:none"></label>
+        <label class="btn btn-sm" style="cursor:pointer" title="Come sopra, ma importa ANCHE le prenotazioni già concluse (check-out nel passato) — utile una tantum per avere uno storico completo e poter confrontare ADR/incassi negli anni">🗄 Importa anche storico<input type="file" accept=".xlsx,.csv" onchange="importPrenotazioniXLSX(event, true)" style="display:none"></label>
         <button class="btn btn-sm" onclick="apriIncollaEmailPrenotazione()" title="Incolla il testo di un'email di conferma o cancellazione (es. dal vecchio gestionale) e aggiorna DeskFlow automaticamente">📧 Incolla mail di conferma</button>
         <button class="btn btn-primary" onclick="openNuovaPrenotazione()"><span aria-hidden="true">+</span> Nuova</button>
       </div>
@@ -20699,7 +20700,7 @@ const NAZIONALITA_MAP = {
 // Importa le prenotazioni future/in corso da un file esportato dal vecchio gestionale.
 // Salta automaticamente: quelle già concluse (check-out nel passato), quelle annullate,
 // e quelle già importate in precedenza (stesso res_id già presente come externalId).
-function importPrenotazioniXLSX(event) {
+function importPrenotazioniXLSX(event, includiStorico) {
   const file = event.target.files[0]; if (!file) return;
   const XL = typeof XLSX !== 'undefined' ? XLSX : null;
   if (!XL) { showToast('Libreria XLSX non disponibile'); return; }
@@ -20742,7 +20743,7 @@ function importPrenotazioniXLSX(event) {
         if (!resId) return;
 
         const checkout = String(row[cCheckout]||'').trim().slice(0,10);
-        if (checkout && checkout < oggi) { saltatePartite++; return; }
+        if (!includiStorico && checkout && checkout < oggi) { saltatePartite++; return; }
 
         const stato = String(row[cStatus]||'').trim().toLowerCase();
         if (stato.indexOf('annullat') >= 0 || stato.indexOf('cancel') >= 0) { saltateAnnullate++; return; }
@@ -20813,7 +20814,9 @@ function importPrenotazioniXLSX(event) {
           colazioneInclusa: /colazion/i.test(meal),
           tariffaId: 'standard',
           source: cSource>=0 ? String(row[cSource]||'').trim() : 'Importata',
-          status: 'confermata',
+          // Una prenotazione storica (check-out già nel passato, importata solo per lo storico) non
+          // ha senso segnarla "Confermata" come le prenotazioni future — è un soggiorno concluso.
+          status: (includiStorico && checkout && checkout < oggi) ? 'check-out' : 'confermata',
           totalPrice: cAmount>=0 ? (parseFloat(row[cAmount])||0) : 0,
           prezzoManuale: true,
           nonRimborsabile: cRefund>=0 ? String(row[cRefund]||'').trim().toLowerCase()==='no' : false,
