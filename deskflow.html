@@ -329,7 +329,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 22/08/2026 · 13:20</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 22/08/2026 · 16:12</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -708,7 +708,7 @@ function bookingToSupabase(b) {
     componenti:b.componenti||[], checkin_at:b.checkinAt||null, checkout_at:b.checkoutAt||null, checkin_token:b.checkinToken||null, tipo_documento_conto:b.tipoDocumentoConto||null,
     fattura:b.fattura||null, garanzia:b.garanzia||null, alloggiati_web_inviato_at:b.alloggiatiWebInviatoAt||null, created_at:b.createdAt||new Date().toISOString(),
     modified_at:b.modifiedAt||null, cancelled_at:b.cancelledAt||null,
-    bloccata:!!b.bloccata, comunicazioni:b.comunicazioni||[], tipo_alloggiato_manuale:b.tipoAlloggiatoManuale||null
+    bloccata:!!b.bloccata, comunicazioni:b.comunicazioni||[], tipo_alloggiato_manuale:b.tipoAlloggiatoManuale||null, escludi_conteggi:!!b.escludiConteggi
   };
 }
 function bookingFromSupabase(b) {
@@ -726,7 +726,7 @@ function bookingFromSupabase(b) {
     componenti:b.componenti||[], checkinAt:b.checkin_at||'', checkoutAt:b.checkout_at||'', checkinToken:b.checkin_token||'', tipoDocumentoConto:b.tipo_documento_conto||'',
     fattura:b.fattura||null, garanzia:b.garanzia||null, alloggiatiWebInviatoAt:b.alloggiati_web_inviato_at||null, createdAt:b.created_at||new Date().toISOString(),
     modifiedAt:b.modified_at||'', cancelledAt:b.cancelled_at||'',
-    bloccata:!!b.bloccata, comunicazioni:b.comunicazioni||[], tipoAlloggiatoManuale:b.tipo_alloggiato_manuale||''
+    bloccata:!!b.bloccata, comunicazioni:b.comunicazioni||[], tipoAlloggiatoManuale:b.tipo_alloggiato_manuale||'', escludiConteggi:!!b.escludi_conteggi
   };
 }
 
@@ -11493,7 +11493,7 @@ function hkNoteConPagato(bk, sv) {
 
 function renderHousekeeping() {
   const rooms    = getRooms();
-  const bookings = DB.get('bookings').filter(b=>b.status!=='cancellata');
+  const bookings = DB.get('bookings').filter(b=>b.status!=='cancellata' && !b.escludiConteggi);
   const hkData   = DB.getObj('hkData', {});
   const cfg      = DB.getObj('settings', {currency:'€'});
 
@@ -11946,7 +11946,7 @@ function renderPuliziaMobile() {
   const el = document.getElementById('page-puliziamobile');
   if (!el) return;
   const rooms = getRooms();
-  const bookings = DB.get('bookings').filter(b=>b.status!=='cancellata');
+  const bookings = DB.get('bookings').filter(b=>b.status!=='cancellata' && !b.escludiConteggi);
   const hkData = DB.getObj('hkData', {});
   const ds = puliziaMobileData;
   const byName = (a,b) => a.name.localeCompare(b.name, 'it', {numeric:true});
@@ -13425,7 +13425,7 @@ function delPreventivo(id) {
 // PREVISIONALE
 // ============================================================
 function renderPrevisionale() {
-  var allBk=DB.get('bookings').filter(function(b){return b.status!=='cancellata';}),rooms=getRooms();
+  var allBk=DB.get('bookings').filter(function(b){return b.status!=='cancellata' && !b.escludiConteggi;}),rooms=getRooms();
   var filtered=allBk;
   if(prevFrom)filtered=filtered.filter(function(b){return b.checkin>=prevFrom;});
   if(prevTo)  filtered=filtered.filter(function(b){return b.checkin<=prevTo;});
@@ -13580,7 +13580,7 @@ function renderDashboard() {
   var el = document.getElementById('page-dashboard');
   if(!el) return;
   try {
-    var bookings = DB.get('bookings') || [];
+    var bookings = (DB.get('bookings') || []).filter(function(b){ return !b.escludiConteggi; });
     var rooms = DB.get('rooms') || [];
     var tod = dashboardDate || today();
     var active = bookings.filter(function(b){ return b.checkin<=tod && b.checkout>tod && b.status!=='cancellata'; });
@@ -15776,6 +15776,10 @@ function openNuovaPrenotazione(prefillDate, prefillRoom) {
               <input type="checkbox" id="f-bloccata" onchange="aggiornaBadgeBloccata()" style="width:auto">
               🔒 Blocca camera
             </label>
+            <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;font-weight:500;text-transform:none" title="La camera resta occupata (esclusa dalla disponibilità) ma non compare in Housekeeping/Pulizie mobile, non conta nelle colazioni, e non entra in occupazione/fatturato/ADR di Dashboard, Report e Previsionale — utile per soggiorni del proprietario, cortesie, manutenzione">
+              <input type="checkbox" id="f-escludiConteggi" style="width:auto">
+              🚫 Escludi da Housekeeping/colazioni/conteggi
+            </label>
           </div>
         </div>
       </div>
@@ -16531,6 +16535,10 @@ function editPrenotazione(id) {
               <input type="checkbox" id="f-bloccata" ${b.bloccata?'checked':''} onchange="aggiornaBadgeBloccata()" style="width:auto">
               🔒 Blocca camera
             </label>
+            <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;font-weight:500;text-transform:none" title="La camera resta occupata (esclusa dalla disponibilità) ma non compare in Housekeeping/Pulizie mobile, non conta nelle colazioni, e non entra in occupazione/fatturato/ADR di Dashboard, Report e Previsionale — utile per soggiorni del proprietario, cortesie, manutenzione">
+              <input type="checkbox" id="f-escludiConteggi" ${b.escludiConteggi?'checked':''} style="width:auto">
+              🚫 Escludi da Housekeeping/colazioni/conteggi
+            </label>
           </div>
         </div>
       </div>
@@ -16795,6 +16803,7 @@ function savePrenotazione(editId) {
     nonRimborsabile: !!document.getElementById('f-nonRimborsabile')?.checked,
     colazioneInclusa: !!document.getElementById('f-colazione')?.checked,
     bloccata: !!document.getElementById('f-bloccata')?.checked,
+    escludiConteggi: !!document.getElementById('f-escludiConteggi')?.checked,
     status: document.getElementById('f-status').value,
     totalPrice: parseFloat(document.getElementById('f-price').value) || 0,
     // Una volta salvata, la prenotazione smette di seguire il listino: il prezzo resta quello inserito ora,
@@ -20733,6 +20742,17 @@ function importPrenotazioniXLSX(event, includiStorico) {
       const guests = DB.get('guests');
       const guestByEmail = {};
       guests.forEach(function(g){ if (g.email) guestByEmail[g.email.trim().toLowerCase()] = g; });
+      // BUG TROVATO E CORRETTO ("dopo aver importato prenotazioni vecchie sono sparite prenotazioni
+      // attuali"): questa importazione, per aggiungere le prenotazioni nuove, chiamava alla fine
+      // DB.set('bookings', bookings) — passando l'INTERA lista come se fosse "la verità assoluta".
+      // Il meccanismo di sincronizzazione, ricevendo questa lista, cancellava da Supabase qualsiasi
+      // prenotazione che NON comparisse in questa copia locale — comprese prenotazioni vere,
+      // aggiunte nel frattempo da un altro dispositivo, che questo browser semplicemente non aveva
+      // ancora in memoria. Ora l'importazione tiene traccia SOLO delle righe che aggiunge davvero
+      // (nuovePrenotazioni/nuoviOspiti) e le manda a Supabase una per una in inserimento mirato,
+      // senza mai passare dal confronto "lista intera" che rischiava di cancellare qualcosa.
+      const nuovePrenotazioni = [];
+      const nuoviOspiti = [];
 
       const oggi = today();
       let importate = 0, saltatePartite = 0, saltateGiaPresenti = 0, saltateAnnullate = 0, cameraNonTrovata = 0, guestsCreati = 0;
@@ -20764,14 +20784,17 @@ function importPrenotazioniXLSX(event, includiStorico) {
         if (!guest) {
           guest = { id: uid(), name: guestName, email: email, phone: phone, notes: '' };
           guests.push(guest);
+          nuoviOspiti.push(guest);
           if (email) guestByEmail[email.toLowerCase()] = guest;
           guestsCreati++;
         } else {
           // Ospite già presente in anagrafica: aggiungiamo telefono/email solo se mancanti,
           // senza sovrascrivere dati che potresti aver già corretto a mano — questo vale anche
           // se la prenotazione stessa risulta già presente (vedi controllo duplicati sotto)
-          if (phone && !guest.phone) guest.phone = phone;
-          if (email && !guest.email) { guest.email = email; guestByEmail[email.toLowerCase()] = guest; }
+          let modificato = false;
+          if (phone && !guest.phone) { guest.phone = phone; modificato = true; }
+          if (email && !guest.email) { guest.email = email; guestByEmail[email.toLowerCase()] = guest; modificato = true; }
+          if (modificato && !nuoviOspiti.includes(guest)) nuoviOspiti.push(guest);
         }
 
         // Controllo duplicati "vero": stessa camera, stesse date, stesso nome cliente — non solo
@@ -20825,13 +20848,37 @@ function importPrenotazioniXLSX(event, includiStorico) {
           createdAt: (cCreated>=0 && row[cCreated]) ? String(row[cCreated]) : new Date().toISOString(),
         };
         bookings.push(booking);
+        nuovePrenotazioni.push(booking);
         existingExternalIds.add(resId);
         importate++;
       });
 
-      DB.set('bookings', bookings);
-      DB.set('guests', guests);
       invalidateGuestDatalistCache();
+      // Scriviamo SOLO le righe nuove/modificate, a piccoli lotti, direttamente su Supabase — mai
+      // tramite DB.set('bookings'/'guests', listaIntera), che rischierebbe di cancellare prenotazioni
+      // od ospiti aggiunti nel frattempo da un altro dispositivo (vedi spiegazione più sopra).
+      _bookingsCache = bookings;
+      _guestsCache = guests;
+      if (supabaseReady && supabaseClient) {
+        const LOTTO = 150;
+        (async function() {
+          for (let i = 0; i < nuoviOspiti.length; i += LOTTO) {
+            const lotto = nuoviOspiti.slice(i, i+LOTTO).map(guestToSupabase);
+            const { error } = await supabaseClient.from('guests').upsert(lotto);
+            if (error) { console.error('Errore import ospiti:', error); showToast('⚠ Alcuni ospiti non salvati su Supabase — controlla la connessione'); }
+            else lotto.forEach(function(g){ if (typeof _syncedMaps !== 'undefined' && _syncedMaps.guests) _syncedMaps.guests.set(g.id, JSON.stringify(g)); });
+          }
+          for (let i = 0; i < nuovePrenotazioni.length; i += LOTTO) {
+            const lotto = nuovePrenotazioni.slice(i, i+LOTTO).map(bookingToSupabase);
+            const { error } = await supabaseClient.from('bookings').upsert(lotto);
+            if (error) { console.error('Errore import prenotazioni:', error); showToast('⚠ Alcune prenotazioni non salvate su Supabase — controlla la connessione'); }
+            else lotto.forEach(function(b){ if (typeof _syncedMaps !== 'undefined' && _syncedMaps.bookings) _syncedMaps.bookings.set(b.id, JSON.stringify(b)); });
+          }
+        })();
+      } else {
+        DB.set('bookings', bookings);
+        DB.set('guests', guests);
+      }
 
       alert('✅ Importazione completata\n\n'+
         'Prenotazioni importate: '+importate+'\n'+
@@ -22170,7 +22217,7 @@ function stampaScheda(guestId) {
 
 
 function renderReport() {
-  const allBk=DB.get('bookings').filter(b=>b.status!=='cancellata');
+  const allBk=DB.get('bookings').filter(b=>b.status!=='cancellata' && !b.escludiConteggi);
   let bookings=allBk;
   if(repFrom)bookings=bookings.filter(b=>b.checkin>=repFrom);
   if(repTo)  bookings=bookings.filter(b=>b.checkin<=repTo);
@@ -25310,7 +25357,7 @@ function saveRevenueConfig(c){ DB.setObj('revenueConfig', c); }
 function calcolaOccupazione(ds){
   var rooms=getRooms().filter(function(r){return r.status==='disponibile';});
   if(!rooms.length) return 0;
-  var bookings=DB.get('bookings').filter(function(b){return b.status!=='cancellata' && b.checkin<=ds && b.checkout>ds;});
+  var bookings=DB.get('bookings').filter(function(b){return b.status!=='cancellata' && !b.escludiConteggi && b.checkin<=ds && b.checkout>ds;});
   var occupiedIds=new Set(bookings.map(function(b){return b.roomId;}));
   var occupate=rooms.filter(function(r){return occupiedIds.has(r.id);}).length;
   return Math.round((occupate/rooms.length)*100);
