@@ -329,7 +329,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 22/08/2026 · 08:36</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 22/08/2026 · 08:52</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -936,6 +936,57 @@ async function initSupabase() {
     console.error('Supabase init error:', err);
     showToast('Connessione a Supabase non riuscita — verifica URL/chiave nelle Impostazioni. Si continua in modalità offline.');
     return false;
+  }
+}
+
+// Quando una scheda del browser resta a lungo in background (es. tieni aperte più schede dello
+// stesso PMS e passi da una all'altra), il collegamento "in tempo reale" con Supabase a volte si
+// addormenta silenziosamente — la scheda smette di ricevere le modifiche fatte altrove finché non
+// la ricarichi a mano. Ora, quando torni su una scheda rimasta nascosta per più di 20 secondi, il
+// programma ricontrolla da solo i dati principali (prenotazioni, camere, blocchi, ospiti) e
+// aggiorna la vista — senza bisogno di premere "Aggiorna app" o ricaricare la pagina.
+let _lastHiddenAt = 0;
+document.addEventListener('visibilitychange', function () {
+  if (document.visibilityState === 'hidden') {
+    _lastHiddenAt = Date.now();
+  } else if (document.visibilityState === 'visible' && _lastHiddenAt) {
+    const nascostaPer = Date.now() - _lastHiddenAt;
+    _lastHiddenAt = 0;
+    if (nascostaPer > 20000 && supabaseReady && supabaseClient) refreshCoreDataOnFocus();
+  }
+});
+async function refreshCoreDataOnFocus() {
+  try {
+    const [{ data: bookings, error: errB }, { data: rooms, error: errR }] = await Promise.all([
+      supabaseClient.from('bookings').select('*'),
+      supabaseClient.from('rooms').select('*'),
+    ]);
+    if (!errB && bookings) {
+      _bookingsCache = bookings.map(bookingFromSupabase);
+      _syncedMaps.bookings = new Map(bookings.map(b => [b.id, JSON.stringify(bookingToSupabase(bookingFromSupabase(b)))]));
+    }
+    if (!errR && rooms) {
+      _roomsCache = rooms.map(roomFromSupabase);
+      _syncedMaps.rooms = new Map(rooms.map(r => [r.id, JSON.stringify(roomToSupabase(roomFromSupabase(r)))]));
+    }
+    if (_roomBlocksReady) {
+      const { data: blocks, error: errBl } = await supabaseClient.from('room_blocks').select('*');
+      if (!errBl && blocks) {
+        _roomBlocksCache = {};
+        blocks.forEach(b => { _roomBlocksCache[b.room_id + '|' + b.block_date] = true; });
+      }
+    }
+    if (_guestsReady) {
+      const { data: guests, error: errG } = await supabaseClient.from('guests').select('*');
+      if (!errG && guests) {
+        _guestsCache = guests.map(guestFromSupabase);
+        _syncedMaps.guests = new Map(guests.map(g => [g.id, JSON.stringify(guestToSupabase(guestFromSupabase(g)))]));
+      }
+    }
+    invalidateGuestDatalistCache();
+    if (typeof currentPage !== 'undefined') renderPage(currentPage);
+  } catch (err) {
+    console.error('Errore aggiornamento dati al ritorno sulla scheda:', err);
   }
 }
 
