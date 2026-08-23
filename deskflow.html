@@ -329,7 +329,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 23/08/2026 · 15:45</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 23/08/2026 · 16:12</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -370,7 +370,6 @@ tr:hover td{background:var(--surface2)}
   <div class="nav-section">Impostazioni</div>
   <div class="nav-item" onclick="navigate('extra')" data-page="extra">🛎 Extra/Servizi</div>
   <div class="nav-item" onclick="navigate('adempimenti')" data-page="adempimenti">📋 Adempimenti</div>
-  <div class="nav-item" onclick="navigate('istat')" data-page="istat">📑 ISTAT</div>
   <div class="nav-item" onclick="navigate('blacklist')" data-page="blacklist" style="color:var(--danger)">🚫 Blacklist</div>
   <div class="nav-item" onclick="navigate('ical')" data-page="ical">🔗 iCal/Portali</div>
   <div class="nav-item" onclick="navigate('impostazioni')" data-page="impostazioni">⚙ Impostazioni</div>
@@ -435,7 +434,6 @@ tr:hover td{background:var(--surface2)}
   <div id="page-report" class="page"></div>
   <div id="page-extra" class="page"></div>
   <div id="page-adempimenti" class="page"></div>
-  <div id="page-istat" class="page"></div>
   <div id="page-blacklist" class="page"></div>
   <div id="page-ical" class="page"></div>
   <div id="page-impostazioni" class="page"></div>
@@ -10866,7 +10864,7 @@ function navigate(page){
     checkin:renderCheckin,checkout:renderCheckout,'arrivi-partenze':renderArriviPartenze,checkineffettuati:renderCheckinEffettuati,checkouteffettuati:renderCheckoutEffettuati,effettuati:renderEffettuati,planner:renderPlanner,contidasaldare:renderContiDaSaldare,corrispettivi:renderCorrispettiviPage,condizioni:renderCondizioni,revenue:renderRevenue,camere:renderCamere,ospiti:renderOspiti,archivioospiti:renderArchivioOspiti,
     listino:renderListino,tipologie:renderTipologie,tassasoggiorno:renderTassaSoggiorno,preventivi:renderPreventivi,addebitiextra:renderAddebitiExtra,
     housekeeping:renderHousekeeping,previsionale:renderPrevisionale,report:renderReport,biancheria:renderBiancheria,
-    extra:renderExtra,adempimenti:renderAdempimenti,istat:renderIstat,
+    extra:renderExtra,adempimenti:renderAdempimenti,
     blacklist:renderBlacklist,ical:renderIcal,impostazioni:renderImpostazioni,
     salvataggio:renderSalvataggio,sitoweb:renderSitoWeb
   };
@@ -23988,10 +23986,11 @@ function renderAdempimenti() {
   // BUG TROVATO E CORRETTO ("Presenze sempre a 0"): mancava il caso più comune di tutti — chi ha
   // fatto check-in PRIMA del periodo selezionato e sta ancora soggiornando, senza arrivare o
   // partire esattamente in quei giorni. La condizione corretta e completa per "questa prenotazione
-  // tocca almeno una notte del periodo" è semplicemente checkin<=adTo && checkout>adFrom — copre da
-  // sola tutti i casi (arrivo durante, partenza durante, soggiorno che attraversa tutto il periodo).
+  // tocca almeno un giorno del periodo (arrivo, partenza o presenza)" è checkin<=adTo &&
+  // checkout>=adFrom — il >= (non solo >) serve a includere anche chi parte ESATTAMENTE il primo
+  // giorno del periodo, altrimenti quella partenza spariva dal conteggio (bug successivo).
   var filteredMovimento = bookings.filter(function(b){
-    return b.checkin <= adTo && b.checkout > adFrom;
+    return b.checkin <= adTo && b.checkout >= adFrom;
   });
 
   var nAW   = filtered.length;
@@ -24007,6 +24006,30 @@ function renderAdempimenti() {
       .map(function(b){ return b.roomId; })
   );
   var totCamere = DB.get('rooms').length;
+
+  // Arrivi/Partenze/Ospiti in casa per il periodo selezionato — persone (non camere), stesso
+  // criterio già usato altrove per non contare gli ospiti a metà (usa i dati del check-in se
+  // presenti, altrimenti adulti+bambini della prenotazione).
+  function personeDi(b) { return (b.componenti && b.componenti.length) ? b.componenti.length : ((parseInt(b.adults)||1)+(parseInt(b.children)||0)); }
+  var arriviCount = 0, partenzeCount = 0, inCasaCount = 0;
+  filteredMovimento.forEach(function(b){
+    if (b.checkin >= adFrom && b.checkin <= adTo) arriviCount += personeDi(b);
+    if (b.checkout >= adFrom && b.checkout <= adTo) partenzeCount += personeDi(b);
+  });
+  // "Ospiti in casa" è per forza riferito a UN giorno preciso (non ha senso su un intervallo) — uso
+  // l'ultimo giorno del periodo selezionato (per il caso più comune, un solo giorno, coincide).
+  bookingsAttivePerOccupazione.forEach(function(b){
+    if (b.checkin <= adTo && b.checkout > adTo) inCasaCount += personeDi(b);
+  });
+
+  // Presenze reali per data (chi dorme davvero quella notte), stesso periodo selezionato sopra —
+  // limitiamo a 92 giorni per non appesantire il calcolo se è stato scelto un periodo molto ampio.
+  // Portato dentro Adempimenti dalla vecchia pagina ISTAT (stesso identico senso, evitava di avere
+  // due schede separate che facevano la stessa cosa).
+  var giorniIntervallo = Math.round((parseLD(adTo)-parseLD(adFrom))/86400000)+1;
+  var presenzeGiornaliereLimitate = giorniIntervallo > 92;
+  var presFrom = presenzeGiornaliereLimitate ? addDays(adTo,-91) : adFrom;
+  var righePresenze = calcolaPresenzeGiornaliere(filteredMovimento, presFrom, adTo);
 
   // Controlla dati mancanti
   var warn = [];
@@ -24032,14 +24055,18 @@ function renderAdempimenti() {
 
     // SELEZIONE PERIODO
     '<div style="background:var(--surface2);border:.5px solid var(--border2);border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
+    '<button class="btn btn-sm" style="font-size:13px;padding:3px 9px" onclick="adSpostaGiorno(-1)" title="Vai al giorno precedente (sposta insieme dal/al di quanti giorni erano selezionati)">‹</button>'+
     '<input type="date" id="ad-from" value="'+adFrom+'" style="font-size:11px;padding:3px 6px;border:.5px solid var(--border2);border-radius:5px;width:118px">'+
     '<span style="font-size:11px;color:var(--text3)">→</span>'+
     '<input type="date" id="ad-to" value="'+adTo+'" style="font-size:11px;padding:3px 6px;border:.5px solid var(--border2);border-radius:5px;width:118px">'+
+    '<button class="btn btn-sm" style="font-size:13px;padding:3px 9px" onclick="adSpostaGiorno(1)" title="Vai al giorno successivo (sposta insieme dal/al di quanti giorni erano selezionati)">›</button>'+
     '<button class="btn btn-primary btn-sm" style="font-size:11px;padding:3px 8px" onclick="window._adFrom=document.getElementById(\'ad-from\').value;window._adTo=document.getElementById(\'ad-to\').value;renderAdempimenti()">Filtra</button>'+
     '<span style="color:var(--border2)">|</span>'+
     '<button class="btn btn-sm" style="font-size:11px;padding:3px 7px" onclick="adPreset(\'today\')">Oggi</button>'+
     '<button class="btn btn-sm" style="font-size:11px;padding:3px 7px" onclick="adPreset(\'week\')">Sett.</button>'+
     '<button class="btn btn-sm" style="font-size:11px;padding:3px 7px" onclick="adPreset(\'month\')">Mese</button>'+
+    '<button class="btn btn-sm" style="font-size:11px;padding:3px 7px" onclick="adPreset(\'anno\')">Anno corrente</button>'+
+    '<button class="btn btn-sm" style="font-size:11px;padding:3px 7px" onclick="adPreset(\'tutto\')">Tutta la storia</button>'+
     '</div>'+
 
     // RIEPILOGO
@@ -24047,6 +24074,9 @@ function renderAdempimenti() {
     '<div class="metric-card"><div class="metric-label">Prenotazioni nel periodo</div><div class="metric-value">'+nAW+'</div></div>'+
     '<div class="metric-card"><div class="metric-label">Ospiti registrati</div><div class="metric-value">'+nComp+'</div></div>'+
     '<div class="metric-card"><div class="metric-label">Camere occupate</div><div class="metric-value">'+camereOccupateSet.size+' / '+totCamere+'</div></div>'+
+    '<div class="metric-card"><div class="metric-label">Arrivi nel periodo</div><div class="metric-value">'+arriviCount+'</div></div>'+
+    '<div class="metric-card"><div class="metric-label">Partenze nel periodo</div><div class="metric-value">'+partenzeCount+'</div></div>'+
+    '<div class="metric-card"><div class="metric-label">Ospiti in casa</div><div class="metric-value">'+inCasaCount+'</div><div class="metric-sub">al '+fmtDate(adTo)+'</div></div>'+
     '<div class="metric-card"><div class="metric-label">Struttura</div><div class="metric-value" style="font-size:14px">'+(cfg.propertyName||'—')+'</div><div class="metric-sub">Cod. PS: '+(cfg.awCode||'n.d.')+'</div></div>'+
     '</div>'+
 
@@ -24059,6 +24089,27 @@ function renderAdempimenti() {
     '<div style="padding:16px">'+
     renderTabellaMovimentoRegione(filteredMovimento, adFrom, adTo)+
     '</div></div>'+
+
+    // PRESENZE REALI PER DATA — portata dentro da ISTAT, stesso senso della tabella sopra ma
+    // conteggio diverso: qui è l'occupazione vera di ogni singola notte, non le notti sommate sul
+    // giorno di arrivo (definizione standard usata per il movimento).
+    '<div class="card" style="margin-bottom:16px">'+
+    '<div style="padding:14px 16px;border-bottom:.5px solid var(--border)">'+
+    '<div style="font-size:14px;font-weight:700">🛏️ Presenze reali per data (chi dorme quella notte)</div>'+
+    '<div style="font-size:12px;color:var(--text2);margin-top:4px">Diverso dalla colonna "Presenze" sopra: qui è l\'occupazione vera di ogni singola notte, non le notti sommate sul giorno di arrivo.'+
+      (presenzeGiornaliereLimitate ? ' Il periodo scelto è ampio: per non appesantire il calcolo mostriamo solo gli ultimi 92 giorni fino al '+fmtDate(adTo)+'.' : '')+
+    '</div></div>'+
+    (righePresenze.length ?
+      '<div style="max-height:400px;overflow-y:auto;padding:0 16px 14px"><table style="width:100%;border-collapse:collapse;font-size:12.5px">' +
+      '<thead style="position:sticky;top:0;background:var(--surface)"><tr style="color:var(--text3);text-align:left"><th style="padding:6px 0">Data</th><th>Regione / Nazione</th><th>Provincia</th><th style="text-align:center">Presenti quella notte</th></tr></thead><tbody>' +
+      righePresenze.map(function(r){
+        var nomeProvincia = PROVINCIA_NOME[r.provincia] ? ' — '+PROVINCIA_NOME[r.provincia] : '';
+        return '<tr style="border-top:1px solid var(--border)"><td style="padding:6px 0">'+fmtDate(r.data)+'</td><td>'+r.provenienza+'</td><td><strong>'+r.provincia+'</strong>'+nomeProvincia+'</td><td style="text-align:center">'+r.presenti+'</td></tr>';
+      }).join('') +
+      '</tbody></table></div>'
+      : '<div class="empty-state" style="padding:24px"><p>Nessuno presente nel periodo selezionato.</p></div>'
+    ) +
+    '</div>'+
 
     noCheckIn+
 
@@ -24134,12 +24185,29 @@ function renderTabellaMovimentoRegione(bookings, adFrom, adTo) {
     +'</div>';
 }
 
+// Sposta avanti/indietro di 1 giorno il periodo selezionato in Adempimenti, mantenendo invariata
+// l'ampiezza (es. se era selezionata una settimana, scorre tutta la settimana di un giorno) —
+// pensato soprattutto per il caso più comune, un solo giorno selezionato, per scorrere data per
+// data senza dover riaprire il calendarietto ogni volta.
+function adSpostaGiorno(delta) {
+  var adFrom = window._adFrom || today();
+  var adTo   = window._adTo   || today();
+  window._adFrom = addDays(adFrom, delta);
+  window._adTo   = addDays(adTo, delta);
+  renderAdempimenti();
+}
 function adPreset(p) {
   var n = new Date();
   var f = function(d){return (function(x){return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');})(d);};
   if(p==='today'){window._adFrom=window._adTo=f(n);}
   else if(p==='week'){var mon=new Date(n);mon.setDate(n.getDate()-n.getDay()+1);var sun=new Date(mon);sun.setDate(mon.getDate()+6);window._adFrom=f(mon);window._adTo=f(sun);}
   else if(p==='month'){window._adFrom=f(new Date(n.getFullYear(),n.getMonth(),1));window._adTo=f(new Date(n.getFullYear(),n.getMonth()+1,0));}
+  else if(p==='anno'){window._adFrom=f(new Date(n.getFullYear(),0,1));window._adTo=f(new Date(n.getFullYear(),11,31));}
+  else if(p==='tutto'){
+    var bk=DB.get('bookings').filter(function(b){return b.status!=='cancellata';});
+    var date=bk.map(function(b){return b.checkin;}).sort();
+    window._adFrom=date.length?date[0]:f(n); window._adTo=f(n);
+  }
   renderAdempimenti();
 }
 
@@ -26654,7 +26722,6 @@ function renderPage(page) {
     impostazioni: renderImpostazioni, listino: renderListino, tassasoggiorno: renderTassaSoggiorno,
     housekeeping: renderHousekeeping, puliziamobile: renderPuliziaMobile, preventivi: renderPreventivi, addebitiextra: renderAddebitiExtra,
     previsionale: renderPrevisionale, esporta: renderEsporta,
-    istat: renderIstat,
     extra: renderExtra,
     ical: renderIcal,
     salvataggio: renderSalvataggio,
@@ -26916,106 +26983,6 @@ function calcolaPresenzeGiornaliere(bookings, dFrom, dTo) {
   });
   return righe;
 }
-function renderIstat() {
-  var el = document.getElementById('page-istat');
-  if (!el) return;
-  var bookings = DB.get('bookings').filter(function(b){
-    return b.componenti && b.componenti.length && b.status !== 'cancellata';
-  });
-
-  // Di default mostriamo tutto lo storico disponibile: dalla prima data di check-in trovata a oggi
-  var tutteLeDate = bookings.map(function(b){ return b.checkin; }).sort();
-  var minData = tutteLeDate.length ? tutteLeDate[0] : today();
-  var isFrom = window._istatFrom || minData;
-  var isTo   = window._istatTo   || today();
-
-  var filteredMovimento = bookings.filter(function(b){
-    return b.checkin <= isTo && b.checkout > isFrom;
-  });
-
-  // Riusa lo stesso calcolo già corretto in Adempimenti (tiene conto di stato cancellata, componenti
-  // reali, ecc.): righe per data + regione/stato + provincia, con lo stesso ordinamento (straniere
-  // prima delle italiane, per ogni data)
-  var righe = calcolaMovimentoPerRegione(filteredMovimento, isFrom, isTo);
-  var totGen = {arrivi:0, partenze:0, presenze:0};
-  righe.forEach(function(r){ totGen.arrivi+=r.arrivi; totGen.partenze+=r.partenze; totGen.presenze+=r.presenze; });
-
-  // Presenze reali per data (chi dorme davvero quella notte), stesso periodo selezionato sopra —
-  // limitiamo a 92 giorni per non appesantire il calcolo se è stato scelto "Tutta la storia"
-  var giorniIntervallo = Math.round((parseLD(isTo)-parseLD(isFrom))/86400000)+1;
-  var presenzeGiornaliereLimitate = giorniIntervallo > 92;
-  var presFrom = presenzeGiornaliereLimitate ? addDays(isTo,-91) : isFrom;
-  var righePresenze = calcolaPresenzeGiornaliere(filteredMovimento, presFrom, isTo);
-  var presenzePerData = {};
-  righePresenze.forEach(function(r){ presenzePerData[r.data] = (presenzePerData[r.data]||0) + r.presenti; });
-
-  el.innerHTML = '<div class="page-header"><div><div class="page-title">ISTAT</div>' +
-    '<div class="page-subtitle">Arrivi, partenze e presenze per data, provincia e nazione</div></div></div>' +
-    '<div class="page-content">' +
-
-    '<div style="background:var(--surface2);border:.5px solid var(--border2);border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
-    '<input type="date" id="is-from" value="'+isFrom+'" style="font-size:11px;padding:3px 6px;border:.5px solid var(--border2);border-radius:5px;width:118px">' +
-    '<span style="font-size:11px;color:var(--text3)">→</span>' +
-    '<input type="date" id="is-to" value="'+isTo+'" style="font-size:11px;padding:3px 6px;border:.5px solid var(--border2);border-radius:5px;width:118px">' +
-    '<button class="btn btn-primary btn-sm" style="font-size:11px;padding:3px 8px" onclick="window._istatFrom=document.getElementById(\'is-from\').value;window._istatTo=document.getElementById(\'is-to\').value;renderIstat()">Filtra</button>'+
-    '<span style="color:var(--border2)">|</span>'+
-    '<button class="btn btn-sm" style="font-size:11px;padding:3px 7px" onclick="istatPreset(\'anno\')">Anno corrente</button>'+
-    '<button class="btn btn-sm" style="font-size:11px;padding:3px 7px" onclick="istatPreset(\'tutto\')">Tutta la storia</button>'+
-    '</div>' +
-
-    '<div class="metrics-grid" style="margin-bottom:16px">' +
-    '<div class="metric-card"><div class="metric-label">Arrivi nel periodo</div><div class="metric-value">'+totGen.arrivi+'</div></div>' +
-    '<div class="metric-card"><div class="metric-label">Partenze nel periodo</div><div class="metric-value">'+totGen.partenze+'</div></div>' +
-    '<div class="metric-card"><div class="metric-label">Presenze totali (pernottamenti)</div><div class="metric-value">'+totGen.presenze+'</div></div>' +
-    '</div>' +
-
-    '<div class="card" style="margin-bottom:16px"><div class="card-header"><span class="card-title">📅 Arrivi, partenze e presenze per data</span></div>' +
-    (righe.length ?
-      '<div style="padding:0 16px 4px;font-size:11px;color:var(--text3)">La colonna Provincia è quella da usare per caricare i dati su Sistema Turismo; per gli stranieri è la Nazione di provenienza.</div>'+
-      '<div style="max-height:480px;overflow-y:auto;padding:0 16px 14px"><table style="width:100%;border-collapse:collapse;font-size:12.5px">' +
-      '<thead style="position:sticky;top:0;background:var(--surface)"><tr style="color:var(--text3);text-align:left"><th style="padding:6px 0">Data</th><th>Regione / Nazione</th><th>Provincia</th><th style="text-align:center">Arrivi</th><th style="text-align:center">Partenze</th><th style="text-align:center">Presenti</th></tr></thead><tbody>' +
-      righe.map(function(r){
-        var nomeProvincia = PROVINCIA_NOME[r.provincia] ? ' — '+PROVINCIA_NOME[r.provincia] : '';
-        return '<tr style="border-top:1px solid var(--border)"><td style="padding:6px 0">'+fmtDate(r.data)+'</td><td>'+r.provenienza+'</td><td><strong>'+r.provincia+'</strong>'+nomeProvincia+'</td><td style="text-align:center">'+r.arrivi+'</td><td style="text-align:center">'+r.partenze+'</td><td style="text-align:center">'+r.presenze+'</td></tr>';
-      }).join('') +
-      '<tr style="border-top:2px solid var(--border2);font-weight:700"><td style="padding:6px 0" colspan="3">Totale periodo</td><td style="text-align:center">'+totGen.arrivi+'</td><td style="text-align:center">'+totGen.partenze+'</td><td style="text-align:center">'+totGen.presenze+'</td></tr>' +
-      '</tbody></table></div>'
-      : '<div class="empty-state" style="padding:24px"><p>Nessun dato da mostrare per il periodo selezionato — servono prenotazioni con check-in già compilato.</p></div>'
-    ) +
-    '</div>' +
-
-    '<div class="card"><div class="card-header"><span class="card-title">🛏️ Presenze reali per data (chi dorme quella notte)</span></div>' +
-    '<div style="padding:0 16px 4px;font-size:11px;color:var(--text3)">Diverso dalla colonna "Presenti" sopra: qui è l\'occupazione vera di ogni singola notte, non le notti sommate sul giorno di arrivo.'+
-      (presenzeGiornaliereLimitate ? ' Il periodo scelto è ampio: per non appesantire il calcolo mostriamo solo gli ultimi 92 giorni fino al '+fmtDate(isTo)+'.' : '')+
-    '</div>' +
-    (righePresenze.length ?
-      '<div style="max-height:400px;overflow-y:auto;padding:0 16px 14px"><table style="width:100%;border-collapse:collapse;font-size:12.5px">' +
-      '<thead style="position:sticky;top:0;background:var(--surface)"><tr style="color:var(--text3);text-align:left"><th style="padding:6px 0">Data</th><th>Regione / Nazione</th><th>Provincia</th><th style="text-align:center">Presenti quella notte</th></tr></thead><tbody>' +
-      righePresenze.map(function(r){
-        var nomeProvincia = PROVINCIA_NOME[r.provincia] ? ' — '+PROVINCIA_NOME[r.provincia] : '';
-        return '<tr style="border-top:1px solid var(--border)"><td style="padding:6px 0">'+fmtDate(r.data)+'</td><td>'+r.provenienza+'</td><td><strong>'+r.provincia+'</strong>'+nomeProvincia+'</td><td style="text-align:center">'+r.presenti+'</td></tr>';
-      }).join('') +
-      '</tbody></table></div>'
-      : '<div class="empty-state" style="padding:24px"><p>Nessuno presente nel periodo selezionato.</p></div>'
-    ) +
-    '</div>' +
-    '</div>';
-}
-function istatPreset(p) {
-  var n = new Date();
-  var f = function(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
-  if (p==='anno') {
-    window._istatFrom = f(new Date(n.getFullYear(),0,1));
-    window._istatTo = f(new Date(n.getFullYear(),11,31));
-  } else if (p==='tutto') {
-    var bookings = DB.get('bookings').filter(function(b){ return b.componenti && b.componenti.length && b.status!=='cancellata'; });
-    var date = bookings.map(function(b){ return b.checkin; }).sort();
-    window._istatFrom = date.length ? date[0] : f(n);
-    window._istatTo = f(n);
-  }
-  renderIstat();
-}
-
 function renderSalvataggio() {
   var el = document.getElementById('page-salvataggio');
   if(!el) return;
