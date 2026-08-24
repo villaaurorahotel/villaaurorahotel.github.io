@@ -329,7 +329,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 23/08/2026 · 16:12</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 24/08/2026 · 05:50</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -13444,6 +13444,45 @@ function renderPrevisionale() {
   });
   var totRev=filtered.reduce(function(s,b){return s+Number(b.totalPrice);},0),totBk=filtered.length,totN=filtered.reduce(function(s,b){return s+nights(b.checkin,b.checkout);},0);
   var rLabel=prevFrom&&prevTo?fmtDate(prevFrom)+' -> '+fmtDate(prevTo):'Tutti i dati';
+
+  // CONFRONTO CON L'ANNO PRECEDENTE — stesso periodo scelto sopra (o l'anno corrente, se non hai
+  // filtrato nulla), spostato indietro di esattamente un anno, per confrontare camere vendute,
+  // notti, ricavi e ADR (prezzo medio a notte) tra i due periodi.
+  function shiftAnno(ds, delta) { var d = new Date(ds+'T00:00:00Z'); d.setUTCFullYear(d.getUTCFullYear()+delta); return d.toISOString().slice(0,10); }
+  var confFrom, confTo;
+  if (prevFrom && prevTo) { confFrom = prevFrom; confTo = prevTo; }
+  else { var annoCorr = new Date().getFullYear(); confFrom = annoCorr+'-01-01'; confTo = annoCorr+'-12-31'; }
+  var confFromPrec = shiftAnno(confFrom, -1), confToPrec = shiftAnno(confTo, -1);
+  var bkAttuale = allBk.filter(function(b){ return b.checkin>=confFrom && b.checkin<=confTo; });
+  var bkPrecedente = allBk.filter(function(b){ return b.checkin>=confFromPrec && b.checkin<=confToPrec; });
+  function metricaConfronto(bk) {
+    var notti = bk.reduce(function(s,b){ return s+nights(b.checkin,b.checkout); }, 0);
+    var rev = bk.reduce(function(s,b){ return s+Number(b.totalPrice||0); }, 0);
+    return { camere: bk.length, notti: notti, ricavi: rev, adr: notti>0 ? rev/notti : 0 };
+  }
+  var mAtt = metricaConfronto(bkAttuale), mPrec = metricaConfronto(bkPrecedente);
+  function variazioneConfronto(nuovo, vecchio) {
+    if (!vecchio) return nuovo>0 ? { txt:'nuovo', ok:true } : { txt:'—', ok:null };
+    var pct = (nuovo-vecchio)/vecchio*100;
+    return { txt:(pct>=0?'+':'')+pct.toFixed(1)+'%', ok: pct>=0 };
+  }
+  function rigaConfronto(etichetta, nuovo, vecchio, formatta) {
+    var v = variazioneConfronto(nuovo, vecchio);
+    var colore = v.ok===true ? 'var(--green)' : (v.ok===false ? 'var(--danger)' : 'var(--text3)');
+    return '<tr><td>'+etichetta+'</td><td style="text-align:right">'+formatta(vecchio)+'</td><td style="text-align:right;font-weight:700">'+formatta(nuovo)+'</td>'+
+      '<td style="text-align:right;font-weight:700;color:'+colore+'">'+v.txt+'</td></tr>';
+  }
+  var confrontoHTML =
+    '<div class="card" style="margin-top:20px">'+
+    '<div class="card-header"><span class="card-title">📊 Confronto con l\'anno precedente</span></div>'+
+    '<div style="font-size:12px;color:var(--text2);padding:0 16px 10px">'+fmtDate(confFromPrec)+' → '+fmtDate(confToPrec)+' &nbsp;vs&nbsp; '+fmtDate(confFrom)+' → '+fmtDate(confTo)+'</div>'+
+    '<table style="width:100%"><thead><tr><th></th><th style="text-align:right">Anno precedente</th><th style="text-align:right">Periodo attuale</th><th style="text-align:right">Variazione</th></tr></thead><tbody>'+
+    rigaConfronto('Camere vendute', mAtt.camere, mPrec.camere, function(v){return v;})+
+    rigaConfronto('Notti vendute', mAtt.notti, mPrec.notti, function(v){return v;})+
+    rigaConfronto('Ricavi', mAtt.ricavi, mPrec.ricavi, fmtCurrency)+
+    rigaConfronto('ADR (prezzo medio/notte)', mAtt.adr, mPrec.adr, fmtCurrency)+
+    '</tbody></table></div>';
+
   document.getElementById('page-previsionale').innerHTML=
     '<div class="page-header"><div><div class="page-title">Previsionale</div><div class="page-subtitle">'+rLabel+'</div></div>'+
     '<div class="flex-row" style="gap:6px">'
@@ -13471,7 +13510,9 @@ function renderPrevisionale() {
     '<div class="card"><div class="card-header"><span class="card-title">Andamento mensile</span></div>'+
     (rows.length===0?'<div class="empty-state"><p>Nessun dato</p></div>':
     '<table><thead><tr><th>Mese</th><th>Prenotazioni</th><th>Notti</th><th>Occupazione</th><th>Ricavi</th><th>Fonti</th></tr></thead><tbody>'+rows.join('')+'</tbody></table>')+
-    '</div></div>';
+    '</div>'+
+    confrontoHTML+
+    '</div>';
 }
 function prevExportXLSX() {
   var XL = typeof XLSX !== 'undefined' ? XLSX : null;
@@ -13589,7 +13630,14 @@ function renderDashboard() {
     var fatturatoOggi = fatturatoDelGiorno(tod);
     var checkinOggi = bookings.filter(function(b){ return b.checkin===tod && b.status!=='cancellata'; }).length;
     var checkoutOggi = bookings.filter(function(b){ return b.checkout===tod && b.status!=='cancellata'; }).length;
-    var colazioniOggi = active.reduce(function(s,b){ return s + (b.colazioneInclusa!==false ? (Number(b.adults||1)+Number(b.children||0)) : 0); }, 0);
+    // BUG TROVATO E CORRETTO ("le colazioni di oggi mostravano quelle di domani"): la colazione di
+    // stamattina (giorno "tod") è per chi ha dormito la notte SCORSA (tra ieri e oggi), non per chi
+    // dorme stanotte (quella è la colazione di domani). "active" sopra rappresenta chi occupa la
+    // camera STANOTTE (checkin<=tod && checkout>tod) — giusto per occupazione/check-in di oggi, ma
+    // sbagliato per le colazioni. Per le colazioni serve chi ha dormito IERI notte: checkin<ieri+1
+    // (cioè <tod) e checkout>=tod (non ancora partito prima di stamattina).
+    var presentiIeriNotte = bookings.filter(function(b){ return b.checkin<tod && b.checkout>=tod && b.status!=='cancellata'; });
+    var colazioniOggi = presentiIeriNotte.reduce(function(s,b){ return s + (b.colazioneInclusa!==false ? (Number(b.adults||1)+Number(b.children||0)) : 0); }, 0);
     var cfgDash = DB.getObj('settings', {});
     var isFreshPC = !cfgDash.supabaseUrl || !cfgDash.supabaseKey;
 
@@ -22225,9 +22273,39 @@ function renderReport() {
   const avgS=bookings.length>0?(totN/bookings.length).toFixed(1):'0';
   const srcMap={};bookings.forEach(b=>{srcMap[b.source||'Altro']=(srcMap[b.source||'Altro']||0)+1;});
   const srcRows=Object.entries(srcMap).sort((a,b)=>b[1]-a[1]);
-  const rmMap={};bookings.forEach(b=>{rmMap[b.roomName]=(rmMap[b.roomName]||0)+nights(b.checkin,b.checkout);});
-  const rmRows=Object.entries(rmMap).sort((a,b)=>b[1]-a[1]);
+  // BUG TROVATO E CORRETTO ("doppioni nelle notti per camera"): raggruppava per il NOME della
+  // camera scritto dentro ogni prenotazione — un testo "fotografato" al momento della prenotazione,
+  // che non si aggiorna se la camera viene rinominata dopo (es. lo "Separa note dal nome" di qualche
+  // giorno fa). Le prenotazioni vecchie restavano quindi sotto il nome vecchio, creando un doppione
+  // per la stessa camera vera. Ora si raggruppa per l'ID della camera (che non cambia mai), e si usa
+  // sempre il nome ATTUALE per mostrarlo — inoltre ordinate in modo crescente, non più per notti.
+  const roomNameById={}; rooms.forEach(r=>{roomNameById[r.id]=r.name;});
+  const rmMap={};bookings.forEach(b=>{rmMap[b.roomId]=(rmMap[b.roomId]||0)+nights(b.checkin,b.checkout);});
+  const rmRows=Object.entries(rmMap)
+    .map(([roomId,n])=>[roomNameById[roomId]||'(camera eliminata)', n])
+    .sort((a,b)=>a[0].localeCompare(b[0],'it',{numeric:true}));
   const rLabel=repFrom&&repTo?fmtDate(repFrom)+' -> '+fmtDate(repTo):repFrom?'Dal '+fmtDate(repFrom):repTo?'Fino al '+fmtDate(repTo):'Tutti i dati';
+
+  // COLAZIONI PER GIORNO — usa TUTTE le prenotazioni attive (non solo quelle con check-in nel
+  // periodo filtrato sopra, altrimenti mancherebbero i giorni di chi è arrivato prima e soggiorna
+  // durante il periodo). Se non hai scelto un periodo sopra, di default mostra il mese corrente
+  // (mostrare "sempre" darebbe una tabella lunghissima). Stesso calcolo corretto della Dashboard:
+  // la colazione del giorno D è per chi ha dormito la notte prima (checkin<D && checkout>=D).
+  var oggiD = new Date();
+  var meseFrom = oggiD.getFullYear()+'-'+String(oggiD.getMonth()+1).padStart(2,'0')+'-01';
+  var meseTo = new Date(oggiD.getFullYear(), oggiD.getMonth()+1, 0).toISOString().slice(0,10);
+  var colFrom = repFrom || meseFrom, colTo = repTo || meseTo;
+  var giorniColazioni = Math.round((parseLD(colTo)-parseLD(colFrom))/86400000)+1;
+  var colazioniLimitate = giorniColazioni > 366;
+  if (colazioniLimitate) colTo = addDays(colFrom, 365);
+  var righeColazioni = [];
+  for (var dC = colFrom; dC <= colTo; dC = addDays(dC, 1)) {
+    var presentiNotteC = allBk.filter(function(b){ return b.checkin<dC && b.checkout>=dC; });
+    var nColaz = presentiNotteC.reduce(function(s,b){ return s + (b.colazioneInclusa!==false ? (Number(b.adults||1)+Number(b.children||0)) : 0); }, 0);
+    if (nColaz > 0) righeColazioni.push({ data: dC, n: nColaz });
+  }
+  var totColazioniPeriodo = righeColazioni.reduce(function(s,r){ return s+r.n; }, 0);
+
   document.getElementById('page-report').innerHTML=
     '<div class="page-header"><div><div class="page-title">Report</div><div class="page-subtitle">'+rLabel+'</div></div>'+
     '<div class="flex-row" style="gap:6px">'
@@ -22261,7 +22339,20 @@ function renderReport() {
     (rmRows.length===0?'<div class="empty-state" style="padding:24px"><p>Nessun dato</p></div>':
     '<table><thead><tr><th>Camera</th><th>Notti</th></tr></thead><tbody>'+
     rmRows.map(([n,v])=>'<tr><td>'+n+'</td><td>'+v+'</td></tr>').join('')+'</tbody></table>')+
-    '</div></div></div>';
+    '</div></div>'+
+    // COLAZIONI PER GIORNO
+    '<div class="card" style="margin-top:16px">'+
+    '<div class="card-header"><span class="card-title">☕ Colazioni per giorno</span></div>'+
+    '<div style="font-size:12px;color:var(--text2);padding:0 16px 10px">'+
+      (repFrom||repTo ? 'Stesso periodo filtrato sopra' : 'Mese corrente (per un periodo diverso, filtralo qui sopra)')+
+      ' — '+fmtDate(colFrom)+' → '+fmtDate(colTo)+' &nbsp;·&nbsp; totale <strong>'+totColazioniPeriodo+'</strong> colazioni'+
+      (colazioniLimitate ? ' <span style="color:var(--amber)">(periodo molto ampio, mostro solo i primi 366 giorni)</span>' : '')+
+    '</div>'+
+    (righeColazioni.length===0?'<div class="empty-state" style="padding:24px"><p>Nessuna colazione nel periodo</p></div>':
+    '<div style="max-height:380px;overflow-y:auto;padding:0 16px 14px"><table style="width:100%;border-collapse:collapse"><thead style="position:sticky;top:0;background:var(--surface)"><tr><th style="text-align:left;padding:6px 0">Data</th><th style="text-align:right">Colazioni</th></tr></thead><tbody>'+
+    righeColazioni.map(function(r){ return '<tr style="border-top:1px solid var(--border)"><td style="padding:6px 0">'+fmtDate(r.data)+'</td><td style="text-align:right;font-weight:600">'+r.n+'</td></tr>'; }).join('')+
+    '</tbody></table></div>')+
+    '</div>';
 }
 var repFrom='';var repTo='';
 var cassaFilter = {from:'',to:'',type:'',cat:'',method:''};
