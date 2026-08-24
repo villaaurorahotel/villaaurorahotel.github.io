@@ -167,6 +167,11 @@ tr:hover td{background:var(--surface2)}
 .dett-riga:hover{background:var(--surface2)}
 #btn-refresh-globale:disabled{opacity:.7;cursor:default}
 #btn-refresh-globale:hover:not(:disabled){filter:brightness(1.1)}
+@media print{
+  #sidebar,#mobile-menu-btn,#mobile-overlay,.no-print{display:none!important}
+  #main{margin-left:0!important}
+  .print-only{display:block!important}
+}
 </style>
 <style>
 /* ===== Modulo Corrispettivi (scoped) ===== */
@@ -329,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 24/08/2026 · 06:38</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 24/08/2026 · 06:51</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -24790,8 +24795,6 @@ function pastiPreset(p) {
 }
 function renderReportPasti() {
   var allBk = DB.get('bookings').filter(function(b){ return b.status!=='cancellata' && !b.escludiConteggi; });
-  var rooms = getRooms();
-  var roomNameById = {}; rooms.forEach(function(r){ roomNameById[r.id]=r.name; });
 
   var n = new Date(); n.setHours(0,0,0,0);
   function f(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
@@ -24815,19 +24818,15 @@ function renderReportPasti() {
     var nP = pranzoBk.reduce(function(s,b){return s+personeDi(b);},0);
     var nCe = cenaBk.reduce(function(s,b){return s+personeDi(b);},0);
     totC+=nC; totP+=nP; totCe+=nCe;
-    if (nC>0 || nP>0 || nCe>0) {
-      var perCamera = {};
-      colazioneBk.forEach(function(b){ perCamera[b.roomId] = perCamera[b.roomId] || {c:0,p:0,ce:0,nome:roomNameById[b.roomId]||b.roomName}; perCamera[b.roomId].c += personeDi(b); });
-      pranzoBk.forEach(function(b){ perCamera[b.roomId] = perCamera[b.roomId] || {c:0,p:0,ce:0,nome:roomNameById[b.roomId]||b.roomName}; perCamera[b.roomId].p += personeDi(b); });
-      cenaBk.forEach(function(b){ perCamera[b.roomId] = perCamera[b.roomId] || {c:0,p:0,ce:0,nome:roomNameById[b.roomId]||b.roomName}; perCamera[b.roomId].ce += personeDi(b); });
-      righe.push({ data:d, c:nC, p:nP, ce:nCe, camere: Object.values(perCamera).sort(function(a,b2){return a.nome.localeCompare(b2.nome,'it',{numeric:true});}) });
-    }
+    if (nC>0 || nP>0 || nCe>0) righe.push({ data:d, c:nC, p:nP, ce:nCe });
   }
 
   document.getElementById('page-reportpasti').innerHTML =
-    '<div class="page-header"><div><div class="page-title">Report Pasti</div><div class="page-subtitle">'+fmtDate(pFrom)+' → '+fmtDate(pTo)+'</div></div></div>'+
+    '<div class="page-header"><div><div class="page-title">Report Pasti</div><div class="page-subtitle">'+fmtDate(pFrom)+' → '+fmtDate(pTo)+'</div></div>'+
+    '<div class="flex-row no-print" style="gap:6px"><button class="btn btn-sm" onclick="window.print()">🖨 Stampa</button></div>'+
+    '</div>'+
     '<div class="page-content">'+
-    '<div style="background:var(--surface2);border:.5px solid var(--border2);border-radius:8px;padding:8px 12px;margin-bottom:16px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">'+
+    '<div class="no-print" style="background:var(--surface2);border:.5px solid var(--border2);border-radius:8px;padding:8px 12px;margin-bottom:16px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">'+
     '<input type="date" id="pasti-from" value="'+pFrom+'" style="font-size:11px;padding:3px 6px;border:.5px solid var(--border2);border-radius:5px;width:118px">'+
     '<span style="font-size:11px;color:var(--text3)">→</span>'+
     '<input type="date" id="pasti-to" value="'+pTo+'" style="font-size:11px;padding:3px 6px;border:.5px solid var(--border2);border-radius:5px;width:118px">'+
@@ -24837,23 +24836,17 @@ function renderReportPasti() {
     '<button class="btn btn-sm" style="font-size:11px;padding:3px 7px" onclick="pastiPreset(\'settimana\')">Prossimi 7gg</button>'+
     '<button class="btn btn-sm" style="font-size:11px;padding:3px 7px" onclick="pastiPreset(\'domani7\')">Da domani, 7gg</button>'+
     '</div>'+
+    '<div style="display:none" class="print-only" style="font-size:13px;margin-bottom:12px">Periodo: '+fmtDate(pFrom)+' → '+fmtDate(pTo)+'</div>'+
     '<div class="metrics-grid" style="margin-bottom:20px">'+
     '<div class="metric-card"><div class="metric-label">☕ Colazioni</div><div class="metric-value">'+totC+'</div></div>'+
     '<div class="metric-card"><div class="metric-label">🍝 Pranzi</div><div class="metric-value">'+totP+'</div></div>'+
     '<div class="metric-card"><div class="metric-label">🍽 Cene</div><div class="metric-value">'+totCe+'</div></div>'+
     '</div>'+
-    (limitato ? '<div style="font-size:11.5px;color:var(--amber);margin-bottom:10px">Periodo molto ampio: mostro solo i primi 62 giorni.</div>' : '')+
+    (limitato ? '<div class="no-print" style="font-size:11.5px;color:var(--amber);margin-bottom:10px">Periodo molto ampio: mostro solo i primi 62 giorni.</div>' : '')+
     (righe.length===0 ? '<div class="empty-state"><p>Nessun pasto da servire nel periodo scelto</p></div>' :
-    righe.map(function(r){
-      return '<div class="card" style="margin-bottom:12px">'+
-        '<div style="padding:10px 16px;border-bottom:.5px solid var(--border);display:flex;justify-content:space-between;align-items:center">'+
-        '<strong style="font-size:13.5px">'+fmtDate(r.data)+'</strong>'+
-        '<span style="font-size:12px;color:var(--text2)">☕ '+r.c+' &nbsp; 🍝 '+r.p+' &nbsp; 🍽 '+r.ce+'</span>'+
-        '</div>'+
-        '<table style="width:100%"><thead><tr style="font-size:11px;color:var(--text3)"><th style="text-align:left;padding:5px 16px">Camera</th><th style="text-align:center">☕</th><th style="text-align:center">🍝</th><th style="text-align:center">🍽</th></tr></thead><tbody>'+
-        r.camere.map(function(c){ return '<tr><td style="padding:4px 16px">'+c.nome+'</td><td style="text-align:center">'+(c.c||'—')+'</td><td style="text-align:center">'+(c.p||'—')+'</td><td style="text-align:center">'+(c.ce||'—')+'</td></tr>'; }).join('')+
-        '</tbody></table></div>';
-    }).join(''))+
+    '<div class="card"><table style="width:100%"><thead><tr><th style="text-align:left">Data</th><th style="text-align:center">☕ Colazioni</th><th style="text-align:center">🍝 Pranzi</th><th style="text-align:center">🍽 Cene</th></tr></thead><tbody>'+
+    righe.map(function(r){ return '<tr><td>'+fmtDate(r.data)+'</td><td style="text-align:center">'+(r.c||'—')+'</td><td style="text-align:center">'+(r.p||'—')+'</td><td style="text-align:center">'+(r.ce||'—')+'</td></tr>'; }).join('')+
+    '</tbody></table></div>')+
     '</div>';
 }
 
