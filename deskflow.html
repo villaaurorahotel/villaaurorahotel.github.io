@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 24/08/2026 · 07:39</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 24/08/2026 · 10:54</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -14500,7 +14500,7 @@ function renderPrenotazioni() {
 
   const filtered = allBookings.filter(b => {
     const q      = prenotazioniFilter.search.toLowerCase();
-    const matchQ = !q || b.guestName.toLowerCase().includes(q) || (b.roomName||'').toLowerCase().includes(q);
+    const matchQ = !q || b.guestName.toLowerCase().includes(q) || (b.roomName||'').toLowerCase().includes(q) || (b.id||'').toLowerCase().includes(q);
     const matchS = !prenotazioniFilter.status || b.status === prenotazioniFilter.status;
     const matchF = !prenotazioniFilter.from || b.checkin >= prenotazioniFilter.from;
     const matchT = !prenotazioniFilter.to   || b.checkin <= prenotazioniFilter.to;
@@ -16495,7 +16495,7 @@ function editPrenotazione(id) {
   if (!b) return;
   const rooms = DB.get('rooms');
   const guests = DB.get('guests');
-  showModal('Modifica prenotazione',
+  showModal(`Modifica prenotazione #${b.id} — ${b.guestName}`,
     `<div class="form-grid">
       <div class="form-group full">
         <label>Ospite</label>
@@ -18283,7 +18283,7 @@ function openDettaglioPrenotazione(id) {
   const tabBtn = (key, label, badge) => '<button type="button" data-dett-tabbtn="'+key+'" onclick="dettSwitchTab(this,\''+key+'\')" style="background:none;border:none;border-bottom:3px solid '+(key==='principale'?'var(--accent)':'transparent')+';padding:9px 14px 8px;font-size:13px;font-weight:'+(key==='principale'?'700':'500')+';color:'+(key==='principale'?'var(--accent)':'var(--text2)')+';cursor:pointer;white-space:nowrap">'+label+(badge?' <span style="background:var(--accent);color:#fff;border-radius:9px;padding:1px 6px;font-size:10.5px;margin-left:2px">'+badge+'</span>':'')+'</button>';
   const tabPanel = (key, html, visible) => '<div data-dett-tab="'+key+'" style="display:'+(visible?'block':'none')+'">'+html+'</div>';
 
-  showModal(`Prenotazione — ${b.guestName}`,
+  showModal(`Prenotazione #${b.id} — ${b.guestName}`,
     '<div style="display:flex;flex-wrap:wrap;gap:22px;min-height:420px">' +
 
     // ── SIDEBAR SINISTRA: Periodo / Cliente / Totali ──
@@ -22491,7 +22491,7 @@ function renderCalendario() {
   const calSearchQ = (calSearchQuery||'').trim().toLowerCase();
   let calPrimoMatchTrovato = false;
   let calRisultatiCount = 0;
-  if (calSearchQ) { calRisultatiCount = bookings.filter(b => (b.guestName||'').toLowerCase().includes(calSearchQ)).length; }
+  if (calSearchQ) { calRisultatiCount = bookings.filter(b => (b.guestName||'').toLowerCase().includes(calSearchQ) || (b.id||'').toLowerCase().includes(calSearchQ)).length; }
   rooms.forEach(room => {
     const cat = room.type || 'Senza tipologia';
     if (cat !== currentCat) {
@@ -22674,8 +22674,8 @@ function renderCalendario() {
           const garanziaTitle = booking.garanzia && booking.garanzia.tipo === 'carta' ? ' | Garanzia: carta •'+(booking.garanzia.ultime4||'----') : (booking.garanzia && booking.garanzia.tipo === 'bonifico' ? ' | Garanzia: bonifico' : '');
           const fonteI = iconeFonte(booking.source);
 
-          // Evidenzia la prenotazione se il nome corrisponde alla ricerca, attenua le altre
-          const searchMatch = calSearchQ && (booking.guestName||'').toLowerCase().includes(calSearchQ);
+          // Evidenzia la prenotazione se il nome o l'ID corrisponde alla ricerca, attenua le altre
+          const searchMatch = calSearchQ && ((booking.guestName||'').toLowerCase().includes(calSearchQ) || (booking.id||'').toLowerCase().includes(calSearchQ));
           const searchDim = calSearchQ && !searchMatch;
           const searchOutline = searchMatch ? 'outline:3px solid #facc15;outline-offset:-3px;box-shadow:0 0 0 2px rgba(250,204,21,.5) inset;' : '';
           const isFirstMatch = searchMatch && !calPrimoMatchTrovato;
@@ -22772,7 +22772,7 @@ function renderCalendario() {
       </div>
       <div class="flex-row">
         <div style="position:relative;display:flex;align-items:center">
-          <input type="text" id="cal-search" placeholder="🔍 Cerca ospite in calendario…" value="${(calSearchQuery||'').replace(/"/g,'&quot;')}" oninput="clearTimeout(window._calSearchDebounce); window._calSearchFocusRestore=true; calSearchQuery=this.value; window._calSearchDebounce=setTimeout(renderCalendario,220)" style="font-size:13px;padding:7px 32px 7px 12px;border:.5px solid var(--border2);border-radius:8px;width:220px">
+          <input type="text" id="cal-search" placeholder="🔍 Cerca ospite o ID prenotazione…" value="${(calSearchQuery||'').replace(/"/g,'&quot;')}" oninput="clearTimeout(window._calSearchDebounce); window._calSearchFocusRestore=true; calSearchQuery=this.value; window._calSearchDebounce=setTimeout(renderCalendario,220)" style="font-size:13px;padding:7px 32px 7px 12px;border:.5px solid var(--border2);border-radius:8px;width:220px">
           ${calSearchQuery ? '<button onclick="calSearchQuery=\'\'; renderCalendario()" title="Cancella ricerca" style="position:absolute;right:6px;background:none;border:none;cursor:pointer;font-size:13px;color:var(--text3)">✕</button>' : ''}
         </div>
         ${calSearchQ ? '<span style="font-size:12px;color:'+(calRisultatiCount>0?'var(--text2)':'var(--red)')+';white-space:nowrap">'+(calRisultatiCount>0?calRisultatiCount+' risultat'+(calRisultatiCount===1?'o':'i'):'Nessun risultato')+'</span>' : ''}
