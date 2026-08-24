@@ -19618,8 +19618,6 @@ function renderPlanner() {
                   '<button class="btn btn-sm" style="padding:8px 10px" onclick="editPrenotazione(\''+b.id+'\')" title="Modifica">✏️</button>' +
                   (b.componenti && b.componenti.length ? '<button class="btn btn-sm" style="padding:8px 10px'+(b.alloggiatiWebInviatoAt?';background:var(--green-bg);color:var(--green)':'')+'" onclick="alloggiatiActionMenu(\''+b.id+'\')" title="'+(b.alloggiatiWebInviatoAt?'✓ Già inviata ad Alloggiati Web il '+fmtDate(b.alloggiatiWebInviatoAt.slice(0,10))+' — clicca per rinviare':'Invia i dati di questa prenotazione ad Alloggiati Web')+'">'+(b.alloggiatiWebInviatoAt?'✓📡':'📡')+'</button>' : '') +
                   (corrTxCard ? '<button class="btn btn-sm" style="padding:8px 10px" onclick="corrRistampaRicevuta(\''+corrTxCard.id+'\')" title="Vedi/ristampa la ricevuta N. '+corrTxCard.numero+'">🧾</button>' : '') +
-                  (corrTxCard ? '<button class="btn btn-sm" style="padding:8px 10px" onclick="scaricaRicevutaPDF(\''+b.id+'\')" title="Scarica la ricevuta in PDF">⬇</button>' : '') +
-                  (corrTxCard ? '<button class="btn btn-sm" style="padding:8px 10px" onclick="inviaRicevutaPrenotazione(\''+b.id+'\')" title="Invia la ricevuta via email/WhatsApp">📤</button>' : '') +
                   azioneRapida +
                   azionePrimaria +
                 '</div>' +
