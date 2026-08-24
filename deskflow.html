@@ -14934,7 +14934,7 @@ function prenImportXLSX(event) {
             existing.adults=cGuests>=0?(parseInt(row[cGuests])||1):1; existing.children=existing.children||0;
             existing.source=cSource>=0?String(row[cSource]||'Importato'):'Importato';
             existing.status=status;
-            if(!existing.prezzoManuale) existing.totalPrice=totalPrice; // aggiorna il prezzo solo se NON bloccato
+            if(!existing.prezzoManuale && existing.status!=='check-in' && existing.status!=='check-out') existing.totalPrice=totalPrice; // aggiorna il prezzo solo se NON bloccato e la prenotazione non è già in corso/conclusa
             if(cRefundable>=0){ existing.nonRimborsabile=nonRimborsabileRow; if(nonRimborsabileRow) nonRimbSet++; }
             if(!existing.groupId && resId && resIdCounts[resId]>1) existing.groupId='RES-'+resId; // collega le camere della stessa prenotazione di gruppo
             existing.notes=notesParts.join(' | ');
