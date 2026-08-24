@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 24/08/2026 · 06:51</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 24/08/2026 · 07:39</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -16658,13 +16658,11 @@ function editPrenotazione(id) {
           ? corrState.transactions.find(function(t){ return t.bookingRef===id || (b.groupId && t.groupRef===b.groupId); })
           : null;
         if (corrTxBk) {
-          return `<div style="grid-column:1/-1;background:var(--green-bg);border-radius:8px;padding:10px 16px;display:flex;justify-content:space-between;align-items:center">
-            <span style="font-size:12.5px;color:var(--green)">🧾 Ricevuta emessa — N. ${corrTxBk.numero} del ${fmtDate(corrTxBk.date)}</span>
-            <span style="display:flex;gap:6px">
-            <button type="button" class="btn btn-sm" onclick="corrRistampaRicevuta('${corrTxBk.id}')">🖨 Vedi/Ristampa</button>
-            <button type="button" class="btn btn-sm" onclick="scaricaRicevutaPDF('${id}')">⬇ Scarica PDF</button>
-            <button type="button" class="btn btn-sm btn-primary" onclick="inviaRicevutaPrenotazione('${id}')">📤 Invia ricevuta</button>
-            </span>
+          // I pulsanti per vedere/scaricare/inviare la ricevuta sono stati spostati nella scheda
+          // Prenotazione (Contabilità), per non affollare questa maschera più rapida usata dal
+          // Planning — qui resta solo l'indicazione che la ricevuta è già stata emessa.
+          return `<div style="grid-column:1/-1;background:var(--green-bg);border-radius:8px;padding:10px 16px">
+            <span style="font-size:12.5px;color:var(--green)">🧾 Ricevuta emessa — N. ${corrTxBk.numero} del ${fmtDate(corrTxBk.date)} — vedi/invia dalla scheda Prenotazione</span>
           </div>`;
         }
         return `<div style="grid-column:1/-1;background:var(--surface2);border-radius:8px;padding:10px 16px;font-size:12.5px;color:var(--text3)">🧾 Nessuna ricevuta emessa ancora per questa prenotazione — usa "🖨 Conto" e poi registrala nei Corrispettivi quando incassi il pagamento.</div>`;
@@ -18455,6 +18453,18 @@ function openDettaglioPrenotazione(id) {
         `<button class="btn" onclick="apriProforma('${b.id}')" title="Riepilogo dell'importo dovuto da mostrare/stampare, senza registrare nulla nei Corrispettivi">📋 Proforma</button>` +
         `<button class="btn" onclick="stampaSchedaPrenotazione('${b.id}')">🖨 Stampa scheda</button>` +
       '</div>' +
+      (function(){
+        const corrTxFooter = (typeof corrState !== 'undefined' && corrState && corrState.transactions)
+          ? corrState.transactions.find(function(t){ return t.bookingRef===b.id || (b.groupId && t.groupRef===b.groupId); })
+          : null;
+        if (!corrTxFooter) return '';
+        return '<div style="display:flex;gap:8px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--border)">' +
+          '<span style="font-size:12.5px;color:var(--green);display:flex;align-items:center">🧾 Ricevuta N. '+corrTxFooter.numero+' del '+fmtDate(corrTxFooter.date)+'</span>' +
+          `<button type="button" class="btn btn-sm" onclick="corrRistampaRicevuta('${corrTxFooter.id}')">🖨 Vedi/Ristampa</button>` +
+          `<button type="button" class="btn btn-sm" onclick="scaricaRicevutaPDF('${b.id}')">⬇ Scarica PDF</button>` +
+          `<button type="button" class="btn btn-sm btn-primary" onclick="inviaRicevutaPrenotazione('${b.id}')">📤 Invia ricevuta</button>` +
+        '</div>';
+      })() +
       '<div style="display:flex;gap:8px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--border)">' +
         (b.status === 'cancellata'
           ? `<button class="btn" onclick="ripristinaPrenotazione('${b.id}'); closeModal();">↩ Ripristina</button>` +
