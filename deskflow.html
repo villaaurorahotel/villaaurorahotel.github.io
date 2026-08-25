@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 25/08/2026 · 06:15</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 25/08/2026 · 06:46</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -781,6 +781,30 @@ function roomTypeInfoFromSupabase(row) { return row.data; }
 function siteContentToSupabase(r) { return { id:r.id, data:r }; }
 function siteContentFromSupabase(row) { return row.data; }
 
+// BUG TROVATO E CORRETTO ("ospiti/prenotazioni spariti dopo un ricaricamento, ma presenti su
+// Supabase se controllati direttamente"): tutte le letture da Supabase usavano semplicemente
+// .select('*'), che di sua natura restituisce al MASSIMO 1000 righe per chiamata — oltre quel
+// numero, il resto viene tagliato via in silenzio, senza nessun errore. Con l'anagrafica ospiti (e
+// le prenotazioni, con anni di storico) ormai oltre quella soglia dopo le ultime importazioni, il
+// programma vedeva sempre e solo "i primi 1000" — gli altri sparivano dalla vista ad ogni
+// ricaricamento, pur restando tranquillamente salvati sul database. Questa funzione scarica TUTTE
+// le righe di una tabella, andando a "pagine" da 1000 finché non finiscono, invece di fermarsi alla
+// prima pagina.
+async function fetchTuttiIRighe(tabella, colonne) {
+  colonne = colonne || '*';
+  let tutte = [];
+  let da = 0;
+  const PAGINA = 1000;
+  while (true) {
+    const { data, error } = await supabaseClient.from(tabella).select(colonne).range(da, da + PAGINA - 1);
+    if (error) throw error;
+    tutte = tutte.concat(data || []);
+    if (!data || data.length < PAGINA) break;
+    da += PAGINA;
+  }
+  return tutte;
+}
+
 // --- Inizializzazione: carica i dati e attiva l'aggiornamento in tempo reale ---
 async function initSupabase() {
   const cfg = getSupabaseConfig();
@@ -789,11 +813,10 @@ async function initSupabase() {
     await loadSupabaseSDK();
     if (!supabaseClient) supabaseClient = supabase.createClient(cfg.url, cfg.key);
 
-    const [{data:rooms, error:err1}, {data:bookings, error:err2}] = await Promise.all([
-      supabaseClient.from('rooms').select('*'),
-      supabaseClient.from('bookings').select('*')
+    const [rooms, bookings] = await Promise.all([
+      fetchTuttiIRighe('rooms'),
+      fetchTuttiIRighe('bookings')
     ]);
-    if (err1 || err2) throw (err1 || err2);
 
     _roomsCache = (rooms||[]).map(roomFromSupabase);
     _syncedMaps.rooms = new Map((rooms||[]).map(r => [r.id, JSON.stringify(roomToSupabase(roomFromSupabase(r)))]));
@@ -802,8 +825,7 @@ async function initSupabase() {
 
     // Blocco camere: tabella facoltativa (se non ancora creata, si continua comunque senza)
     try {
-      const {data:blocks, error:err3} = await supabaseClient.from('room_blocks').select('*');
-      if (err3) throw err3;
+      const blocks = await fetchTuttiIRighe('room_blocks');
       _roomBlocksCache = {};
       (blocks||[]).forEach(b => { _roomBlocksCache[b.room_id+'|'+b.block_date] = true; });
       _roomBlocksReady = true;
@@ -814,8 +836,7 @@ async function initSupabase() {
 
     // Ospiti: tabella facoltativa (se non ancora creata, gli Ospiti restano locali su questo PC)
     try {
-      const {data:guests, error:err4} = await supabaseClient.from('guests').select('*');
-      if (err4) throw err4;
+      const guests = await fetchTuttiIRighe('guests');
       _guestsCache = (guests||[]).map(guestFromSupabase);
       _syncedMaps.guests = new Map((guests||[]).map(g => [g.id, JSON.stringify(guestToSupabase(guestFromSupabase(g)))]));
       _guestsReady = true;
@@ -826,8 +847,7 @@ async function initSupabase() {
 
     // Listino prezzi: tabella facoltativa
     try {
-      const {data:listino, error:err5} = await supabaseClient.from('listino').select('*');
-      if (err5) throw err5;
+      const listino = await fetchTuttiIRighe('listino');
       _listinoCache = (listino||[]).map(listinoFromSupabase);
       _syncedMaps.listino = new Map((listino||[]).map(l => [l.room_id+'|'+l.tariffa_id, JSON.stringify(listinoToSupabase(listinoFromSupabase(l)))]));
       _listinoReady = true;
@@ -838,8 +858,7 @@ async function initSupabase() {
 
     // Tariffe: tabella facoltativa
     try {
-      const {data:tariffe, error:err6} = await supabaseClient.from('tariffe').select('*');
-      if (err6) throw err6;
+      const tariffe = await fetchTuttiIRighe('tariffe');
       _tariffeCache = (tariffe||[]).map(tariffaFromSupabase);
       _syncedMaps.tariffe = new Map((tariffe||[]).map(t => [t.id, JSON.stringify(tariffaToSupabase(tariffaFromSupabase(t)))]));
       _tariffeReady = true;
@@ -850,8 +869,7 @@ async function initSupabase() {
 
     // Preventivi: tabella facoltativa
     try {
-      const {data:quotes, error:err7} = await supabaseClient.from('quotes').select('*');
-      if (err7) throw err7;
+      const quotes = await fetchTuttiIRighe('quotes');
       _quotesCache = (quotes||[]).map(quoteFromSupabase);
       _syncedMaps.quotes = new Map((quotes||[]).map(q => [q.id, JSON.stringify(quoteToSupabase(quoteFromSupabase(q)))]));
       _quotesReady = true;
@@ -862,8 +880,7 @@ async function initSupabase() {
 
     // Richieste di preventivo dal portale/sito pubblico: tabella facoltativa
     try {
-      const {data:richieste, error:err7b} = await supabaseClient.from('richieste_preventivo').select('*');
-      if (err7b) throw err7b;
+      const richieste = await fetchTuttiIRighe('richieste_preventivo');
       _richiestePreventivoCache = (richieste||[]).map(richiestaFromSupabase);
       _syncedMaps.richieste_preventivo = new Map((richieste||[]).map(r => [r.id, JSON.stringify(richiestaToSupabase(richiestaFromSupabase(r)))]));
       _richiestePreventivoReady = true;
@@ -875,8 +892,7 @@ async function initSupabase() {
 
     // Descrizioni e foto per tipologia camera (usate dal sito prenota.html): tabella facoltativa
     try {
-      const {data:rti, error:err7c} = await supabaseClient.from('room_type_info').select('*');
-      if (err7c) throw err7c;
+      const rti = await fetchTuttiIRighe('room_type_info');
       _roomTypeInfoCache = (rti||[]).map(roomTypeInfoFromSupabase);
       _syncedMaps.room_type_info = new Map((rti||[]).map(r => [r.id, JSON.stringify(roomTypeInfoToSupabase(roomTypeInfoFromSupabase(r)))]));
       _roomTypeInfoReady = true;
@@ -887,8 +903,7 @@ async function initSupabase() {
 
     // Contenuti/tema del sito prenota.html (nome, testi, colori, sezioni): tabella facoltativa
     try {
-      const {data:sc, error:err7d} = await supabaseClient.from('site_content').select('*');
-      if (err7d) throw err7d;
+      const sc = await fetchTuttiIRighe('site_content');
       _siteContentCache = (sc||[]).map(siteContentFromSupabase);
       _syncedMaps.site_content = new Map((sc||[]).map(r => [r.id, JSON.stringify(siteContentToSupabase(siteContentFromSupabase(r)))]));
       _siteContentReady = true;
@@ -962,28 +977,28 @@ document.addEventListener('visibilitychange', function () {
 });
 async function refreshCoreDataOnFocus() {
   try {
-    const [{ data: bookings, error: errB }, { data: rooms, error: errR }] = await Promise.all([
-      supabaseClient.from('bookings').select('*'),
-      supabaseClient.from('rooms').select('*'),
+    const [bookings, rooms] = await Promise.all([
+      fetchTuttiIRighe('bookings'),
+      fetchTuttiIRighe('rooms'),
     ]);
-    if (!errB && bookings) {
+    if (bookings) {
       _bookingsCache = bookings.map(bookingFromSupabase);
       _syncedMaps.bookings = new Map(bookings.map(b => [b.id, JSON.stringify(bookingToSupabase(bookingFromSupabase(b)))]));
     }
-    if (!errR && rooms) {
+    if (rooms) {
       _roomsCache = rooms.map(roomFromSupabase);
       _syncedMaps.rooms = new Map(rooms.map(r => [r.id, JSON.stringify(roomToSupabase(roomFromSupabase(r)))]));
     }
     if (_roomBlocksReady) {
-      const { data: blocks, error: errBl } = await supabaseClient.from('room_blocks').select('*');
-      if (!errBl && blocks) {
+      const blocks = await fetchTuttiIRighe('room_blocks');
+      if (blocks) {
         _roomBlocksCache = {};
         blocks.forEach(b => { _roomBlocksCache[b.room_id + '|' + b.block_date] = true; });
       }
     }
     if (_guestsReady) {
-      const { data: guests, error: errG } = await supabaseClient.from('guests').select('*');
-      if (!errG && guests) {
+      const guests = await fetchTuttiIRighe('guests');
+      if (guests) {
         _guestsCache = guests.map(guestFromSupabase);
         _syncedMaps.guests = new Map(guests.map(g => [g.id, JSON.stringify(guestToSupabase(guestFromSupabase(g)))]));
       }
@@ -1878,17 +1893,17 @@ async function refreshDatiCorrenti() {
   if (supabaseReady && supabaseClient) {
     try {
       const jobs = [
-        supabaseClient.from('rooms').select('*').then(r => { _roomsCache = (r.data||[]).map(roomFromSupabase); _syncedMaps.rooms = new Map((r.data||[]).map(x => [x.id, JSON.stringify(roomToSupabase(roomFromSupabase(x)))])); }),
-        supabaseClient.from('bookings').select('*').then(r => { _bookingsCache = (r.data||[]).map(bookingFromSupabase); _syncedMaps.bookings = new Map((r.data||[]).map(x => [x.id, JSON.stringify(bookingToSupabase(bookingFromSupabase(x)))])); })
+        fetchTuttiIRighe('rooms').then(r => { _roomsCache = r.map(roomFromSupabase); _syncedMaps.rooms = new Map(r.map(x => [x.id, JSON.stringify(roomToSupabase(roomFromSupabase(x)))])); }),
+        fetchTuttiIRighe('bookings').then(r => { _bookingsCache = r.map(bookingFromSupabase); _syncedMaps.bookings = new Map(r.map(x => [x.id, JSON.stringify(bookingToSupabase(bookingFromSupabase(x)))])); })
       ];
-      if (_guestsReady) jobs.push(supabaseClient.from('guests').select('*').then(r => { _guestsCache = (r.data||[]).map(guestFromSupabase); _syncedMaps.guests = new Map((r.data||[]).map(x => [x.id, JSON.stringify(guestToSupabase(guestFromSupabase(x)))])); }));
-      if (_listinoReady) jobs.push(supabaseClient.from('listino').select('*').then(r => { _listinoCache = (r.data||[]).map(listinoFromSupabase); _syncedMaps.listino = new Map((r.data||[]).map(x => [x.room_id+'|'+x.tariffa_id, JSON.stringify(listinoToSupabase(listinoFromSupabase(x)))])); }));
-      if (_tariffeReady) jobs.push(supabaseClient.from('tariffe').select('*').then(r => { _tariffeCache = (r.data||[]).map(tariffaFromSupabase); _syncedMaps.tariffe = new Map((r.data||[]).map(x => [x.id, JSON.stringify(tariffaToSupabase(tariffaFromSupabase(x)))])); }));
-      if (_quotesReady) jobs.push(supabaseClient.from('quotes').select('*').then(r => { _quotesCache = (r.data||[]).map(quoteFromSupabase); _syncedMaps.quotes = new Map((r.data||[]).map(x => [x.id, JSON.stringify(quoteToSupabase(quoteFromSupabase(x)))])); }));
-      if (_richiestePreventivoReady) jobs.push(supabaseClient.from('richieste_preventivo').select('*').then(r => { _richiestePreventivoCache = (r.data||[]).map(richiestaFromSupabase); _syncedMaps.richieste_preventivo = new Map((r.data||[]).map(x => [x.id, JSON.stringify(richiestaToSupabase(richiestaFromSupabase(x)))])); notificaRichiesteNuove(_richiestePreventivoCache); }));
-      if (_roomBlocksReady) jobs.push(supabaseClient.from('room_blocks').select('*').then(r => {
+      if (_guestsReady) jobs.push(fetchTuttiIRighe('guests').then(r => { _guestsCache = r.map(guestFromSupabase); _syncedMaps.guests = new Map(r.map(x => [x.id, JSON.stringify(guestToSupabase(guestFromSupabase(x)))])); }));
+      if (_listinoReady) jobs.push(fetchTuttiIRighe('listino').then(r => { _listinoCache = r.map(listinoFromSupabase); _syncedMaps.listino = new Map(r.map(x => [x.room_id+'|'+x.tariffa_id, JSON.stringify(listinoToSupabase(listinoFromSupabase(x)))])); }));
+      if (_tariffeReady) jobs.push(fetchTuttiIRighe('tariffe').then(r => { _tariffeCache = r.map(tariffaFromSupabase); _syncedMaps.tariffe = new Map(r.map(x => [x.id, JSON.stringify(tariffaToSupabase(tariffaFromSupabase(x)))])); }));
+      if (_quotesReady) jobs.push(fetchTuttiIRighe('quotes').then(r => { _quotesCache = r.map(quoteFromSupabase); _syncedMaps.quotes = new Map(r.map(x => [x.id, JSON.stringify(quoteToSupabase(quoteFromSupabase(x)))])); }));
+      if (_richiestePreventivoReady) jobs.push(fetchTuttiIRighe('richieste_preventivo').then(r => { _richiestePreventivoCache = r.map(richiestaFromSupabase); _syncedMaps.richieste_preventivo = new Map(r.map(x => [x.id, JSON.stringify(richiestaToSupabase(richiestaFromSupabase(x)))])); notificaRichiesteNuove(_richiestePreventivoCache); }));
+      if (_roomBlocksReady) jobs.push(fetchTuttiIRighe('room_blocks').then(r => {
         _roomBlocksCache = {};
-        (r.data||[]).forEach(b => { _roomBlocksCache[b.room_id+'|'+b.block_date] = true; });
+        r.forEach(b => { _roomBlocksCache[b.room_id+'|'+b.block_date] = true; });
       }));
       if (_blobsReady['settings'] || _blobsReady['corrispettivi'] || _blobsReady['storicoOspiti'] || _blobsReady['messageTemplates'] || _blobsReady['listinoAggiustamenti'] || _blobsReady['listinoScostamenti'] || _blobsReady['revenueConfig'] || _blobsReady['competitorStrutture'] || _blobsReady['competitorPrices'] || _blobsReady['blacklist'] || _blobsReady['extras'] || _blobsReady['movimenti'] || _blobsReady['tassaSoggiornoLog'] || _blobsReady['categoryOrder'] || _blobsReady['groupColors'] || _blobsReady['hkData'] || _blobsReady['regoleTipo'] || _blobsReady['tassaSoggiornoDettaglio'] || _blobsReady['ical_portals']) {
         jobs.push(supabaseClient.from('app_blobs').select('*').in('key', ['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals']).then(r => {
@@ -27695,14 +27710,21 @@ function expGuests() {
   var guests = DB.get('guests');
   var bookings = DB.get('bookings');
   var wb = XLSX.utils.book_new();
+  // Colonne allineate esattamente a quelle lette dall'importazione (ospitiImportXLSX), così questo
+  // file può anche essere ricaricato in futuro senza perdere nulla — pensato apposta come copia di
+  // sicurezza completa dell'anagrafica, per non dover più dipendere dal vecchio gestionale.
   var rows = guests.map(function(g){
     var soggiorni = bookings.filter(function(b){return b.guestId===g.id;}).length;
-    return {Nome:g.name||'', Email:g.email||'', Telefono:g.phone||'',
-            Nazionalita:g.nationality||'', Citta:g.city||'', Soggiorni:soggiorni, Note:g.notes||''};
+    return {
+      name: g.name||'', email: g.email||'', phone: g.phone||'',
+      address: g.indirizzo||'', postcode: g.cap||'', city: g.citta||'', country: g.nazionalita||'',
+      vat_code: g.piva||'', tax_code: g.codiceFiscale||'', sdi: g.sdi||'', pec: g.pec||'',
+      birthday: g.dataNascita||'', notes: g.notes||'', soggiorni_registrati: soggiorni
+    };
   });
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Ospiti');
   XLSX.writeFile(wb, 'ospiti-'+today()+'.xlsx');
-  showToast('Export ospiti scaricato');
+  showToast('Export ospiti scaricato — '+rows.length+' ospiti, ricaricabile in futuro con "⬆ Importa"');
 }
 
 function schedaPrenotazioneHTML(b, cfg) {
