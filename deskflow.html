@@ -16507,12 +16507,33 @@ function apriGruppoCollegato(groupId) {
   );
 }
 
-function editPrenotazione(id) {
+async function editPrenotazione(id) {
   window._garanziaCifrata = null;
   const b = DB.get('bookings').find(x => x.id === id);
   if (!b) return;
   const rooms = DB.get('rooms');
   const guests = DB.get('guests');
+  // BUG TROVATO E CORRETTO ("email/telefono spariti da una prenotazione da un giorno all'altro"):
+  // questa scheda leggeva email/telefono dalla copia ospiti che il browser aveva già in memoria —
+  // se la scheda del browser restava aperta a lungo SENZA mai passare in secondo piano (il controllo
+  // automatico aggiunto di recente scatta solo quando la scheda torna visibile DOPO essere stata
+  // nascosta), quella copia poteva restare "vecchia" anche per ore o un giorno intero, mostrando
+  // campi vuoti anche se il dato vero era corretto su Supabase. Peggio ancora: se poi si salvava la
+  // prenotazione, quei campi vuoti finivano per SOVRASCRIVERE il dato corretto. Ora, appena apri
+  // questa scheda, il programma ricontrolla al volo i dati veri dell'ospite su Supabase, invece di
+  // fidarsi di quanto il browser ha in memoria in quel momento.
+  if (b.guestId && supabaseReady && supabaseClient) {
+    try {
+      const { data: freshGuest, error } = await supabaseClient.from('guests').select('*').eq('id', b.guestId).maybeSingle();
+      if (!error && freshGuest) {
+        const idx = guests.findIndex(g => g.id === b.guestId);
+        const guestAggiornato = guestFromSupabase(freshGuest);
+        if (idx >= 0) guests[idx] = guestAggiornato; else guests.push(guestAggiornato);
+        _guestsCache = guests;
+        if (typeof _syncedMaps !== 'undefined' && _syncedMaps.guests) _syncedMaps.guests.set(guestAggiornato.id, JSON.stringify(freshGuest));
+      }
+    } catch (errFresh) { console.error('Errore aggiornamento dati ospite:', errFresh); }
+  }
   showModal(`Modifica prenotazione #${b.id} — ${b.guestName}`,
     `<div class="form-grid">
       <div class="form-group full">
