@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 25/08/2026 · 06:46</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 25/08/2026 · 07:38</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -16493,6 +16493,18 @@ function azzeraCameraOriginale(id) {
   editPrenotazione(id);
 }
 
+// Cliccando una prenotazione nel Planning: se fa parte di un gruppo (più camere collegate), chiede
+// prima quale scheda aprire, invece di andare dritto sulla singola camera — così non serve più
+// passare per forza dalla scheda singola per raggiungere il riepilogo del gruppo.
+function clickPrenotazionePlanning(bookingId, groupId) {
+  if (!groupId) { openDettaglioPrenotazione(bookingId); return; }
+  showModal('Questa camera fa parte di un gruppo',
+    '<div style="font-size:13px;color:var(--text2)">Vuoi aprire solo questa camera, o il riepilogo di tutto il gruppo (gruppo "'+groupId+'")?</div>',
+    '<button class="btn" onclick="closeModal()">Annulla</button>'
+    +'<button class="btn" onclick="closeModal(); openDettaglioPrenotazione(\''+bookingId+'\')">🚪 Solo questa camera</button>'
+    +'<button class="btn btn-primary" onclick="closeModal(); apriGruppoCollegato(\''+groupId.replace(/'/g,"\\'")+'\')">🔗 Tutto il gruppo</button>'
+  );
+}
 // Mostra tutte le camere collegate allo stesso gruppo, con la possibilità di aprirne subito la modifica
 function apriGruppoCollegato(groupId) {
   const bookings = DB.get('bookings').filter(b => b.groupId === groupId && b.status !== 'cancellata')
@@ -22778,7 +22790,7 @@ function renderCalendario() {
           const taxInfoCal = calcTassaSoggiorno(booking);
           const extrasTotCal = (booking.extras||[]).reduce((s2,ex)=>s2+(Number(ex.totale)||0),0);
           const totaleCompletoCal = parseFloat(booking.totalPrice||0) + taxInfoCal.tax + extrasTotCal;
-          roomCells += `<td${isFirstMatch?' id="cal-search-hit"':''} colspan="${span}" draggable="true" ondragstart="onBookingDragStart(event, '${booking.id}')" ondragend="onBookingDragEnd(event)" style="background:${barBg};background-clip:content-box;-webkit-background-clip:content-box;padding:4px;border-left:${borderL};border-right:1px solid rgba(255,255,255,.3);border-radius:10px;${nonRimbOutline}${searchOutline}${searchDim?'opacity:.22;':''}cursor:${booking.bloccata?'not-allowed':'grab'};position:relative;overflow:hidden" title="${isOverb?'⚠ OVERBOOKING — ':''}${booking.nonRimborsabile?'Non rimborsabile — ':''}${booking.bloccata?'🔒 Bloccata (non spostabile) — ':''}${name} | ${fmtDate(booking.checkin)}→${fmtDate(booking.checkout)} | ${n} notti${trattInfoCal?' | '+trattInfoCal.code:''} | ${personeCal} persone${garanziaTitle} | ${fonteI.title} | Totale: ${fmtCurrency(totaleCompletoCal)}" onclick="openDettaglioPrenotazione('${booking.id}')">` +
+          roomCells += `<td${isFirstMatch?' id="cal-search-hit"':''} colspan="${span}" draggable="true" ondragstart="onBookingDragStart(event, '${booking.id}')" ondragend="onBookingDragEnd(event)" style="background:${barBg};background-clip:content-box;-webkit-background-clip:content-box;padding:4px;border-left:${borderL};border-right:1px solid rgba(255,255,255,.3);border-radius:10px;${nonRimbOutline}${searchOutline}${searchDim?'opacity:.22;':''}cursor:${booking.bloccata?'not-allowed':'grab'};position:relative;overflow:hidden" title="${isOverb?'⚠ OVERBOOKING — ':''}${booking.nonRimborsabile?'Non rimborsabile — ':''}${booking.bloccata?'🔒 Bloccata (non spostabile) — ':''}${name} | ${fmtDate(booking.checkin)}→${fmtDate(booking.checkout)} | ${n} notti${trattInfoCal?' | '+trattInfoCal.code:''} | ${personeCal} persone${garanziaTitle} | ${fonteI.title} | Totale: ${fmtCurrency(totaleCompletoCal)}" onclick="clickPrenotazionePlanning('${booking.id}', '${(booking.groupId||'').replace(/'/g,"\\'")}')">` +
             `<div style="display:flex;align-items:center;gap:5px;padding:3px 6px;height:25px;box-sizing:border-box;color:${barText};font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">` +
             `${isCheckin?'<span style="font-size:12px;opacity:.8">▶</span>':''}${trattInfoCal?'<span style="font-size:11.5px;background:rgba(255,255,255,.85);color:#1f2937;border-radius:3px;padding:0 4px;font-weight:800">'+trattInfoCal.code+'</span>':''}${isOverb?'<span style="font-size:13px">⚠</span>':''}${booking.bloccata?'<span style="font-size:13px" title="Bloccata — non spostabile">🔒</span>':''}${moveIcon}${garanziaIcon?'<span style="font-size:13px">'+garanziaIcon+'</span>':''}<span title="${fonteI.title}" style="font-size:13px">${fonteI.icon}</span>${name}` +
             ` <span style="font-size:11px;background:rgba(255,255,255,.6);color:${barText};border-radius:3px;padding:0 4px;font-weight:700;opacity:.9">👤${personeCal}</span>` +
