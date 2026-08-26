@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 26/08/2026 · 09:13</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 26/08/2026 · 17:13</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -13795,6 +13795,8 @@ function renderDashboard() {
     var dashPrevDaVal = window._dashPrevDa || tod;
     var dashPrevAVal = window._dashPrevA || addDays(tod, 13);
     var bookingsAttivi = bookings.filter(function(b){ return b.status!=='cancellata'; });
+    function pensioneDiPrev(b) { return b.pensione || (b.colazioneInclusa!==false ? 'BB' : 'nessuno'); }
+    function personeDiPrev(b) { return (b.componenti && b.componenti.length) ? b.componenti.length : ((parseInt(b.adults)||1)+(parseInt(b.children)||0)); }
     var giorniPrev = [];
     (function(){
       var d = new Date(dashPrevDaVal+'T00:00:00');
@@ -13802,18 +13804,22 @@ function renderDashboard() {
       var guard = 0;
       while (d <= fine && guard < 370) {
         var ds = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-        var partenze = 0, incasso = 0;
+        var arrivi = 0, partenze = 0, colazioni = 0, incasso = 0;
         bookingsAttivi.forEach(function(b){
-          if (b.checkout===ds) {
-            partenze++;
-            incasso += Number(b.totalPrice||0);
-          }
+          if (b.checkin===ds) arrivi++;
+          if (b.checkout===ds) { partenze++; incasso += Number(b.totalPrice||0); }
+          // Colazione del giorno ds: chi ha dormito la notte precedente (stessa logica già usata in
+          // Dashboard/Report — checkin<ds && checkout>=ds), non chi arriva/parte proprio oggi.
+          if (b.checkin<ds && b.checkout>=ds && pensioneDiPrev(b)!=='nessuno') colazioni += personeDiPrev(b);
         });
-        giorniPrev.push({ data: ds, partenze: partenze, incasso: incasso });
+        giorniPrev.push({ data: ds, arrivi: arrivi, partenze: partenze, colazioni: colazioni, incasso: incasso });
         d.setDate(d.getDate()+1); guard++;
       }
     })();
     var totIncassoPrev = giorniPrev.reduce(function(s,g){ return s+g.incasso; }, 0);
+    var totArriviPrev = giorniPrev.reduce(function(s,g){ return s+g.arrivi; }, 0);
+    var totPartenzePrev = giorniPrev.reduce(function(s,g){ return s+g.partenze; }, 0);
+    var totColazioniPrev = giorniPrev.reduce(function(s,g){ return s+g.colazioni; }, 0);
     var maxIncassoPrev = Math.max(1, Math.max.apply(null, giorniPrev.map(function(g){ return g.incasso; })) || 1);
     html += '<div class="card" style="margin-bottom:14px">' +
       '<div class="card-header" style="flex-wrap:wrap;gap:8px">' +
@@ -13831,7 +13837,13 @@ function renderDashboard() {
         '</div>' +
       '</div>' +
       '<div style="padding:14px 16px">' +
-        '<div style="font-size:13px;color:var(--text2);margin-bottom:10px">Totale possibile fatturato nel periodo: <strong style="color:var(--accent);font-size:15px">'+fmtCurrency(totIncassoPrev)+'</strong> su '+giorniPrev.length+' giorni</div>' +
+        '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;font-size:13px;color:var(--text2);margin-bottom:10px">' +
+          '<span>Totale possibile fatturato nel periodo: <strong style="color:var(--accent);font-size:15px">'+fmtCurrency(totIncassoPrev)+'</strong> su '+giorniPrev.length+' giorni</span>' +
+          '<span style="color:var(--border2)">|</span>' +
+          '<span style="width:70px;text-align:right;font-weight:700">'+totArriviPrev+' arrivi</span>' +
+          '<span style="width:80px;text-align:right;font-weight:700">'+totPartenzePrev+' partenze</span>' +
+          '<span style="width:90px;text-align:right;font-weight:700">'+totColazioniPrev+' colazioni</span>' +
+        '</div>' +
         '<div style="max-height:280px;overflow-y:auto">' +
         giorniPrev.map(function(g){
           var barW = Math.round(g.incasso/maxIncassoPrev*100);
@@ -13841,7 +13853,9 @@ function renderDashboard() {
             '<div style="flex:1;background:var(--surface2);border-radius:4px;height:16px;position:relative;overflow:hidden">' +
               '<div style="width:'+barW+'%;height:100%;background:var(--accent);opacity:.75;border-radius:4px"></div>' +
             '</div>' +
+            '<div style="width:70px;font-size:11px;color:var(--text3);text-align:right;flex-shrink:0">'+g.arrivi+' arriv'+(g.arrivi===1?'o':'i')+'</div>' +
             '<div style="width:80px;font-size:11px;color:var(--text3);text-align:right;flex-shrink:0">'+g.partenze+' partenz'+(g.partenze===1?'a':'e')+'</div>' +
+            '<div style="width:90px;font-size:11px;color:var(--text3);text-align:right;flex-shrink:0">'+g.colazioni+' colazion'+(g.colazioni===1?'e':'i')+'</div>' +
             '<div style="width:85px;font-size:13px;font-weight:700;text-align:right;flex-shrink:0">'+fmtCurrency(g.incasso)+'</div>' +
           '</div>';
         }).join('') +
