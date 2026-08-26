@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 25/08/2026 · 07:38</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 26/08/2026 · 09:13</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -25442,11 +25442,14 @@ function registraComunicazione(bookingId, info) {
       // non essere ancora arrivata su Supabase (la sincronizzazione della creazione è appena partita,
       // in parallelo) — la lettura qui sotto falliva perché non trovava ancora nessuna riga con
       // quell'id, e il messaggio restava solo nel salvataggio normale locale, mai scritto su Supabase.
-      // Ora, se la riga non si trova ancora, riproviamo un paio di volte con una breve pausa invece di
-      // arrenderci subito.
-      for (let tentativo = 0; tentativo < 3; tentativo++) {
+      // Ora, se la riga non si trova ancora, riproviamo alcune volte con pause crescenti invece di
+      // arrenderci subito — fino a circa 30 secondi in totale, per coprire anche i casi in cui la
+      // prenotazione stessa ha dovuto aspettare un nuovo tentativo di salvataggio (es. per un
+      // intoppo momentaneo di Supabase).
+      let riuscito = false;
+      for (let tentativo = 0; tentativo < 6; tentativo++) {
         try {
-          if (tentativo > 0) await new Promise(res => setTimeout(res, 700 * tentativo));
+          if (tentativo > 0) await new Promise(res => setTimeout(res, 1000 * Math.pow(2, tentativo - 1)));
           const { data: fresh, error: errFetch } = await supabaseClient.from('bookings').select('comunicazioni').eq('id', bookingId).single();
           if (errFetch) throw errFetch;
           const comunicazioniAttuali = (fresh && fresh.comunicazioni) || [];
@@ -25457,11 +25460,18 @@ function registraComunicazione(bookingId, info) {
             const bAgg = DB.get('bookings').find(x => x.id === bookingId);
             if (bAgg) _syncedMaps.bookings.set(bookingId, JSON.stringify(bookingToSupabase(Object.assign({}, bAgg, {comunicazioni: comunicazioniAttuali}))));
           }
+          riuscito = true;
           break; // riuscito, non serve riprovare
         } catch (err) {
-          if (tentativo === 2) console.error('Salvataggio sicuro del messaggio non riuscito dopo 3 tentativi, resta comunque il salvataggio normale come ripiego:', err);
+          if (tentativo === 5) console.error('Salvataggio sicuro del messaggio non riuscito dopo 6 tentativi:', err);
         }
       }
+      // BUG TROVATO E CORRETTO ("un messaggio inviato spariva senza nessun avviso"): se anche dopo
+      // tutti i tentativi il messaggio non risultava salvato su Supabase, prima non veniva detto
+      // nulla — sembrava tutto a posto (il messaggio era comunque visibile su questo browser finché
+      // non veniva ricaricata la pagina), ma in realtà non era mai arrivato sul database. Ora, in
+      // quel caso, avvisa chiaramente invece di far sparire il messaggio in silenzio.
+      if (!riuscito) showToast('⚠ Il messaggio inviato potrebbe non essere salvato nello storico — controlla tra qualche minuto');
     })();
   }
   return msgId;
