@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 27/08/2026 · 05:30</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 27/08/2026 · 08:31</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -713,7 +713,8 @@ function bookingToSupabase(b) {
     componenti:b.componenti||[], checkin_at:b.checkinAt||null, checkout_at:b.checkoutAt||null, checkin_token:b.checkinToken||null, tipo_documento_conto:b.tipoDocumentoConto||null,
     fattura:b.fattura||null, garanzia:b.garanzia||null, alloggiati_web_inviato_at:b.alloggiatiWebInviatoAt||null, created_at:b.createdAt||new Date().toISOString(),
     modified_at:b.modifiedAt||null, cancelled_at:b.cancelledAt||null,
-    bloccata:!!b.bloccata, comunicazioni:b.comunicazioni||[], tipo_alloggiato_manuale:b.tipoAlloggiatoManuale||null, escludi_conteggi:!!b.escludiConteggi
+    bloccata:!!b.bloccata, comunicazioni:b.comunicazioni||[], tipo_alloggiato_manuale:b.tipoAlloggiatoManuale||null, escludi_conteggi:!!b.escludiConteggi,
+    registro_modifiche:b.registroModifiche||[]
   };
 }
 function bookingFromSupabase(b) {
@@ -731,7 +732,8 @@ function bookingFromSupabase(b) {
     componenti:b.componenti||[], checkinAt:b.checkin_at||'', checkoutAt:b.checkout_at||'', checkinToken:b.checkin_token||'', tipoDocumentoConto:b.tipo_documento_conto||'',
     fattura:b.fattura||null, garanzia:b.garanzia||null, alloggiatiWebInviatoAt:b.alloggiati_web_inviato_at||null, createdAt:b.created_at||new Date().toISOString(),
     modifiedAt:b.modified_at||'', cancelledAt:b.cancelled_at||'',
-    bloccata:!!b.bloccata, comunicazioni:b.comunicazioni||[], tipoAlloggiatoManuale:b.tipo_alloggiato_manuale||'', escludiConteggi:!!b.escludi_conteggi
+    bloccata:!!b.bloccata, comunicazioni:b.comunicazioni||[], tipoAlloggiatoManuale:b.tipo_alloggiato_manuale||'', escludiConteggi:!!b.escludi_conteggi,
+    registroModifiche:b.registro_modifiche||[]
   };
 }
 
@@ -16456,6 +16458,7 @@ function aeSalvaExtra(bookingId) {
   else { DB.set('bookings', bookings); }
 
   var totaleNuovi = nuovi.reduce(function(s,ex){ return s+(Number(ex.totale)||0); }, 0);
+  registraModificaPrenotazione(bookingId, 'extra', 'Extra addebitati: '+nuovi.map(function(ex){return ex.nome||'';}).filter(Boolean).join(', ')+' — '+fmtCurrency(totaleNuovi));
   showToast('🛎 Extra addebitati: '+fmtCurrency(totaleNuovi));
 
   if (supabaseReady && supabaseClient) {
@@ -17124,6 +17127,12 @@ function savePrenotazione(editId) {
     const idx = bookings.findIndex(b => b.id === editId);
     const old = bookings[idx] || {};
     bookings[idx] = booking;
+    // Registro Modifiche: confronta vecchio/nuovo e registra una riga per ogni campo importante
+    // cambiato — non blocca il salvataggio principale se qualcosa va storto qui.
+    try {
+      const righeModifica = lstDescriviModificaCampo(old, booking);
+      if (righeModifica.length) registraModificaPrenotazione(editId, 'modifica', righeModifica.join(' · '));
+    } catch(errRegistro) { console.error('Registro Modifiche non aggiornato:', errRegistro); }
     // Se la caparra è cambiata, aggiorna il movimento in cassa
     if (booking.caparra > 0 && booking.caparra !== (old.caparra||0)) {
       const movs = DB.get('movimenti');
@@ -17219,6 +17228,9 @@ function savePrenotazione(editId) {
     DB.set('guests', extraGuests); invalidateGuestDatalistCache();
   }
   DB.set('bookings', bookings);
+  if (!editId) {
+    try { registraModificaPrenotazione(booking.id, 'creazione', 'Prenotazione creata — '+booking.roomName+' · '+fmtDate(booking.checkin)+' → '+fmtDate(booking.checkout)+' · '+fmtCurrency(booking.totalPrice)); } catch(errRegistro) { console.error('Registro Modifiche non aggiornato:', errRegistro); }
+  }
   if (groupId && useColor && groupColor) setGroupColor(groupId, groupColor);
   renderPage(currentPage);
   if (editId) {
@@ -17258,6 +17270,7 @@ function eseguiCancellazionePrenotazione(id, avvisaCliente) {
   bookings[idx].status = 'cancellata';
   bookings[idx].cancelledAt = new Date().toISOString();
   DB.set('bookings', bookings);
+  registraModificaPrenotazione(id, 'cancellazione', 'Prenotazione cancellata'+(avvisaCliente?' (cliente avvisato)':' (senza avviso al cliente)'));
   renderPage(currentPage);
   if (avvisaCliente) {
     apriInvioCancellazione(id);
@@ -17378,6 +17391,7 @@ function ripristinaPrenotazione(id) {
   bookings[idx].status = 'confermata';
   delete bookings[idx].cancelledAt;
   DB.set('bookings', bookings);
+  registraModificaPrenotazione(id, 'ripristino', 'Prenotazione ripristinata (era cancellata)');
   showToast('Prenotazione ripristinata');
   renderPage(currentPage);
 }
@@ -18544,6 +18558,7 @@ function openDettaglioPrenotazione(id) {
         tabBtn('checkin','Check-in', (b.status==='confermata'||b.status==='attesa') ? '' : '✓') +
         tabBtn('contabilita','Contabilità') +
         tabBtn('messaggi','Messaggi', (b.comunicazioni && b.comunicazioni.length) ? b.comunicazioni.length : '') +
+        tabBtn('registro','Registro modifiche', (b.registroModifiche && b.registroModifiche.length) ? b.registroModifiche.length : '') +
       '</div>' +
 
       tabPanel('principale',
@@ -18657,6 +18672,8 @@ function openDettaglioPrenotazione(id) {
         '</div>'
       , false) +
 
+      tabPanel('registro', renderRegistroModificheHTML(b), false) +
+
     '</div>' +
     '</div>',
 
@@ -18703,11 +18720,43 @@ function dettSwitchTab(btn, tab) {
   });
 }
 
+// Icona per tipo di voce nel Registro Modifiche — solo estetica, per riconoscere a colpo d'occhio
+// il genere di movimento senza dover leggere il testo.
+function registroModificheIcona(tipo) {
+  var mappa = {
+    creazione: '🆕', modifica: '✏️', pagamento: '💳', extra: '🛎',
+    checkin: '🔑', checkout: '🚪', cancellazione: '🚫', ripristino: '↩️'
+  };
+  return mappa[tipo] || '•';
+}
+// Costruisce il contenuto del tab "Registro modifiche" nella scheda prenotazione — elenco di tutti
+// i movimenti/modifiche registrati per questa prenotazione, più recenti in cima.
+function renderRegistroModificheHTML(b) {
+  var voci = (b.registroModifiche || []).slice().sort(function(a,c){ return (c.data||'').localeCompare(a.data||''); });
+  if (!voci.length) {
+    return '<div style="font-size:13px;color:var(--text3);padding:12px 2px">Nessun movimento registrato ancora per questa prenotazione.</div>';
+  }
+  return '<div style="display:flex;flex-direction:column;gap:2px">' +
+    voci.map(function(v){
+      var dt = new Date(v.data);
+      var dataFmt = isNaN(dt.getTime()) ? '—' : (fmtDate(v.data.slice(0,10)) + ' · ' + dt.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}));
+      return '<div style="display:flex;gap:10px;padding:10px 2px;border-bottom:1px solid var(--border);align-items:flex-start">' +
+        '<span style="font-size:16px;line-height:1.3">'+registroModificheIcona(v.tipo)+'</span>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-size:12px;color:var(--text3);font-weight:600">'+dataFmt+'</div>' +
+          '<div style="font-size:13.5px;color:var(--text1);margin-top:2px;word-break:break-word">'+(v.testo||'')+'</div>' +
+        '</div>' +
+      '</div>';
+    }).join('') +
+  '</div>';
+}
+
 function doCheckin(id) {
   const bookings = DB.get('bookings');
   const b = bookings.find(x => x.id === id);
   if (b) b.status = 'check-in';
   DB.set('bookings', bookings);
+  registraModificaPrenotazione(id, 'checkin', 'Check-in effettuato');
   showToast(`Check-in effettuato per ${b?.guestName}`);
   renderPage(currentPage);
 }
@@ -18907,6 +18956,7 @@ async function doCheckoutTutti() {
     if (idx>=0) { bks[idx].status = 'check-out'; bks[idx].checkoutAt = now; guestNames[id] = bks[idx].guestName; }
   });
   DB.set('bookings', bks);
+  ids.forEach(id => registraModificaPrenotazione(id, 'checkout', 'Check-out rapido (multiplo)'));
 
   if (supabaseReady && supabaseClient) {
     try {
@@ -18931,6 +18981,7 @@ async function doCheckout(id) {
   b.status = 'check-out';
   b.checkoutAt = new Date().toISOString();
   DB.set('bookings', bookings); // aggiorna subito la vista e avvia il salvataggio
+  registraModificaPrenotazione(id, 'checkout', 'Check-out effettuato');
 
   // Verifica esplicita del salvataggio quando collegati a Supabase, per non lasciare fallimenti silenziosi
   if (supabaseReady && supabaseClient) {
@@ -20122,6 +20173,7 @@ async function quickCheckinTutti() {
     if (idx>=0) { bks[idx].status = 'check-in'; bks[idx].checkinAt = now; if (!bks[idx].componenti) bks[idx].componenti = []; }
   });
   DB.set('bookings', bks);
+  ids.forEach(id => registraModificaPrenotazione(id, 'checkin', 'Check-in rapido (multiplo)'));
 
   if (supabaseReady && supabaseClient) {
     try {
@@ -20148,6 +20200,7 @@ async function quickCheckin(bookingId) {
   bks[idx].checkinAt = new Date().toISOString();
   if (!bks[idx].componenti) bks[idx].componenti = [];
   DB.set('bookings', bks);
+  registraModificaPrenotazione(bookingId, 'checkin', 'Check-in rapido effettuato');
 
   if (supabaseReady && supabaseClient) {
     try {
@@ -20851,6 +20904,7 @@ async function saveCheckinDataGruppo() {
     // La scelta manuale di tipo alloggiato riguarda l'intestatario, quindi solo la sua camera
     // (la prima del gruppo, quella con l'ospite di indice 0) la riceve.
     if (bid === slots[0].bookingId) bks[idx].tipoAlloggiatoManuale = tipoAllogScelto;
+    registraModificaPrenotazione(bid, 'checkin', 'Check-in con dati ospite completato ('+componenti.length+' ospit'+(componenti.length===1?'e':'i')+')');
     totComponenti += componenti.length;
     totMancanti   += componenti.filter(c=>!c || !c.cognome || !c.nome).length;
     console.log('🔍 DIAGNOSTICA CHECK-IN — prenotazione '+bid+': salvo '+componenti.length+' componenti ->', JSON.stringify(componenti.map(c=>c&&(c.cognome+' '+c.nome))));
@@ -20949,6 +21003,7 @@ async function saveCheckinData(bookingId, nAdults) {
   bks[idx].componenti  = componenti;
   bks[idx].checkinAt   = new Date().toISOString();
   DB.set('bookings', bks);
+  registraModificaPrenotazione(bookingId, 'checkin', 'Check-in con dati ospite completato ('+componenti.length+' ospit'+(componenti.length===1?'e':'i')+')');
   salvaInStoricoOspiti(componenti, bks[idx].checkin);
   // Nota: DB.set sincronizza già con Supabase in background senza bloccare — il check-in resta salvato
   // in locale anche se Supabase è lento o momentaneamente irraggiungibile.
@@ -25605,6 +25660,86 @@ function registraComunicazione(bookingId, info) {
   }
   return msgId;
 }
+// ============================================================
+// REGISTRO MODIFICHE PRENOTAZIONE — richiesto da Gian: uno storico di tutti i movimenti/modifiche
+// di una prenotazione (creazione, modifiche ai campi, pagamenti, extra, check-in/out, cancellazione/
+// ripristino), visibile nella scheda prenotazione. Stessa identica logica anti-corsa già collaudata
+// per i messaggi (registraComunicazione sopra): quando Supabase è connesso NON si passa mai da un
+// DB.set('bookings', tuttaLaLista) — che rischierebbe di sovrascrivere una modifica fatta nel
+// frattempo da un altro dispositivo — ma si scrive SOLO la colonna registro_modifiche, rileggendo
+// prima la versione più recente da Supabase.
+function registraModificaPrenotazione(bookingId, tipo, testo) {
+  if (!bookingId || !testo) return null;
+  const bookings = DB.get('bookings');
+  const bi = bookings.findIndex(x=>x.id===bookingId);
+  if (bi<0) return null;
+  if (!bookings[bi].registroModifiche) bookings[bi].registroModifiche = [];
+  const voceId = uid();
+  const nuovaVoce = { id: voceId, data: new Date().toISOString(), tipo: tipo||'modifica', testo: testo };
+  bookings[bi].registroModifiche.push(nuovaVoce);
+  // Stessa correzione già trovata per i messaggi: quando Supabase è connesso NON si innesca il
+  // salvataggio normale dell'intera riga (che potrebbe arrivare dopo e sovrascrivere questa
+  // scrittura mirata) — si aggiorna solo la cache locale per l'interfaccia.
+  if (supabaseReady && supabaseClient) { _bookingsCache = bookings; }
+  else { DB.set('bookings', bookings); }
+  if (supabaseReady && supabaseClient) {
+    (async () => {
+      let riuscito = false;
+      for (let tentativo = 0; tentativo < 4; tentativo++) {
+        try {
+          if (tentativo > 0) await new Promise(res => setTimeout(res, 1000 * Math.pow(2, tentativo - 1)));
+          const { data: fresh, error: errFetch } = await supabaseClient.from('bookings').select('registro_modifiche').eq('id', bookingId).single();
+          if (errFetch) throw errFetch;
+          const registroAttuale = (fresh && fresh.registro_modifiche) || [];
+          if (!registroAttuale.some(v => v.id === voceId)) registroAttuale.push(nuovaVoce);
+          const { error: errUpdate } = await supabaseClient.from('bookings').update({ registro_modifiche: registroAttuale }).eq('id', bookingId);
+          if (errUpdate) throw errUpdate;
+          if (typeof _syncedMaps !== 'undefined' && _syncedMaps.bookings) {
+            const bAgg = DB.get('bookings').find(x => x.id === bookingId);
+            if (bAgg) _syncedMaps.bookings.set(bookingId, JSON.stringify(bookingToSupabase(Object.assign({}, bAgg, {registroModifiche: registroAttuale}))));
+          }
+          riuscito = true;
+          break;
+        } catch (err) {
+          if (tentativo === 3) console.error('Salvataggio sicuro della voce di registro non riuscito:', err);
+        }
+      }
+    })();
+  }
+  return voceId;
+}
+
+// Confronta la prenotazione appena salvata (nuovo) con quella precedente (vecchio) e restituisce
+// una riga di testo per ogni campo "importante" cambiato — usata da savePrenotazione per popolare
+// il Registro Modifiche in automatico ad ogni salvataggio, senza dover richiamare manualmente
+// registraModificaPrenotazione da ogni singolo punto del form.
+function lstDescriviModificaCampo(vecchio, nuovo) {
+  const righe = [];
+  const camp = (label, key, fmt) => {
+    const vOld = vecchio ? vecchio[key] : undefined;
+    const vNew = nuovo[key];
+    const oldNorm = (vOld===undefined||vOld===null) ? '' : vOld;
+    const newNorm = (vNew===undefined||vNew===null) ? '' : vNew;
+    if (String(oldNorm) === String(newNorm)) return;
+    const f = fmt || (x=>String(x||'—'));
+    righe.push(label+': '+f(oldNorm)+' → '+f(newNorm));
+  };
+  camp('Check-in', 'checkin', fmtDate);
+  camp('Check-out', 'checkout', fmtDate);
+  camp('Camera', 'roomName');
+  camp('Adulti', 'adults');
+  camp('Bambini', 'children');
+  camp('Allestimento', 'trattamento');
+  camp('Fonte', 'source');
+  camp('Stato', 'status');
+  camp('Prezzo', 'totalPrice', v => fmtCurrency(parseFloat(v)||0));
+  camp('Pagato', 'pagato');
+  camp('Caparra', 'caparra', v => fmtCurrency(parseFloat(v)||0));
+  camp('Bloccata', 'bloccata', v => v ? 'sì' : 'no');
+  camp('Note', 'notes');
+  return righe;
+}
+
 // Come registraComunicazione, ma per un preventivo invece che per una prenotazione — così anche
 // gli invii di preventivi restano visibili da qualsiasi postazione (i preventivi sono sincronizzati)
 function registraComunicazioneQuote(quoteId, info) {
@@ -28594,6 +28729,10 @@ function contoSalvaPagamento(bookingId) {
     }
   }
   DB.set('bookings', bookings);
+  {
+    const riepilogoLog = pagamenti.length ? pagamenti.map(p=>p.metodo+' '+fmtCurrency(p.importo)).join(' + ') : 'nessun pagamento';
+    registraModificaPrenotazione(bookingId, 'pagamento', 'Pagamento registrato ('+stato+') — '+riepilogoLog);
+  }
   if (incassato) {
     // Un incasso è stato effettivamente ricevuto: registra/aggiorna il movimento nei Corrispettivi,
     // così compare subito il numero di scontrino/fattura — prima questo pulsante lo saltava, ed era
