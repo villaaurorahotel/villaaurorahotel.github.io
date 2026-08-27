@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 27/08/2026 · 08:31</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 27/08/2026 · 16:38</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -10722,9 +10722,11 @@ function confermaSpostamentoDrag(bId, targetRoomId) {
   const b = bookings.find(x => x.id === bId);
   const targetRoom = DB.get('rooms').find(r => r.id === targetRoomId);
   if (!b || !targetRoom) { closeModal(); renderCalendario(); return; }
+  const roomNamePrima = b.roomName;
   b.roomId = targetRoomId;
   b.roomName = targetRoom.name;
   DB.set('bookings', bookings);
+  registraModificaPrenotazione(bId, 'modifica', 'Camera cambiata (spostamento nel Planning): '+roomNamePrima+' → '+targetRoom.name);
   closeModal();
   showToast('Prenotazione di ' + b.guestName + ' spostata in camera ' + b.roomName);
   renderCalendario();
@@ -15798,6 +15800,7 @@ function confermaCancellazioneEmail(idsCsv) {
     }
   });
   DB.set('bookings', bookings);
+  ids.forEach(function(id){ registraModificaPrenotazione(id, 'cancellazione', 'Prenotazione cancellata automaticamente da email del portale'); });
   closeModal();
   showToast(n===1 ? 'Prenotazione cancellata — resta visibile nell\'archivio (filtro Stato → Cancellata)' : n+' prenotazioni cancellate — restano visibili nell\'archivio (filtro Stato → Cancellata)');
   renderPage(currentPage);
@@ -15868,16 +15871,21 @@ function elaboraModificaEmail(testo, idDallaFrase) {
 function confermaModificaEmail(idsCsv, nuovoCheckin, nuovoCheckout, nuoviAdulti, nuoviBambini, nuovoPrezzo) {
   const ids = idsCsv.split(',').filter(Boolean);
   const bookings = DB.get('bookings');
+  const logDaScrivere = []; // {id, testo} — scritti SOLO dopo il DB.set qui sotto, altrimenti registraModificaPrenotazione
+                             // rilegge da DB.get() i valori ancora vecchi e la sua scrittura verrebbe poi sovrascritta
   ids.forEach(function(id){
     const idx = bookings.findIndex(function(b){ return b.id === id; });
     if (idx < 0) return;
-    if (nuovoCheckin) bookings[idx].checkin = nuovoCheckin;
-    if (nuovoCheckout) bookings[idx].checkout = nuovoCheckout;
-    if (nuoviAdulti != null) bookings[idx].adults = nuoviAdulti;
-    if (nuoviBambini != null) bookings[idx].children = nuoviBambini;
-    if (nuovoPrezzo != null) { bookings[idx].totalPrice = nuovoPrezzo; bookings[idx].prezzoManuale = true; }
+    const righeCambio = [];
+    if (nuovoCheckin && nuovoCheckin !== bookings[idx].checkin) { righeCambio.push('Check-in: '+fmtDate(bookings[idx].checkin)+' → '+fmtDate(nuovoCheckin)); bookings[idx].checkin = nuovoCheckin; }
+    if (nuovoCheckout && nuovoCheckout !== bookings[idx].checkout) { righeCambio.push('Check-out: '+fmtDate(bookings[idx].checkout)+' → '+fmtDate(nuovoCheckout)); bookings[idx].checkout = nuovoCheckout; }
+    if (nuoviAdulti != null && nuoviAdulti !== bookings[idx].adults) { righeCambio.push('Adulti: '+bookings[idx].adults+' → '+nuoviAdulti); bookings[idx].adults = nuoviAdulti; }
+    if (nuoviBambini != null && nuoviBambini !== (bookings[idx].children||0)) { righeCambio.push('Bambini: '+(bookings[idx].children||0)+' → '+nuoviBambini); bookings[idx].children = nuoviBambini; }
+    if (nuovoPrezzo != null && nuovoPrezzo !== parseFloat(bookings[idx].totalPrice||0)) { righeCambio.push('Prezzo: '+fmtCurrency(bookings[idx].totalPrice||0)+' → '+fmtCurrency(nuovoPrezzo)); bookings[idx].totalPrice = nuovoPrezzo; bookings[idx].prezzoManuale = true; }
+    if (righeCambio.length) logDaScrivere.push({ id: id, testo: 'Aggiornata da email del portale — '+righeCambio.join(' · ') });
   });
   DB.set('bookings', bookings);
+  logDaScrivere.forEach(function(v){ registraModificaPrenotazione(v.id, 'modifica', v.testo); });
   closeModal();
   showToast('Prenotazione aggiornata con i dati dell\'email');
   renderPage(currentPage);
@@ -19356,6 +19364,7 @@ async function segnaContoComePagato(id) {
   const statoPrecedente = bks[idx].pagato;
   bks[idx].pagato = 'si';
   DB.set('bookings', bks);
+  registraModificaPrenotazione(id, 'pagamento', 'Conto segnato come pagato manualmente (senza movimento in Corrispettivi)');
 
   if (supabaseReady && supabaseClient) {
     try {
@@ -20822,6 +20831,7 @@ function annullaCheckinPrenotazione(bookingId) {
   b.status = 'confermata';
   delete b.checkinAt;
   DB.set('bookings', bks);
+  registraModificaPrenotazione(bookingId, 'ripristino', 'Check-in annullato — tornata a "Confermata"');
   showToast('↩ Check-in annullato — la prenotazione è tornata a "Confermata"');
   closeModal();
   if (typeof renderPage === 'function' && typeof currentPage !== 'undefined') renderPage(currentPage);
@@ -24874,6 +24884,7 @@ async function inviaAlloggiatiWebPrenotazione(bookingId, soloTest) {
         if (idx>=0) bks[idx].alloggiatiWebInviatoAt = new Date().toISOString();
       });
       DB.set('bookings', bks);
+      idsInviati.forEach(function(idInviato){ registraModificaPrenotazione(idInviato, 'modifica', '📋 Scheda Alloggiati Web inviata alla Polizia'); });
     }
     renderPage(currentPage);
   } catch (err) {
@@ -25731,12 +25742,28 @@ function lstDescriviModificaCampo(vecchio, nuovo) {
   camp('Bambini', 'children');
   camp('Allestimento', 'trattamento');
   camp('Fonte', 'source');
+  camp('Tariffa', 'tariffaId');
+  camp('Non rimborsabile', 'nonRimborsabile', v => v ? 'sì' : 'no');
+  camp('Pensione', 'pensione');
   camp('Stato', 'status');
   camp('Prezzo', 'totalPrice', v => fmtCurrency(parseFloat(v)||0));
   camp('Pagato', 'pagato');
+  camp('Metodo pagamento', 'metodoPagamento');
   camp('Caparra', 'caparra', v => fmtCurrency(parseFloat(v)||0));
+  camp('Tassa soggiorno manuale', 'tassaSoggiornoOverride', v => v==='' ? '—' : fmtCurrency(parseFloat(v)||0));
   camp('Bloccata', 'bloccata', v => v ? 'sì' : 'no');
+  camp('Escludi conteggi', 'escludiConteggi', v => v ? 'sì' : 'no');
+  camp('Gruppo', 'groupId');
   camp('Note', 'notes');
+  // Garanzia ed extra sono oggetti/liste — confrontati a parte perché camp() confronta solo valori semplici
+  const garVecchia = vecchio && vecchio.garanzia ? vecchio.garanzia.tipo : '';
+  const garNuova = nuovo.garanzia ? nuovo.garanzia.tipo : '';
+  if (garVecchia !== garNuova) righe.push('Garanzia: '+(garVecchia||'nessuna')+' → '+(garNuova||'nessuna'));
+  const extraVecchi = (vecchio && vecchio.extras) || [];
+  const extraNuovi = nuovo.extras || [];
+  if (extraVecchi.length !== extraNuovi.length) {
+    righe.push('Extra: '+extraVecchi.length+' → '+extraNuovi.length);
+  }
   return righe;
 }
 
@@ -28768,6 +28795,10 @@ function contoStampaEDeposita(bookingId) {
     }
   }
   DB.set('bookings', bookings);
+  {
+    const riepilogoLog = pagamenti.length ? pagamenti.map(p=>p.metodo+' '+fmtCurrency(p.importo)).join(' + ') : 'nessun pagamento';
+    registraModificaPrenotazione(bookingId, 'pagamento', 'Conto stampato e depositato ('+stato+') — '+riepilogoLog);
+  }
   if (incassato) {
     // Un incasso è stato effettivamente ricevuto: registra/aggiorna il movimento nei Corrispettivi,
     // suddiviso automaticamente tra le modalità di pagamento inserite, nella sezione Scontrini o Fatture
