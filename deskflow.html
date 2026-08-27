@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 26/08/2026 · 17:13</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 27/08/2026 · 05:21</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -15072,6 +15072,116 @@ const CATENA_RIFERIMENTO_TIPOLOGIE = {
   singola:  { tipo:'standard', pax:'PAX2' },
   family:   { tipo:'deluxe',   pax:'PAX2' }
 };
+// Eccezioni puntuali cella per cella (resa globale — prima viveva solo dentro lstApplyPeriodo —
+// così la può leggere anche la propagazione automatica dalla griglia Listino qui sotto).
+const ECCEZIONI_CELLA_GLOBAL = { 'superior|PAX1': { tipo:'standard', pax:'PAX2' } };
+
+function lstMaxCapOf(t, rooms) {
+  var gr = rooms.filter(function(r){ return normCatType(r.type) === t; });
+  return Math.max.apply(null, gr.map(function(r){ return Math.max(1, parseInt(r.capacity)||1); }));
+}
+function lstPaxPrimario(t, rooms) { return lstMaxCapOf(t, rooms) >= 2 ? 'PAX2' : 'PAX1'; }
+function lstTipoRiferimento(t, masterType, types) {
+  if (t === masterType) return null;
+  var rif = CATENA_RIFERIMENTO_TIPOLOGIE[t.toLowerCase()];
+  if (!rif) return { tipo: masterType, pax: 'PAX2' };
+  var tipoReale = types.find(function(x){ return x.toLowerCase() === rif.tipo; }) || masterType;
+  return { tipo: tipoReale, pax: rif.pax };
+}
+
+// Da quale cella (tipologia+pax) dipende ciascuna cella di ciascuna tipologia NON-master, con le
+// stesse regole già usate in Aggiornamento Massivo: la fascia primaria (di norma 2 Pax) prende il
+// prezzo dalla tipologia precedente in catena; le altre fasce scostano dalla propria fascia
+// precedente (4p da 3p, le altre dalla propria primaria); eccezioni puntuali hanno la precedenza.
+function lstCalcolaRiferimentiCelle(rooms) {
+  var types = Array.from(new Set(rooms.map(function(r){ return normCatType(r.type); })));
+  var masterType = types.find(function(t){ return t.toLowerCase()==='standard'; }) || types[0];
+  var cellRef = {};
+  types.forEach(function(t){
+    if (t === masterType) return;
+    var maxCap = lstMaxCapOf(t, rooms);
+    var primPax = lstPaxPrimario(t, rooms);
+    var rifInfo = lstTipoRiferimento(t, masterType, types);
+    for (var p=1; p<=maxCap; p++) {
+      var pk = 'PAX'+p;
+      var isPrimaryCell = (pk === primPax);
+      var eccezione = ECCEZIONI_CELLA_GLOBAL[t.toLowerCase()+'|'+pk];
+      var paxRifPropria = (pk === 'PAX4') ? 'PAX3' : primPax;
+      var refTipoCella = eccezione ? (types.find(function(x){return x.toLowerCase()===eccezione.tipo;})||masterType) : (isPrimaryCell ? rifInfo.tipo : t);
+      var refPaxCella = eccezione ? eccezione.pax : (isPrimaryCell ? rifInfo.pax : paxRifPropria);
+      cellRef[t+'|'+pk] = { t:t, pk:pk, refType: refTipoCella, refPax: refPaxCella };
+    }
+  });
+  return { types: types, masterType: masterType, cellRef: cellRef };
+}
+
+// NOVITÀ richiesta da Gian: quando si modifica DIRETTAMENTE nella griglia del Listino il prezzo di
+// Standard 2 Pax (la fascia "base" della struttura), ricalcola e salva subito in automatico tutte
+// le altre tipologie/fasce collegate in catena — stessa logica dell'Aggiornamento Massivo, ma senza
+// dover aprire quella maschera. Usa gli scostamenti già salvati in precedenza (listinoScostamenti);
+// se una tipologia non ha ancora uno scostamento salvato, resta a 0 (stesso prezzo del riferimento)
+// finché Gian non lo imposta una volta da Aggiornamento Massivo. Non tocca le celle modificate a
+// mano direttamente (Superior, Deluxe, ecc.) — solo quelle che dipendono in catena da Standard 2p.
+// v = prezzo appena salvato; context = {ds} cella singolo giorno, {dal,al} periodo, {} prezzo base.
+function lstPropagaDaStandard(rId, pk, v, context) {
+  if (!v || v <= 0) return false; // non propaga la cancellazione del prezzo, solo un valore valido
+  var rooms = DB.get('rooms') || [];
+  var room = rooms.find(function(r){ return r.id === rId; });
+  if (!room) return false;
+  var info = lstCalcolaRiferimentiCelle(rooms);
+  if (normCatType(room.type) !== info.masterType || pk !== 'PAX2') return false;
+  if (!Object.keys(info.cellRef).length) return false; // nessun'altra tipologia da aggiornare
+
+  var scostamenti = DB.get('listinoScostamenti') || [];
+  function scostamentoDi(t, pk) {
+    var s = scostamenti.find(function(x){ return x.tipo===t && x.pax===pk; });
+    return s ? { valore: s.valore, unita: s.unita||'€' } : { valore: 0, unita: '€' };
+  }
+  function applicaOffset(base, off) {
+    return Math.max(0, Math.round(off.unita==='%' ? base*(1+off.valore/100) : base + off.valore));
+  }
+
+  var valore = {};
+  valore[info.masterType+'|PAX2'] = v;
+  var cambiato = true, giri = 0;
+  while (cambiato && giri < 12) {
+    cambiato = false; giri++;
+    Object.keys(info.cellRef).forEach(function(chiave){
+      if (valore[chiave] != null) return;
+      var c = info.cellRef[chiave];
+      var chiaveRif = c.refType+'|'+c.refPax;
+      if (valore[chiaveRif] == null) return;
+      valore[chiave] = applicaOffset(valore[chiaveRif], scostamentoDi(c.t, c.pk));
+      cambiato = true;
+    });
+  }
+
+  var lst = DB.get('listino') || [];
+  Object.keys(info.cellRef).forEach(function(chiave){
+    var c = info.cellRef[chiave];
+    var prezzo = valore[chiave];
+    if (prezzo == null) return;
+    var targetRooms = rooms.filter(function(r){ return normCatType(r.type) === c.t; });
+    targetRooms.forEach(function(troom){
+      var e = lst.find(function(l){ return l.roomId===troom.id && (l.tariffaId||'standard')===lstTariffaId; });
+      if (!e) { e = {roomId:troom.id, tariffaId:lstTariffaId, prezzi:{}, periodi:[]}; lst.push(e); }
+      if (!e.periodi) e.periodi = [];
+      if (context.ds) {
+        var pd = e.periodi.find(function(p){ return p.dal===context.ds && p.al===context.ds; });
+        if (!pd) { pd = {dal:context.ds, al:context.ds, prezzi:{}}; e.periodi.push(pd); }
+        pd.prezzi[c.pk] = prezzo;
+      } else if (context.dal && context.al) {
+        var pp = e.periodi.find(function(p){ return p.dal===context.dal && p.al===context.al; });
+        if (!pp) { pp = {dal:context.dal, al:context.al, prezzi:{}}; e.periodi.push(pp); }
+        pp.prezzi[c.pk] = prezzo;
+      } else {
+        e.prezzi[c.pk] = prezzo;
+      }
+    });
+  });
+  DB.set('listino', lst);
+  return true;
+}
 
 function lstApplyPeriodo() {
   const from = lstSelFrom || document.getElementById('lst-sf')?.value || today();
@@ -24141,11 +24251,13 @@ function lstCellSave(el){
   var e=lst.find(function(l){return l.roomId===rId && (l.tariffaId||'standard')===lstTariffaId;});
   if(!e){e={roomId:rId,tariffaId:lstTariffaId,prezzi:{},periodi:[]};lst.push(e);}
   if(!e.periodi)e.periodi=[];
+  var ctx;
   if(lstSelFrom&&lstSelTo&&ds>=lstSelFrom&&ds<=lstSelTo){
     // Cella dentro un range selezionato — aggiorna il periodo del range
     var p=e.periodi.find(function(p){return p.dal===lstSelFrom&&p.al===lstSelTo;});
     if(!p){p={dal:lstSelFrom,al:lstSelTo,prezzi:{}};e.periodi.push(p);}
     if(v>0)p.prezzi[pk]=v;else delete p.prezzi[pk];
+    ctx = {dal:lstSelFrom, al:lstSelTo};
   } else {
     // Cella singola — salva come periodo giornaliero indipendente
     var pd=e.periodi.find(function(p){return p.dal===ds&&p.al===ds;});
@@ -24156,14 +24268,17 @@ function lstCellSave(el){
       if(Object.keys(pd.prezzi).length===0)
         e.periodi=e.periodi.filter(function(p){return !(p.dal===ds&&p.al===ds);});
     }
+    ctx = {ds:ds};
   }
   DB.set('listino',lst);
   lstSincronizzaTipologia(rId);
+  var propagato = lstPropagaDaStandard(rId, pk, v, ctx);
   lstOnInput(el);
+  if(propagato) renderListino();
 }
-function lstPeriodSave(el){var rId=el.dataset.room,pk=el.dataset.trat||'PAX1',dal=el.dataset.dal,al=el.dataset.al;if(!rId||!dal||!al)return;var v=Math.round(parseFloat(el.value)||0);el.value=v||'';var lst=DB.get('listino')||[];var e=lst.find(function(l){return l.roomId===rId && (l.tariffaId||'standard')===lstTariffaId;});if(!e){e={roomId:rId,tariffaId:lstTariffaId,prezzi:{},periodi:[]};lst.push(e);}if(!e.periodi)e.periodi=[];var p=e.periodi.find(function(p){return p.dal===dal&&p.al===al;});if(!p){p={dal:dal,al:al,prezzi:{}};e.periodi.push(p);}if(v>0)p.prezzi[pk]=v;else delete p.prezzi[pk];DB.set('listino',lst);lstSincronizzaTipologia(rId);}
+function lstPeriodSave(el){var rId=el.dataset.room,pk=el.dataset.trat||'PAX1',dal=el.dataset.dal,al=el.dataset.al;if(!rId||!dal||!al)return;var v=Math.round(parseFloat(el.value)||0);el.value=v||'';var lst=DB.get('listino')||[];var e=lst.find(function(l){return l.roomId===rId && (l.tariffaId||'standard')===lstTariffaId;});if(!e){e={roomId:rId,tariffaId:lstTariffaId,prezzi:{},periodi:[]};lst.push(e);}if(!e.periodi)e.periodi=[];var p=e.periodi.find(function(p){return p.dal===dal&&p.al===al;});if(!p){p={dal:dal,al:al,prezzi:{}};e.periodi.push(p);}if(v>0)p.prezzi[pk]=v;else delete p.prezzi[pk];DB.set('listino',lst);lstSincronizzaTipologia(rId);var propagato=lstPropagaDaStandard(rId,pk,v,{dal:dal,al:al});if(propagato)renderListino();}
 
-function lstBaseSave(el){var rId=el.dataset.room,pk=el.dataset.trat||'PAX1';if(!rId)return;var v=Math.round(parseFloat(el.value)||0);el.value=v||'';var lst=DB.get('listino')||[];var e=lst.find(function(l){return l.roomId===rId && (l.tariffaId||'standard')===lstTariffaId;});if(!e){e={roomId:rId,tariffaId:lstTariffaId,prezzi:{},periodi:[]};lst.push(e);}if(!e.periodi)e.periodi=[];if(v>0)e.prezzi[pk]=v;else delete e.prezzi[pk];DB.set('listino',lst);lstSincronizzaTipologia(rId);renderListino();}
+function lstBaseSave(el){var rId=el.dataset.room,pk=el.dataset.trat||'PAX1';if(!rId)return;var v=Math.round(parseFloat(el.value)||0);el.value=v||'';var lst=DB.get('listino')||[];var e=lst.find(function(l){return l.roomId===rId && (l.tariffaId||'standard')===lstTariffaId;});if(!e){e={roomId:rId,tariffaId:lstTariffaId,prezzi:{},periodi:[]};lst.push(e);}if(!e.periodi)e.periodi=[];if(v>0)e.prezzi[pk]=v;else delete e.prezzi[pk];DB.set('listino',lst);lstSincronizzaTipologia(rId);lstPropagaDaStandard(rId,pk,v,{});renderListino();}
 
 // lstSaveMin/lstSaveMinEvt rimosse: il soggiorno minimo non è più
 // modificabile per singola camera (vedi applyMinNottiCategoria, per tipologia+data).
