@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 27/08/2026 · 05:21</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 27/08/2026 · 05:30</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -24274,11 +24274,11 @@ function lstCellSave(el){
   lstSincronizzaTipologia(rId);
   var propagato = lstPropagaDaStandard(rId, pk, v, ctx);
   lstOnInput(el);
-  if(propagato) renderListino();
+  if(propagato) setTimeout(renderListino, 0); // rimandato: evita errore DOM se scatta da un blur
 }
-function lstPeriodSave(el){var rId=el.dataset.room,pk=el.dataset.trat||'PAX1',dal=el.dataset.dal,al=el.dataset.al;if(!rId||!dal||!al)return;var v=Math.round(parseFloat(el.value)||0);el.value=v||'';var lst=DB.get('listino')||[];var e=lst.find(function(l){return l.roomId===rId && (l.tariffaId||'standard')===lstTariffaId;});if(!e){e={roomId:rId,tariffaId:lstTariffaId,prezzi:{},periodi:[]};lst.push(e);}if(!e.periodi)e.periodi=[];var p=e.periodi.find(function(p){return p.dal===dal&&p.al===al;});if(!p){p={dal:dal,al:al,prezzi:{}};e.periodi.push(p);}if(v>0)p.prezzi[pk]=v;else delete p.prezzi[pk];DB.set('listino',lst);lstSincronizzaTipologia(rId);var propagato=lstPropagaDaStandard(rId,pk,v,{dal:dal,al:al});if(propagato)renderListino();}
+function lstPeriodSave(el){var rId=el.dataset.room,pk=el.dataset.trat||'PAX1',dal=el.dataset.dal,al=el.dataset.al;if(!rId||!dal||!al)return;var v=Math.round(parseFloat(el.value)||0);el.value=v||'';var lst=DB.get('listino')||[];var e=lst.find(function(l){return l.roomId===rId && (l.tariffaId||'standard')===lstTariffaId;});if(!e){e={roomId:rId,tariffaId:lstTariffaId,prezzi:{},periodi:[]};lst.push(e);}if(!e.periodi)e.periodi=[];var p=e.periodi.find(function(p){return p.dal===dal&&p.al===al;});if(!p){p={dal:dal,al:al,prezzi:{}};e.periodi.push(p);}if(v>0)p.prezzi[pk]=v;else delete p.prezzi[pk];DB.set('listino',lst);lstSincronizzaTipologia(rId);var propagato=lstPropagaDaStandard(rId,pk,v,{dal:dal,al:al});if(propagato)setTimeout(renderListino,0);}
 
-function lstBaseSave(el){var rId=el.dataset.room,pk=el.dataset.trat||'PAX1';if(!rId)return;var v=Math.round(parseFloat(el.value)||0);el.value=v||'';var lst=DB.get('listino')||[];var e=lst.find(function(l){return l.roomId===rId && (l.tariffaId||'standard')===lstTariffaId;});if(!e){e={roomId:rId,tariffaId:lstTariffaId,prezzi:{},periodi:[]};lst.push(e);}if(!e.periodi)e.periodi=[];if(v>0)e.prezzi[pk]=v;else delete e.prezzi[pk];DB.set('listino',lst);lstSincronizzaTipologia(rId);lstPropagaDaStandard(rId,pk,v,{});renderListino();}
+function lstBaseSave(el){var rId=el.dataset.room,pk=el.dataset.trat||'PAX1';if(!rId)return;var v=Math.round(parseFloat(el.value)||0);el.value=v||'';var lst=DB.get('listino')||[];var e=lst.find(function(l){return l.roomId===rId && (l.tariffaId||'standard')===lstTariffaId;});if(!e){e={roomId:rId,tariffaId:lstTariffaId,prezzi:{},periodi:[]};lst.push(e);}if(!e.periodi)e.periodi=[];if(v>0)e.prezzi[pk]=v;else delete e.prezzi[pk];DB.set('listino',lst);lstSincronizzaTipologia(rId);lstPropagaDaStandard(rId,pk,v,{});setTimeout(renderListino,0);}
 
 // lstSaveMin/lstSaveMinEvt rimosse: il soggiorno minimo non è più
 // modificabile per singola camera (vedi applyMinNottiCategoria, per tipologia+data).
