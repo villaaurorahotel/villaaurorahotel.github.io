@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 27/08/2026 · 16:38</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 28/08/2026 · 16:05</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -1630,6 +1630,16 @@ function salvaConfermaTemplate() {
   s.confermaTemplateIt = testo;
   DB.setObj('settings', s);
   showToast(testo.trim() ? '🟢 Modello salvato' : '🟢 Tornato al testo automatico');
+}
+
+// Modello personalizzabile del testo del preventivo (vedi eseguiInvioPreventivo) — lasciarlo vuoto
+// fa tornare al testo automatico di sempre. Vale solo per l'italiano, come il modello di conferma.
+function salvaPreventivoTemplate() {
+  const testo = (document.getElementById('s-preventivoTemplate')?.value || '');
+  const s = DB.getObj('settings', {});
+  s.preventivoTemplateIt = testo;
+  DB.setObj('settings', s);
+  showToast(testo.trim() ? '🟢 Modello preventivo salvato' : '🟢 Tornato al testo automatico');
 }
 
 // Link e password della pagina "Scansione documenti" — password separata da quella delle pulizie,
@@ -13149,15 +13159,23 @@ function eseguiInvioPreventivo(id, metodo) {
       +(piuOpzioni ? '' : 'Total stay'+(q.colazioneInclusa!==false?' with breakfast':'')+': '+(cfg.currency||'€')+' '+Number(q.totalPrice).toFixed(2)+'\n\n')
       +notaCaparraEn
       +'We remain at your disposal for any further information.\n'
-    : 'PREVENTIVO N. '+q.num+'\n\n'
-      +'Gentile '+titoloOspite(q.clientName)+' '+q.clientName+',\n'
-      +'La ringraziamo per averci contattato e come richiesto inviamo il preventivo di soggiorno, non vincolante'+(q.expiry?', valido fino al '+fmtDate(q.expiry):'')+'.\n\n'
-      +(piuPeriodi ? '' : 'Check-in: '+fmtDate(q.checkin)+' - Check-out: '+fmtDate(q.checkout)+' - per notti '+n+'\n\n')
-      +elencoCamere
-      +(piuOpzioni && linkScelta ? 'Può anche scegliere la soluzione che preferisce direttamente da qui:\n'+linkScelta+'\n\n' : '')
-      +(piuOpzioni ? '' : 'Totale soggiorno'+(q.colazioneInclusa!==false?' con Prima Colazione':'')+': '+(cfg.currency||'€')+' '+Number(q.totalPrice).toFixed(2)+'\n\n')
-      +notaCaparra
-      +'Restiamo a disposizione per qualsiasi informazione.\n';
+    // Modello personalizzabile da Impostazioni → Modello messaggio preventivo (segnaposto sostituiti
+    // qui sotto); se non è mai stato compilato, resta il testo di sempre, identico a prima.
+    : (function(){
+        const sSet = DB.getObj('settings', {});
+        const templateSource = (sSet.preventivoTemplateIt && sSet.preventivoTemplateIt.trim())
+          ? sSet.preventivoTemplateIt
+          : 'PREVENTIVO N. {numero}\n\nGentile {saluto},\nLa ringraziamo per averci contattato e come richiesto inviamo il preventivo di soggiorno, non vincolante{scadenza}.\n\n{periodo}{camere}{link_scelta}{totale}Al momento della conferma, verrà richiesta una caparra confirmatoria del 30% oppure un numero di carta di credito a garanzia e nel caso di tariffe scontate, la caparra versata verrà trattenuta in caso di cancellazione.\n\nRestiamo a disposizione per qualsiasi informazione.\n';
+        return templateSource
+          .replace(/\{numero\}/g, String(q.num))
+          .replace(/\{saluto\}/g, titoloOspite(q.clientName)+' '+q.clientName)
+          .replace(/\{nome\}/g, q.clientName)
+          .replace(/\{scadenza\}/g, q.expiry ? ', valido fino al '+fmtDate(q.expiry) : '')
+          .replace(/\{periodo\}/g, piuPeriodi ? '' : 'Check-in: '+fmtDate(q.checkin)+' - Check-out: '+fmtDate(q.checkout)+' - per notti '+n+'\n\n')
+          .replace(/\{camere\}/g, elencoCamere)
+          .replace(/\{link_scelta\}/g, (piuOpzioni && linkScelta) ? 'Può anche scegliere la soluzione che preferisce direttamente da qui:\n'+linkScelta+'\n\n' : '')
+          .replace(/\{totale\}/g, piuOpzioni ? '' : 'Totale soggiorno'+(q.colazioneInclusa!==false?' con Prima Colazione':'')+': '+(cfg.currency||'€')+' '+Number(q.totalPrice).toFixed(2)+'\n\n');
+      })();
   const firma = (en ? '\nBest regards,\n' : '\nCordiali saluti,\n')+cfg.propertyName
     +(cfg.telefono?'\n'+cfg.telefono:'')
     +(cfg.email?'\n'+cfg.email:'');
@@ -26695,6 +26713,21 @@ function renderImpostazioni() {
               <input type="text" id="s-scegliPreventivoUrl" value="${s.scegliPreventivoUrl||''}" placeholder="https://tuosito.it/scegli-preventivo.html">
             </div>
             <button type="button" class="btn btn-sm btn-primary full" onclick="salvaScegliPreventivoUrl()">💾 Salva indirizzo</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="max-width:500px;flex:1 1 460px">
+        <div class="card-header"><span class="card-title">Modello messaggio preventivo</span></div>
+        <div class="sub" style="margin:-6px 0 14px;font-size:12px;color:var(--text3)">Il testo che parte quando invii un preventivo (pulsante "Invia preventivo"). Lascialo vuoto per usare il testo automatico di sempre. Vale solo per l'italiano — l'inglese resta automatico.</div>
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group full">
+              <textarea id="s-preventivoTemplate" rows="10" style="width:100%;font-family:inherit;font-size:13px;padding:8px;box-sizing:border-box">${s.preventivoTemplateIt||''}</textarea>
+            </div>
+            <div class="form-group full" style="font-size:11px;color:var(--text3)">Segnaposto disponibili — vengono sostituiti automaticamente: {numero} {saluto} {nome} {scadenza}<br><strong>{periodo}</strong> — riga check-in/check-out/notti (vuota se il preventivo ha più periodi separati)<br><strong>{camere}</strong> — obbligatorio, qui va l'elenco delle camere/tipologie proposte, calcolato da DeskFlow<br><strong>{link_scelta}</strong> — riga con il link "Scegli preventivo", solo se ci sono più opzioni tra cui scegliere<br><strong>{totale}</strong> — riga con il totale soggiorno (vuota se ci sono più opzioni, dato che in quel caso ogni opzione ha già il suo prezzo)<br>Le condizioni della struttura e la firma finale restano automatiche e si aggiungono sempre dopo questo testo.</div>
+            <button type="button" class="btn btn-sm btn-primary full" onclick="salvaPreventivoTemplate()">💾 Salva modello</button>
+            <button type="button" class="btn btn-sm full" onclick="document.getElementById('s-preventivoTemplate').value=''; salvaPreventivoTemplate()">↺ Torna al testo automatico</button>
           </div>
         </div>
       </div>
