@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 29/08/2026 · 09:03</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 29/08/2026 · 13:31</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -11634,9 +11634,12 @@ function renderHousekeeping() {
 
     const hasSomething = arrivi.length||partenze.length||fermate.length;
 
-    // Persone a colazione questo giorno: ospiti di camere occupate (checkin<=ds<checkout) con colazione inclusa
+    // Persone a colazione questo giorno: chi ha dormito la notte PRIMA di "ds" (non chi occupa la
+    // camera stanotte — quella è la colazione di domani). Stessa correzione già fatta in Dashboard
+    // ("le colazioni di oggi mostravano quelle di domani"): serve checkin<ds (non ancora arrivato
+    // stamattina non conta) e checkout>=ds (chi parte oggi ha comunque fatto colazione stamattina).
     const colazioni = bookings
-      .filter(b => b.status!=='cancellata' && b.checkin<=ds && b.checkout>ds && b.colazioneInclusa!==false)
+      .filter(b => b.checkin<ds && b.checkout>=ds && b.colazioneInclusa!==false)
       .reduce((s,b) => s + (parseInt(b.adults)||0) + (parseInt(b.children)||0), 0);
 
     // Export rows (grouped into 3 sections, ordinate per camera)
@@ -18554,7 +18557,10 @@ function openDettaglioPrenotazione(id) {
 
       '<div style="border-top:1px solid var(--border);padding-top:14px">' +
         '<div style="font-size:11px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">Cliente</div>' +
-        '<div style="font-size:15.5px;font-weight:700;color:var(--text1)">'+b.guestName+'</div>' +
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+          '<span style="font-size:15.5px;font-weight:700;color:var(--text1)">'+b.guestName+'</span>' +
+          '<span class="badge" style="background:var(--accent);color:#fff;font-weight:700">🚪 Camera '+b.roomName+'</span>' +
+        '</div>' +
         '<div style="font-size:12.5px;color:var(--text2);margin-top:2px">Fonte: '+(b.source||'—')+'</div>' +
         (guestRec && guestRec.phone ? '<div style="font-size:12.5px;color:var(--text2);margin-top:6px">📞 '+guestRec.phone+'</div>' : '') +
         (guestRec && guestRec.email ? '<div style="font-size:12.5px;color:var(--text2);margin-top:2px;word-break:break-all">✉️ '+guestRec.email+'</div>' : '') +
@@ -18588,7 +18594,7 @@ function openDettaglioPrenotazione(id) {
       '</div>' +
 
       tabPanel('principale',
-        rigaTripla('Camera', b.roomName, 'Ospiti', b.adults+' adulti'+(b.children>0?', '+b.children+' bamb.':''), 'Allestimento', trattInfoDett ? trattInfoDett.code : '—') +
+        rigaTripla('Ospiti', b.adults+' adulti'+(b.children>0?', '+b.children+' bamb.':''), 'Allestimento', trattInfoDett ? trattInfoDett.code : '—', 'Trattamento', ({BB:'BB — Colazione', HB:'HB — Mezza pensione', PC:'PC — Pensione completa'})[b.pensione||(b.colazioneInclusa!==false?'BB':'nessuno')] || 'SS — Solo soggiorno') +
         riga('Stato', statusBadge(b.status) + ' <span style="margin-left:8px">'+(b.garanzia && b.garanzia.tipo === 'carta'
             ? '<span class="badge" style="background:#1e40af;color:#fff">💳 Carta •'+(b.garanzia.ultime4||'----')+'</span>'
               + (b.garanzia.titolare ? ' <span style="font-size:12px;color:var(--text2)">'+b.garanzia.titolare+'</span>' : '')
@@ -28143,7 +28149,7 @@ function stampaSchedaGruppo(groupId) {
   if (!bookings.length) { showToast('Nessuna prenotazione trovata per questo gruppo'); return; }
   const cfg = DB.getObj('settings', {propertyName:'La mia struttura', currency:'€'});
   const win = window.open('', '_blank', 'width=700,height=900');
-  win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Scheda gruppo — '+groupId+'</title>' + SCHEDA_PRENOTAZIONE_CSS + '</head><body>' + schedaGruppoHTML(bookings, cfg) + '</body></html>');
+  win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Scheda gruppo — '+groupId+'</title>' + SCHEDA_PRENOTAZIONE_CSS_A5 + '</head><body>' + schedaGruppoHTML(bookings, cfg) + '</body></html>');
   win.document.close();
   setTimeout(function(){ win.print(); }, 500);
 }
@@ -28153,7 +28159,7 @@ function stampaSchedaPrenotazione(bid) {
   if (!b) { showToast('Prenotazione non trovata'); return; }
   const cfg = DB.getObj('settings', {propertyName:'La mia struttura', currency:'€'});
   const win = window.open('', '_blank', 'width=700,height=900');
-  win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Scheda prenotazione — '+b.guestName+'</title>' + SCHEDA_PRENOTAZIONE_CSS + '</head><body>' + schedaPrenotazioneHTML(b, cfg) + '</body></html>');
+  win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Scheda prenotazione — '+b.guestName+'</title>' + SCHEDA_PRENOTAZIONE_CSS_A5 + '</head><body>' + schedaPrenotazioneHTML(b, cfg) + '</body></html>');
   win.document.close();
   setTimeout(function(){ win.print(); }, 500);
 }
@@ -28175,7 +28181,7 @@ function stampaTutteSchedePrenotazioni(bookings) {
 
   const win = window.open('', '_blank', 'width=700,height=900');
   const sheets = pages.join('<div class="page-break"></div>');
-  win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Schede prenotazione</title>' + SCHEDA_PRENOTAZIONE_CSS + '</head><body>' + sheets + '</body></html>');
+  win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Schede prenotazione</title>' + SCHEDA_PRENOTAZIONE_CSS_A5 + '</head><body>' + sheets + '</body></html>');
   win.document.close();
   const nGruppi = Object.keys(gruppi).length;
   showToast(pages.length+' fogli pronti per la stampa ('+bookings.length+' prenotazioni'+(nGruppi?', '+nGruppi+' gruppi combinati sullo stesso foglio':'')+')');
@@ -28203,15 +28209,15 @@ const SCHEDA_PRENOTAZIONE_CSS = '<style>' +
   '@media print{.page-break{page-break-after:always}}' +
   '</style>';
 
-// Stessa impaginazione del conto, ma dimensionata come un foglio A5 (metà di un A4) — così esce più
-// compatta, mentre in stampa continua a usare la carta A4 normale già caricata nella stampante (il
-// contenuto A5 viene centrato sul foglio A4, non serve carta speciale).
+// Stessa impaginazione del conto, ma dimensionata a metà tra A5 e A4 (~176mm di larghezza, formato
+// B5) — più compatta di un foglio A4 pieno ma più leggibile di un A5, mentre in stampa continua a
+// usare la carta A4 normale già caricata nella stampante (il contenuto viene centrato sul foglio).
 const SCHEDA_PRENOTAZIONE_CSS_A5 = SCHEDA_PRENOTAZIONE_CSS.replace('</style>',
   '@page{size:A4;margin:10mm}' +
-  'body{padding:0;display:flex;justify-content:center;align-items:flex-start;font-size:12px}' +
-  '.sheet{width:148mm;max-width:148mm;padding:10mm;box-sizing:border-box;border:.5px dashed #ccc}' +
+  'body{padding:0;display:flex;justify-content:center;align-items:flex-start;font-size:13px}' +
+  '.sheet{width:176mm;max-width:176mm;padding:12mm;box-sizing:border-box;border:.5px dashed #ccc}' +
   '@media print{.sheet{border:none}}' +
-  'h1{font-size:16px}.doc-title{font-size:13px}.room-box{font-size:24px;padding:8px 10px}.guest-box{font-size:20px}' +
+  'h1{font-size:18px}.doc-title{font-size:14px}.room-box{font-size:27px;padding:9px 12px}.guest-box{font-size:22px}' +
   '</style>');
 
 // ── Maschera "Conto": riepilogo prenotazione, conteggi e incasso del pagamento ──
@@ -29185,6 +29191,7 @@ async function corrLoadData(){
   if(!corrState.transactions) corrState.transactions = [];
   if(!corrState.uscite) corrState.uscite = [];
   if(!corrState.chiusure) corrState.chiusure = {};
+  if(!corrState.log) corrState.log = [];
 }
 
 let corrLastSaveError = '';
@@ -29228,6 +29235,36 @@ function corrNextNumero(tipo){
   return Math.max(...list.map(t=>Number(t.numero)||0)) + 1;
 }
 
+// ── Registro Modifiche del modulo Corrispettivi — richiesto da Gian: traccia chi/quando/cosa è
+// cambiato su un movimento (variazioni di importo, cancellazioni di ricevute, modifiche varie),
+// stesso principio del Registro modifiche già presente nella scheda di ogni prenotazione. Salvato
+// dentro corrState (sincronizzato come tutto il resto del modulo tramite corrPersist).
+function corrRegistraLog(tipo, testo){
+  if (!corrState.log) corrState.log = [];
+  corrState.log.push({ id: corrUid(), data: new Date().toISOString(), tipo: tipo||'modifica', testo: testo });
+}
+function corrLogIcona(tipo){
+  const mappa = { creazione:'🆕', modifica:'✏️', cancellazione:'🚫' };
+  return mappa[tipo] || '•';
+}
+function corrRenderLog(){
+  const voci = (corrState.log||[]).slice().sort((a,c)=>(c.data||'').localeCompare(a.data||''));
+  if (!voci.length) return '<div class="card"><p style="color:var(--muted,#777)">Nessuna modifica registrata ancora in questo registro.</p></div>';
+  return '<div class="card"><div style="display:flex;flex-direction:column;gap:2px">' +
+    voci.map(v=>{
+      const dt = new Date(v.data);
+      const dataFmt = isNaN(dt.getTime()) ? '—' : (fmtDate(v.data.slice(0,10)) + ' · ' + dt.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}));
+      return '<div style="display:flex;gap:10px;padding:10px 2px;border-bottom:1px solid #eee;align-items:flex-start">' +
+        '<span style="font-size:16px;line-height:1.3">'+corrLogIcona(v.tipo)+'</span>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-size:12px;color:#888;font-weight:600">'+dataFmt+'</div>' +
+          '<div style="font-size:13.5px;color:#222;margin-top:2px;word-break:break-word">'+corrEscapeHtml(v.testo||'')+'</div>' +
+        '</div>' +
+      '</div>';
+    }).join('') +
+  '</div></div>';
+}
+
 function corrMonthKey(iso){ return iso ? iso.slice(0,7) : ''; }
 
 function corrDaysInMonth(y,m){ return new Date(y, m, 0).getDate(); }
@@ -29259,6 +29296,7 @@ function corrRenderTopbar(){
     ['resoconto','Resoconto giorno'],
     ['chiusura','Chiusura cassa'],
     ['importa','Importa dati'],
+    ['log','Registro modifiche'],
     ['impostazioni','Impostazioni']
   ];
   return `
@@ -29287,6 +29325,7 @@ function corrRenderTab(){
   if(corrTab==='resoconto') return corrRenderResoconto();
   if(corrTab==='chiusura') return corrRenderChiusura();
   if(corrTab==='importa') return corrRenderImporta();
+  if(corrTab==='log') return corrRenderLog();
   if(corrTab==='impostazioni') return corrRenderImpostazioniTab();
   return '';
 }
@@ -30485,9 +30524,18 @@ function corrAttachNuovoHandlers(){
     });
     if(corrEditingId){
       const idx = corrState.transactions.findIndex(t=>t.id===corrEditingId);
+      const vecchio = corrState.transactions[idx];
+      const totaleVecchio = vecchio ? corrRowTotal(vecchio) : 0;
+      const totaleNuovo = corrRowTotal(tx);
       corrState.transactions[idx] = tx;
+      const pezziModifica = [];
+      if (Math.abs(totaleVecchio-totaleNuovo) > 0.001) pezziModifica.push('importo: '+corrEur(totaleVecchio)+' → '+corrEur(totaleNuovo));
+      if (vecchio && vecchio.date !== tx.date) pezziModifica.push('data: '+vecchio.date+' → '+tx.date);
+      if (vecchio && (Number(vecchio.numero)||0) !== (Number(tx.numero)||0)) pezziModifica.push('numero: '+(vecchio.numero||'—')+' → '+(tx.numero||'—'));
+      corrRegistraLog('modifica', (tx.tipo==='F'?'Fattura':'Scontrino')+' N.'+tx.numero+' del '+tx.date+' modificato'+(pezziModifica.length?' — '+pezziModifica.join(', '):''));
     }else{
       corrState.transactions.push(tx);
+      corrRegistraLog('creazione', 'Nuovo '+(tx.tipo==='F'?'fattura':'scontrino')+' N.'+tx.numero+' del '+tx.date+' — '+corrEur(corrRowTotal(tx)));
     }
     corrEditingId = null;
     corrSelectedDay = tx.date; corrTab='registro';
@@ -30512,7 +30560,9 @@ function corrAttachRegistroHandlers(){
   document.querySelectorAll('[data-edit]').forEach(b=> b.onclick = ()=>{ corrEditingId=b.dataset.edit; corrTab='nuovo'; corrRender(); });
   document.querySelectorAll('[data-del]').forEach(b=> b.onclick = async ()=>{
     if(!confirm('Eliminare questo movimento?')) return;
+    const daEliminare = corrState.transactions.find(t=>t.id===b.dataset.del);
     corrState.transactions = corrState.transactions.filter(t=>t.id!==b.dataset.del);
+    if (daEliminare) corrRegistraLog('cancellazione', (daEliminare.tipo==='F'?'Fattura':'Scontrino')+' N.'+daEliminare.numero+' del '+daEliminare.date+' eliminata — importo '+corrEur(corrRowTotal(daEliminare))+(daEliminare.clienteNome?' — '+daEliminare.clienteNome:''));
     await corrPersist('movimento eliminato');
   });
 }
