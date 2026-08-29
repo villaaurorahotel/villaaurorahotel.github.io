@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 29/08/2026 · 08:30</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 29/08/2026 · 09:03</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -28254,24 +28254,24 @@ function apriContoGruppo(groupId) {
   showModal('Conto unico di gruppo — '+groupId,
     '<div style="font-size:13px">'+
       '<div style="font-weight:700;color:var(--accent);margin-bottom:6px;text-transform:uppercase;font-size:11px;letter-spacing:.5px">Dettaglio camere del gruppo ('+bookings.length+')</div>'+
-      '<div style="font-size:11px;color:var(--text3);margin-bottom:8px">✏️ Il prezzo del Soggiorno è modificabile: se lo alzi, il nuovo prezzo diventa quello vero della prenotazione. Se lo abbassi, la prenotazione mantiene il prezzo originale — la differenza resta visibile come rimanenza nel Registro modifiche della prenotazione, così non si perde traccia dello sconto fatto qui.</div>'+
+      '<div style="font-size:11px;color:var(--text3);margin-bottom:8px">✏️ Soggiorno e Tassa sono modificabili: se alzi un importo, il nuovo valore diventa quello vero della prenotazione. Se lo abbassi, la prenotazione mantiene il valore originale — la differenza resta visibile come rimanenza nel Registro modifiche della prenotazione, così non si perde traccia dello sconto fatto qui.</div>'+
       '<table id="conto-gruppo-tabella" style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:12.5px">'+
-        '<tr style="color:var(--text3);font-size:11px"><td style="padding:3px 0">Camera</td><td>Ospite</td><td>Periodo</td><td style="text-align:right;min-width:110px">Soggiorno</td><td style="text-align:right">Tassa</td><td style="text-align:right">Extra</td><td style="text-align:right"><strong>Totale</strong></td></tr>'+
-        righe.map(r => '<tr data-riga-booking="'+r.b.id+'" data-tax="'+r.tax+'" data-extra="'+r.extrasTotal+'" data-originale="'+r.soggiorno+'">'
+        '<tr style="color:var(--text3);font-size:11px"><td style="padding:3px 0">Camera</td><td>Ospite</td><td>Periodo</td><td style="text-align:right;min-width:110px">Soggiorno</td><td style="text-align:right;min-width:90px">Tassa</td><td style="text-align:right">Extra</td><td style="text-align:right"><strong>Totale</strong></td></tr>'+
+        righe.map(r => '<tr data-riga-booking="'+r.b.id+'" data-extra="'+r.extrasTotal+'">'
           +'<td style="padding:5px 0"><strong>'+r.b.roomName+'</strong></td>'
           +'<td>'+r.b.guestName+'</td>'
           +'<td>'+fmtDate(r.b.checkin)+' → '+fmtDate(r.b.checkout)+'</td>'
           +'<td style="text-align:right"><input type="number" step="0.01" min="0" value="'+r.soggiorno.toFixed(2)+'" data-soggiorno-input style="width:90px;text-align:right;padding:4px 6px;border:1px solid var(--border2);border-radius:5px;font-size:12.5px" oninput="ricalcolaContoGruppoLive()"></td>'
-          +'<td style="text-align:right" data-cella-tax>'+fmtCurrency(r.tax)+'</td>'
+          +'<td style="text-align:right"><input type="number" step="0.01" min="0" value="'+r.tax.toFixed(2)+'" data-tax-input style="width:70px;text-align:right;padding:4px 6px;border:1px solid var(--border2);border-radius:5px;font-size:12.5px" oninput="ricalcolaContoGruppoLive()"></td>'
           +'<td style="text-align:right" data-cella-extra>'+fmtCurrency(r.extrasTotal)+'</td>'
           +'<td style="text-align:right" data-cella-totale><strong>'+fmtCurrency(r.totale)+'</strong></td>'
         +'</tr>').join('')+
-        '<tr style="border-top:1px solid var(--border)"><td colspan="3" style="padding:6px 0;font-weight:700;color:var(--text2)">Totali per categoria</td><td id="conto-gruppo-tot-soggiorno" style="text-align:right;font-weight:700">'+fmtCurrency(totSoggiornoGen)+'</td><td style="text-align:right;font-weight:700">'+fmtCurrency(totTassaGen)+'</td><td style="text-align:right;font-weight:700">'+fmtCurrency(totExtraGen)+'</td><td id="conto-gruppo-tot-totale" style="text-align:right;font-weight:700">'+fmtCurrency(totaleDovuto)+'</td></tr>'+
+        '<tr style="border-top:1px solid var(--border)"><td colspan="3" style="padding:6px 0;font-weight:700;color:var(--text2)">Totali per categoria</td><td id="conto-gruppo-tot-soggiorno" style="text-align:right;font-weight:700">'+fmtCurrency(totSoggiornoGen)+'</td><td id="conto-gruppo-tot-tassa" style="text-align:right;font-weight:700">'+fmtCurrency(totTassaGen)+'</td><td style="text-align:right;font-weight:700">'+fmtCurrency(totExtraGen)+'</td><td id="conto-gruppo-tot-totale" style="text-align:right;font-weight:700">'+fmtCurrency(totaleDovuto)+'</td></tr>'+
       '</table>'+
       '<div style="font-weight:700;color:var(--accent);margin-bottom:6px;text-transform:uppercase;font-size:11px;letter-spacing:.5px">Conteggi complessivi</div>'+
       '<table style="width:100%;border-collapse:collapse;margin-bottom:16px">'+
         '<tr><td style="padding:5px 0;color:var(--text2)">Soggiorno (tutte le camere)</td><td id="conto-gruppo-riep-soggiorno" style="text-align:right">'+fmtCurrency(totSoggiornoGen)+'</td></tr>'+
-        '<tr><td style="padding:5px 0;color:var(--text2)">Tassa di soggiorno (tutte le camere)</td><td style="text-align:right">'+fmtCurrency(totTassaGen)+'</td></tr>'+
+        '<tr><td style="padding:5px 0;color:var(--text2)">Tassa di soggiorno (tutte le camere)</td><td id="conto-gruppo-riep-tassa" style="text-align:right">'+fmtCurrency(totTassaGen)+'</td></tr>'+
         '<tr><td style="padding:5px 0;color:var(--text2)">Extra (tutte le camere)</td><td style="text-align:right">'+fmtCurrency(totExtraGen)+'</td></tr>'+
         '<tr><td style="padding:10px 0;font-weight:800;font-size:15px;border-top:1.5px solid var(--border)">TOTALE DOVUTO</td><td id="conto-gruppo-riep-totale" style="padding:10px 0;font-weight:800;font-size:15px;border-top:1.5px solid var(--border);text-align:right">'+fmtCurrency(totaleDovuto)+'</td></tr>'+
         '<tr><td style="padding:5px 0;color:var(--text2)">Caparra già incassata</td><td style="text-align:right">'+fmtCurrency(caparraTotale)+'</td></tr>'+
@@ -28349,15 +28349,17 @@ function ricalcolaContoGruppoLive() {
   let totSoggiorno = 0, totTax = 0, totExtra = 0, totTotale = 0;
   tabella.querySelectorAll('tr[data-riga-booking]').forEach(function(tr){
     const soggiorno = parseFloat(tr.querySelector('[data-soggiorno-input]').value) || 0;
-    const tax = parseFloat(tr.getAttribute('data-tax')) || 0;
+    const tax = parseFloat(tr.querySelector('[data-tax-input]').value) || 0;
     const extra = parseFloat(tr.getAttribute('data-extra')) || 0;
     const totaleRiga = soggiorno + tax + extra;
     tr.querySelector('[data-cella-totale]').innerHTML = '<strong>'+fmtCurrency(totaleRiga)+'</strong>';
     totSoggiorno += soggiorno; totTax += tax; totExtra += extra; totTotale += totaleRiga;
   });
   const elTotSoggiorno = document.getElementById('conto-gruppo-tot-soggiorno'); if (elTotSoggiorno) elTotSoggiorno.textContent = fmtCurrency(totSoggiorno);
+  const elTotTassa = document.getElementById('conto-gruppo-tot-tassa'); if (elTotTassa) elTotTassa.textContent = fmtCurrency(totTax);
   const elTotTotale = document.getElementById('conto-gruppo-tot-totale'); if (elTotTotale) elTotTotale.textContent = fmtCurrency(totTotale);
   const elRiepSoggiorno = document.getElementById('conto-gruppo-riep-soggiorno'); if (elRiepSoggiorno) elRiepSoggiorno.textContent = fmtCurrency(totSoggiorno);
+  const elRiepTassa = document.getElementById('conto-gruppo-riep-tassa'); if (elRiepTassa) elRiepTassa.textContent = fmtCurrency(totTax);
   const elRiepTotale = document.getElementById('conto-gruppo-riep-totale'); if (elRiepTotale) elRiepTotale.textContent = fmtCurrency(totTotale);
   // Ricalcola anche "Da pagare" tenendo conto della caparra già incassata (non cambia con questa modifica)
   const caparraTotale = parseFloat(window._contoGruppoCaparra||0);
@@ -28378,32 +28380,61 @@ function contoGruppoStampaEDeposita(groupId) {
   const gruppo = bookings.filter(b => b.groupId === groupId && b.status !== 'cancellata');
   if (!gruppo.length) { showToast('Nessuna prenotazione trovata per questo gruppo'); return; }
 
-  // Applica le eventuali modifiche al prezzo Soggiorno fatte nella tabella (vedi ricalcolaContoGruppoLive).
-  // Il prezzo scritto in tabella diventa il totale usato per IL CONTO DI OGGI (ricevuta/registrazione).
-  // Se è più alto dell'originale: diventa anche il nuovo prezzo vero della prenotazione (correzione
-  // permanente). Se è più basso: il prezzo della prenotazione NON viene ridotto — resta quello vero —
+  // Applica le eventuali modifiche a Soggiorno e Tassa fatte nella tabella (vedi ricalcolaContoGruppoLive).
+  // Il valore scritto in tabella diventa il totale usato per IL CONTO DI OGGI (ricevuta/registrazione).
+  // Se è più alto dell'originale: diventa anche il nuovo valore vero della prenotazione (correzione
+  // permanente). Se è più basso: il valore della prenotazione NON viene ridotto — resta quello vero —
   // e la differenza viene lasciata come traccia nel Registro modifiche, così la rimanenza non sparisce.
-  const daRipristinareDopo = []; // {id, prezzoOriginale} — il prezzo vero da rimettere sulla prenotazione
-                                  // DOPO aver stampato/registrato il conto di oggi con l'importo ridotto
+  const daRipristinareDopo = []; // {id, prezzoOriginale?, tassaManualeOriginale?, tassaOverrideOriginale?}
+                                  // — i valori veri da rimettere sulla prenotazione DOPO aver
+                                  // stampato/registrato il conto di oggi con l'importo ridotto
   const tabellaConto = document.getElementById('conto-gruppo-tabella');
   if (tabellaConto) {
     tabellaConto.querySelectorAll('tr[data-riga-booking]').forEach(function(tr){
       const bId = tr.getAttribute('data-riga-booking');
       const bk = gruppo.find(function(x){ return x.id === bId; });
       const inputSoggiorno = tr.querySelector('[data-soggiorno-input]');
-      if (!bk || !inputSoggiorno) return;
-      const nuovoPrezzo = Math.round((parseFloat(inputSoggiorno.value)||0)*100)/100;
-      const prezzoOriginale = Math.round((parseFloat(bk.totalPrice)||0)*100)/100;
-      if (nuovoPrezzo === prezzoOriginale) return;
-      if (nuovoPrezzo > prezzoOriginale) {
-        bk.totalPrice = nuovoPrezzo;
-        registraModificaPrenotazione(bId, 'modifica', 'Prezzo soggiorno aggiornato dal conto di gruppo: '+fmtCurrency(prezzoOriginale)+' → '+fmtCurrency(nuovoPrezzo));
-      } else {
-        const differenza = prezzoOriginale - nuovoPrezzo;
-        bk.totalPrice = nuovoPrezzo; // temporaneo: serve solo per calcolare/stampare il conto di oggi
-        daRipristinareDopo.push({ id: bId, prezzoOriginale: prezzoOriginale });
-        registraModificaPrenotazione(bId, 'modifica', 'Conto di gruppo: registrati '+fmtCurrency(nuovoPrezzo)+' invece di '+fmtCurrency(prezzoOriginale)+' — rimanenza di '+fmtCurrency(differenza)+' lasciata sulla prenotazione (il prezzo vero resta '+fmtCurrency(prezzoOriginale)+')');
+      const inputTax = tr.querySelector('[data-tax-input]');
+      if (!bk) return;
+      let ripristino = null;
+      const getRipristino = function(){ if (!ripristino) ripristino = { id: bId }; return ripristino; };
+      // Soggiorno
+      if (inputSoggiorno) {
+        const nuovoPrezzo = Math.round((parseFloat(inputSoggiorno.value)||0)*100)/100;
+        const prezzoOriginale = Math.round((parseFloat(bk.totalPrice)||0)*100)/100;
+        if (nuovoPrezzo !== prezzoOriginale) {
+          if (nuovoPrezzo > prezzoOriginale) {
+            bk.totalPrice = nuovoPrezzo;
+            registraModificaPrenotazione(bId, 'modifica', 'Prezzo soggiorno aggiornato dal conto di gruppo: '+fmtCurrency(prezzoOriginale)+' → '+fmtCurrency(nuovoPrezzo));
+          } else {
+            const differenza = prezzoOriginale - nuovoPrezzo;
+            bk.totalPrice = nuovoPrezzo; // temporaneo: solo per calcolare/stampare il conto di oggi
+            getRipristino().prezzoOriginale = prezzoOriginale;
+            registraModificaPrenotazione(bId, 'modifica', 'Conto di gruppo: soggiorno registrato a '+fmtCurrency(nuovoPrezzo)+' invece di '+fmtCurrency(prezzoOriginale)+' — rimanenza di '+fmtCurrency(differenza)+' lasciata sulla prenotazione (il prezzo vero resta '+fmtCurrency(prezzoOriginale)+')');
+          }
+        }
       }
+      // Tassa di soggiorno (usa lo stesso meccanismo di override manuale già esistente nella prenotazione)
+      if (inputTax) {
+        const nuovaTassa = Math.round((parseFloat(inputTax.value)||0)*100)/100;
+        const tassaOriginale = Math.round(calcTassaSoggiorno(bk).tax*100)/100;
+        if (nuovaTassa !== tassaOriginale) {
+          if (nuovaTassa > tassaOriginale) {
+            bk.tassaManuale = true;
+            bk.tassaSoggiornoOverride = nuovaTassa;
+            registraModificaPrenotazione(bId, 'modifica', 'Tassa di soggiorno aggiornata dal conto di gruppo: '+fmtCurrency(tassaOriginale)+' → '+fmtCurrency(nuovaTassa));
+          } else {
+            const differenza = tassaOriginale - nuovaTassa;
+            const r = getRipristino();
+            r.tassaManualeOriginale = !!bk.tassaManuale;
+            r.tassaOverrideOriginale = bk.tassaSoggiornoOverride != null ? bk.tassaSoggiornoOverride : null;
+            bk.tassaManuale = true;
+            bk.tassaSoggiornoOverride = nuovaTassa; // temporaneo: solo per calcolare/stampare il conto di oggi
+            registraModificaPrenotazione(bId, 'modifica', 'Conto di gruppo: tassa di soggiorno registrata a '+fmtCurrency(nuovaTassa)+' invece di '+fmtCurrency(tassaOriginale)+' — rimanenza di '+fmtCurrency(differenza)+' lasciata sulla prenotazione (la tassa vera resta '+fmtCurrency(tassaOriginale)+')');
+          }
+        }
+      }
+      if (ripristino) daRipristinareDopo.push(ripristino);
     });
   }
 
@@ -28438,14 +28469,19 @@ function contoGruppoStampaEDeposita(groupId) {
   closeModal();
   stampaContoGruppo(groupId);
 
-  // Ripristina il prezzo vero sulle camere dove è stato ridotto solo per il conto di oggi — la ricevuta
-  // appena stampata/registrata resta con l'importo ridotto di oggi (corretto), ma la prenotazione torna
-  // a mostrare il prezzo pieno, con la differenza ancora visibile come rimanenza da pagare.
+  // Ripristina i valori veri sulle camere dove sono stati ridotti solo per il conto di oggi — la
+  // ricevuta appena stampata/registrata resta con gli importi ridotti di oggi (corretti), ma la
+  // prenotazione torna a mostrare i valori pieni, con la differenza ancora visibile come rimanenza.
   if (daRipristinareDopo.length) {
     const bookingsFinali = DB.get('bookings');
     daRipristinareDopo.forEach(function(m){
       const bk = bookingsFinali.find(function(x){ return x.id === m.id; });
-      if (bk) bk.totalPrice = m.prezzoOriginale;
+      if (!bk) return;
+      if (m.prezzoOriginale != null) bk.totalPrice = m.prezzoOriginale;
+      if (m.tassaManualeOriginale !== undefined) {
+        bk.tassaManuale = m.tassaManualeOriginale;
+        bk.tassaSoggiornoOverride = m.tassaOverrideOriginale;
+      }
     });
     DB.set('bookings', bookingsFinali);
   }
