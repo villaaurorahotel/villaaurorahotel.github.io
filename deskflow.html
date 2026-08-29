@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 29/08/2026 · 13:36</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 29/08/2026 · 16:46</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -22609,7 +22609,41 @@ function stampaScheda(guestId) {
 
 
 
+// ══════════════════════════════════════════════════════════════════════════
+// REPARTO REPORT — richiesto da Gian: tre maschere avanzate (Produzione
+// Giornaliera, Revenue, Report Nazionalità), sul modello di un altro
+// gestionale che ha mostrato. "Panoramica" è il vecchio contenuto della
+// pagina Report, spostato come primo tab per non perdere nulla.
+// ══════════════════════════════════════════════════════════════════════════
+var repTab = 'panoramica';
+function repSwitchTab(tab){ repTab = tab; renderReport(); }
+
 function renderReport() {
+  var tabs = [
+    ['panoramica','Panoramica'],
+    ['produzione','Produzione Giornaliera'],
+    ['revenue','Revenue'],
+    ['nazionalita','Report Nazionalità']
+  ];
+  var tabBar = '<div style="display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:16px;flex-wrap:wrap">' +
+    tabs.map(function(t){
+      var active = repTab===t[0];
+      return '<div onclick="repSwitchTab(\''+t[0]+'\')" style="padding:9px 14px;cursor:pointer;font-size:13px;font-weight:'+(active?'700':'500')+';color:'+(active?'var(--accent)':'var(--text2)')+';border-bottom:2.5px solid '+(active?'var(--accent)':'transparent')+'">'+t[1]+'</div>';
+    }).join('') +
+  '</div>';
+
+  document.getElementById('page-report').innerHTML =
+    '<div class="page-header"><div><div class="page-title">Report</div></div></div>' +
+    '<div class="page-content">' + tabBar + '<div id="report-tab-body"></div></div>';
+
+  var body = document.getElementById('report-tab-body');
+  if (repTab==='panoramica') body.innerHTML = repRenderPanoramicaHTML();
+  else if (repTab==='produzione') repRenderProduzione(body);
+  else if (repTab==='revenue') repRenderRevenue(body);
+  else if (repTab==='nazionalita') repRenderNazionalita(body);
+}
+
+function repRenderPanoramicaHTML() {
   const allBk=DB.get('bookings').filter(b=>b.status!=='cancellata' && !b.escludiConteggi);
   let bookings=allBk;
   if(repFrom)bookings=bookings.filter(b=>b.checkin>=repFrom);
@@ -22620,12 +22654,6 @@ function renderReport() {
   const avgS=bookings.length>0?(totN/bookings.length).toFixed(1):'0';
   const srcMap={};bookings.forEach(b=>{srcMap[b.source||'Altro']=(srcMap[b.source||'Altro']||0)+1;});
   const srcRows=Object.entries(srcMap).sort((a,b)=>b[1]-a[1]);
-  // BUG TROVATO E CORRETTO ("doppioni nelle notti per camera"): raggruppava per il NOME della
-  // camera scritto dentro ogni prenotazione — un testo "fotografato" al momento della prenotazione,
-  // che non si aggiorna se la camera viene rinominata dopo (es. lo "Separa note dal nome" di qualche
-  // giorno fa). Le prenotazioni vecchie restavano quindi sotto il nome vecchio, creando un doppione
-  // per la stessa camera vera. Ora si raggruppa per l'ID della camera (che non cambia mai), e si usa
-  // sempre il nome ATTUALE per mostrarlo — inoltre ordinate in modo crescente, non più per notti.
   const roomNameById={}; rooms.forEach(r=>{roomNameById[r.id]=r.name;});
   const rmMap={};bookings.forEach(b=>{rmMap[b.roomId]=(rmMap[b.roomId]||0)+nights(b.checkin,b.checkout);});
   const rmRows=Object.entries(rmMap)
@@ -22633,13 +22661,11 @@ function renderReport() {
     .sort((a,b)=>a[0].localeCompare(b[0],'it',{numeric:true}));
   const rLabel=repFrom&&repTo?fmtDate(repFrom)+' -> '+fmtDate(repTo):repFrom?'Dal '+fmtDate(repFrom):repTo?'Fino al '+fmtDate(repTo):'Tutti i dati';
 
-  document.getElementById('page-report').innerHTML=
-    '<div class="page-header"><div><div class="page-title">Report</div><div class="page-subtitle">'+rLabel+'</div></div>'+
-    '<div class="flex-row" style="gap:6px">'
+  return '<div class="page-subtitle" style="margin-bottom:10px">'+rLabel+'</div>'+
+    '<div class="flex-row" style="gap:6px;margin-bottom:14px">'
     +'<button class="btn btn-sm" onclick="prevExportXLSX()">📊 Excel</button>'
     +'<button class="btn btn-sm" onclick="window.print()">🖨 Stampa</button>'
-    +'</div></div>'+
-    '<div class="page-content">'+
+    +'</div>'+
     '<div style="background:var(--surface2);border:.5px solid var(--border2);border-radius:8px;padding:8px 12px;margin-bottom:16px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">'+
     '<input type="date" id="rep-from" value="'+repFrom+'" style="font-size:11px;padding:3px 6px;border:.5px solid var(--border2);border-radius:5px;width:118px">'+
     '<span style="font-size:11px;color:var(--text3)">→</span>'+
@@ -22678,6 +22704,387 @@ function repPreset(p){
   else if(p==='quarter'){repFrom=f(new Date(n.getFullYear(),n.getMonth(),1));repTo=f(new Date(n.getFullYear(),n.getMonth()+3,0));}
   else if(p==='year'){repFrom=n.getFullYear()+'-01-01';repTo=n.getFullYear()+'-12-31';}
   renderReport();
+}
+
+// ── Produzione Giornaliera: una riga per giorno con arrivi/partenze/presenze,
+// occupazione, e produzione (camere+extra) suddivisa per tipo di trattamento ──
+var repProdDal='', repProdAl='', repProdStato='confermata';
+function repPrimoUltimoGiornoMese(){
+  var n=new Date(); n.setHours(0,0,0,0);
+  var primo=new Date(n.getFullYear(),n.getMonth(),1), ultimo=new Date(n.getFullYear(),n.getMonth()+1,0);
+  function f(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+  return [f(primo), f(ultimo)];
+}
+function repProdCategoria(b){
+  if (b.pensione==='HB') return 'HB';
+  if (b.pensione==='PC') return 'FB';
+  if (b.pensione==='BB' || (!b.pensione && b.colazioneInclusa!==false)) return 'BB';
+  return 'RO';
+}
+function repProdCalcolaRighe(dal, al, stato){
+  var bookingsAll = DB.get('bookings').filter(function(b){ return !b.escludiConteggi; });
+  var bookings = stato==='tutte' ? bookingsAll : bookingsAll.filter(function(b){ return b.status!=='cancellata'; });
+  var totRooms = getRooms().length;
+  var giorni = []; var d = dal;
+  var guard = 0;
+  while (d <= al && guard < 400) { giorni.push(d); d = addDays(d,1); guard++; }
+  return giorni.map(function(ds){
+    var presenti = bookings.filter(function(b){ return b.checkin<=ds && b.checkout>ds; });
+    var arr = bookings.filter(function(b){ return b.checkin===ds; }).length;
+    var part = bookings.filter(function(b){ return b.checkout===ds; }).length;
+    var pres = presenti.reduce(function(s,b){ return s+(Number(b.adults||0)+Number(b.children||0)); },0);
+    var occ = presenti.length;
+    var toc = totRooms>0 ? occ/totRooms*100 : 0;
+    var cat = {RO:0,BB:0,HB:0,FB:0,AI:0};
+    var prodCat = {RO:0,BB:0,HB:0,FB:0,AI:0};
+    var prodCamere=0, extra=0;
+    presenti.forEach(function(b){
+      var n = nights(b.checkin,b.checkout)||1;
+      var nightly = (Number(b.totalPrice)||0)/n;
+      var c = repProdCategoria(b);
+      cat[c]++; prodCat[c]+=nightly; prodCamere+=nightly;
+      var extraTot = (b.extras||[]).reduce(function(s,ex){return s+(Number(ex.totale)||0);},0);
+      extra += extraTot/n;
+    });
+    var revpar = totRooms>0 ? prodCamere/totRooms : 0;
+    var adr = occ>0 ? prodCamere/occ : 0;
+    return { ds:ds, arr:arr, part:part, pres:pres, cat:cat, occ:occ, totRooms:totRooms, toc:toc,
+      prodCamere:prodCamere, revpar:revpar, adr:adr, prodCat:prodCat, extra:extra, prodTot:prodCamere+extra };
+  });
+}
+function repRenderProduzione(el){
+  if (!repProdDal || !repProdAl) { var pu = repPrimoUltimoGiornoMese(); repProdDal = pu[0]; repProdAl = pu[1]; }
+  var righe = repProdCalcolaRighe(repProdDal, repProdAl, repProdStato);
+  var tot = righe.reduce(function(s,r){
+    s.arr+=r.arr; s.part+=r.part; s.pres+=r.pres; s.occ+=r.occ;
+    s.prodCamere+=r.prodCamere; s.extra+=r.extra; s.prodTot+=r.prodTot;
+    ['RO','BB','HB','FB','AI'].forEach(function(c){ s.cat[c]+=r.cat[c]; s.prodCat[c]+=r.prodCat[c]; });
+    return s;
+  }, {arr:0,part:0,pres:0,occ:0,prodCamere:0,extra:0,prodTot:0,cat:{RO:0,BB:0,HB:0,FB:0,AI:0},prodCat:{RO:0,BB:0,HB:0,FB:0,AI:0}});
+  var totRooms = getRooms().length;
+  var giorniTot = righe.length || 1;
+  var tocMedia = totRooms>0 ? tot.occ/(totRooms*giorniTot)*100 : 0;
+  var adrMedia = tot.occ>0 ? tot.prodCamere/tot.occ : 0;
+  var revparMedio = totRooms>0 ? tot.prodCamere/(totRooms*giorniTot) : 0;
+
+  var th = function(t){ return '<th style="text-align:right;white-space:nowrap;font-size:10.5px">'+t+'</th>'; };
+  var tocColor = function(v){ return v<30?'#dc2626':v<70?'#d97706':'#16a34a'; };
+
+  el.innerHTML =
+    '<div style="font-size:12.5px;color:var(--text3);margin-bottom:12px">Report di produzione giornaliera con dettaglio trattamenti, revenue e incassi. RO = solo soggiorno, BB/HB/FB come da trattamento prenotazione. AI (all inclusive) non è gestito da DeskFlow, resta sempre a 0.</div>'+
+    '<div style="background:var(--surface2);border:.5px solid var(--border2);border-radius:8px;padding:8px 12px;margin-bottom:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
+      '<span style="font-size:11px;color:var(--text3)">Da</span>'+
+      '<input type="date" id="repprod-dal" value="'+repProdDal+'" style="font-size:11px;padding:3px 6px;border:.5px solid var(--border2);border-radius:5px;width:118px">'+
+      '<span style="font-size:11px;color:var(--text3)">A</span>'+
+      '<input type="date" id="repprod-al" value="'+repProdAl+'" style="font-size:11px;padding:3px 6px;border:.5px solid var(--border2);border-radius:5px;width:118px">'+
+      '<select id="repprod-stato" style="font-size:11px;padding:3px 6px;border:.5px solid var(--border2);border-radius:5px">'+
+        '<option value="confermata" '+(repProdStato==='confermata'?'selected':'')+'>Confermate (esclude cancellate)</option>'+
+        '<option value="tutte" '+(repProdStato==='tutte'?'selected':'')+'>Tutte (incluse cancellate)</option>'+
+      '</select>'+
+      '<button class="btn btn-primary btn-sm" style="font-size:11px" onclick="repProdDal=document.getElementById(\'repprod-dal\').value;repProdAl=document.getElementById(\'repprod-al\').value;repProdStato=document.getElementById(\'repprod-stato\').value;repSwitchTab(\'produzione\')">Applica</button>'+
+      '<button class="btn btn-sm" style="font-size:11px" onclick="repProdEsportaXLSX()">📊 Esporta</button>'+
+    '</div>'+
+    '<div class="metrics-grid" style="margin-bottom:16px">'+
+      '<div class="metric-card"><div class="metric-label">Produzione camere</div><div class="metric-value">'+fmtCurrency(tot.prodCamere)+'</div></div>'+
+      '<div class="metric-card"><div class="metric-label">Produzione totale</div><div class="metric-value">'+fmtCurrency(tot.prodTot)+'</div></div>'+
+      '<div class="metric-card"><div class="metric-label">TOC% medio</div><div class="metric-value">'+tocMedia.toFixed(1)+'%</div></div>'+
+      '<div class="metric-card"><div class="metric-label">ADR medio</div><div class="metric-value">'+fmtCurrency(adrMedia)+'</div></div>'+
+      '<div class="metric-card"><div class="metric-label">REVPAR medio</div><div class="metric-value">'+fmtCurrency(revparMedio)+'</div></div>'+
+    '</div>'+
+    '<div class="card" style="overflow-x:auto">'+
+    '<table style="width:100%;border-collapse:collapse;font-size:11.5px;white-space:nowrap">'+
+    '<thead><tr style="color:var(--text3)"><th style="text-align:left;font-size:10.5px">Data</th>'+
+      th('Arr')+th('Part')+th('Pres')+th('RO')+th('BB')+th('HB')+th('FB')+th('AI')+th('Occ')+th('TOC%')+
+      th('Prod. Camere')+th('REVPAR')+th('Prezzo Medio')+th('Prod. RO')+th('Prod. BB')+th('Prod. HB')+th('Prod. FB')+th('Prod. AI')+th('Extra')+th('Prod. Tot')+
+    '</tr></thead><tbody>'+
+    righe.map(function(r){
+      return '<tr style="border-top:1px solid var(--border)">'+
+        '<td style="padding:5px 6px;font-weight:600">'+fmtDate(r.ds)+'</td>'+
+        '<td style="text-align:right">'+r.arr+'</td>'+
+        '<td style="text-align:right">'+r.part+'</td>'+
+        '<td style="text-align:right">'+r.pres+'</td>'+
+        '<td style="text-align:right">'+r.cat.RO+'</td>'+
+        '<td style="text-align:right">'+r.cat.BB+'</td>'+
+        '<td style="text-align:right">'+r.cat.HB+'</td>'+
+        '<td style="text-align:right">'+r.cat.FB+'</td>'+
+        '<td style="text-align:right">'+r.cat.AI+'</td>'+
+        '<td style="text-align:right">'+r.occ+'/'+r.totRooms+'</td>'+
+        '<td style="text-align:right"><span style="background:'+tocColor(r.toc)+';color:#fff;padding:2px 7px;border-radius:20px;font-weight:700;font-size:10.5px">'+r.toc.toFixed(2)+'%</span></td>'+
+        '<td style="text-align:right">'+fmtCurrency(r.prodCamere)+'</td>'+
+        '<td style="text-align:right">'+fmtCurrency(r.revpar)+'</td>'+
+        '<td style="text-align:right">'+fmtCurrency(r.adr)+'</td>'+
+        '<td style="text-align:right">'+fmtCurrency(r.prodCat.RO)+'</td>'+
+        '<td style="text-align:right">'+fmtCurrency(r.prodCat.BB)+'</td>'+
+        '<td style="text-align:right">'+fmtCurrency(r.prodCat.HB)+'</td>'+
+        '<td style="text-align:right">'+fmtCurrency(r.prodCat.FB)+'</td>'+
+        '<td style="text-align:right">'+fmtCurrency(r.prodCat.AI)+'</td>'+
+        '<td style="text-align:right">'+fmtCurrency(r.extra)+'</td>'+
+        '<td style="text-align:right;font-weight:700">'+fmtCurrency(r.prodTot)+'</td>'+
+      '</tr>';
+    }).join('')+
+    '<tr style="border-top:2px solid var(--border);font-weight:800;background:var(--surface2)">'+
+      '<td style="padding:6px">Totale</td>'+
+      '<td style="text-align:right">'+tot.arr+'</td><td style="text-align:right">'+tot.part+'</td><td style="text-align:right">'+tot.pres+'</td>'+
+      '<td style="text-align:right">'+tot.cat.RO+'</td><td style="text-align:right">'+tot.cat.BB+'</td><td style="text-align:right">'+tot.cat.HB+'</td><td style="text-align:right">'+tot.cat.FB+'</td><td style="text-align:right">'+tot.cat.AI+'</td>'+
+      '<td style="text-align:right">—</td><td style="text-align:right">'+tocMedia.toFixed(2)+'%</td>'+
+      '<td style="text-align:right">'+fmtCurrency(tot.prodCamere)+'</td><td style="text-align:right">'+fmtCurrency(revparMedio)+'</td><td style="text-align:right">'+fmtCurrency(adrMedia)+'</td>'+
+      '<td style="text-align:right">'+fmtCurrency(tot.prodCat.RO)+'</td><td style="text-align:right">'+fmtCurrency(tot.prodCat.BB)+'</td><td style="text-align:right">'+fmtCurrency(tot.prodCat.HB)+'</td><td style="text-align:right">'+fmtCurrency(tot.prodCat.FB)+'</td><td style="text-align:right">'+fmtCurrency(tot.prodCat.AI)+'</td>'+
+      '<td style="text-align:right">'+fmtCurrency(tot.extra)+'</td><td style="text-align:right">'+fmtCurrency(tot.prodTot)+'</td>'+
+    '</tr>'+
+    '</tbody></table></div>';
+}
+function repProdEsportaXLSX(){
+  var XL = typeof XLSX !== 'undefined' ? XLSX : null;
+  if(!XL){showToast('Libreria XLSX non disponibile');return;}
+  var righe = repProdCalcolaRighe(repProdDal, repProdAl, repProdStato);
+  var hdr=['Data','Arr','Part','Pres','RO','BB','HB','FB','AI','Occ','Tot.Camere','TOC%','Prod.Camere','REVPAR','Prezzo Medio','Prod.RO','Prod.BB','Prod.HB','Prod.FB','Prod.AI','Extra','Prod.Tot'];
+  var rows = righe.map(function(r){
+    return [fmtDate(r.ds),r.arr,r.part,r.pres,r.cat.RO,r.cat.BB,r.cat.HB,r.cat.FB,r.cat.AI,r.occ,r.totRooms,
+      Number(r.toc.toFixed(2)),Number(r.prodCamere.toFixed(2)),Number(r.revpar.toFixed(2)),Number(r.adr.toFixed(2)),
+      Number(r.prodCat.RO.toFixed(2)),Number(r.prodCat.BB.toFixed(2)),Number(r.prodCat.HB.toFixed(2)),Number(r.prodCat.FB.toFixed(2)),Number(r.prodCat.AI.toFixed(2)),
+      Number(r.extra.toFixed(2)),Number(r.prodTot.toFixed(2))];
+  });
+  var ws=XL.utils.aoa_to_sheet([hdr,...rows]);
+  var wb=XL.utils.book_new();
+  XL.utils.book_append_sheet(wb,ws,'Produzione Giornaliera');
+  XL.writeFile(wb,'produzione-giornaliera-'+repProdDal+'_'+repProdAl+'.xlsx');
+  showToast('Produzione Giornaliera esportata in Excel');
+}
+
+// ── Revenue: confronto mese per mese tra un anno e l'anno precedente, con
+// grafico a barre (ricavi) e linea (occupazione), più tabella con ADR/REVPAR ──
+var repRevAnno = new Date().getFullYear();
+var repRevAnnoPrec = new Date().getFullYear()-1;
+function repRevCalcolaMese(anno, mese){
+  // mese: 0-11. Calcola ricavo (prorata sulle notti che cadono nel mese), occupazione, ADR, REVPAR
+  var primo = new Date(anno, mese, 1), ultimo = new Date(anno, mese+1, 0);
+  function f(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+  var dal = f(primo), al = f(ultimo);
+  var bookings = DB.get('bookings').filter(function(b){ return b.status!=='cancellata' && !b.escludiConteggi; });
+  var totRooms = getRooms().length;
+  var giorniMese = ultimo.getDate();
+  var revenue=0, occRoomNights=0;
+  var d = dal;
+  for (var i=0; i<giorniMese; i++){
+    var ds = d;
+    bookings.forEach(function(b){
+      if (b.checkin<=ds && b.checkout>ds){
+        occRoomNights++;
+        var n = nights(b.checkin,b.checkout)||1;
+        revenue += (Number(b.totalPrice)||0)/n;
+      }
+    });
+    d = addDays(d,1);
+  }
+  var dispRoomNights = totRooms*giorniMese;
+  var occPct = dispRoomNights>0 ? occRoomNights/dispRoomNights*100 : 0;
+  var adr = occRoomNights>0 ? revenue/occRoomNights : 0;
+  var revpar = dispRoomNights>0 ? revenue/dispRoomNights : 0;
+  return { revenue:revenue, occPct:occPct, adr:adr, revpar:revpar };
+}
+function repRevSvgChart(datiAttuale, datiPrec){
+  var w=900, h=260, padL=40, padR=40, padT=10, padB=24;
+  var maxRev = Math.max.apply(null, datiAttuale.map(function(m){return m.revenue;}).concat(datiPrec.map(function(m){return m.revenue;})).concat([1]));
+  var maxOcc = 100;
+  var chartW = w-padL-padR, chartH = h-padT-padB;
+  var barGroupW = chartW/12;
+  var barW = barGroupW*0.32;
+  function yRev(v){ return padT + chartH - (v/maxRev)*chartH; }
+  function yOcc(v){ return padT + chartH - (v/maxOcc)*chartH; }
+  var mesi = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+  var bars = '';
+  var lineAttPts = [], linePrecPts = [];
+  for (var i=0;i<12;i++){
+    var x = padL + i*barGroupW;
+    var hAtt = chartH - (yRev(datiAttuale[i].revenue)-padT);
+    var hPrec = chartH - (yRev(datiPrec[i].revenue)-padT);
+    bars += '<rect x="'+(x+barGroupW*0.12).toFixed(1)+'" y="'+yRev(datiAttuale[i].revenue).toFixed(1)+'" width="'+barW.toFixed(1)+'" height="'+hAtt.toFixed(1)+'" fill="#2563eb" rx="2"/>';
+    bars += '<rect x="'+(x+barGroupW*0.5).toFixed(1)+'" y="'+yRev(datiPrec[i].revenue).toFixed(1)+'" width="'+barW.toFixed(1)+'" height="'+hPrec.toFixed(1)+'" fill="#c7c7c7" rx="2"/>';
+    var cx = x+barGroupW/2;
+    lineAttPts.push(cx.toFixed(1)+','+yOcc(datiAttuale[i].occPct).toFixed(1));
+    linePrecPts.push(cx.toFixed(1)+','+yOcc(datiPrec[i].occPct).toFixed(1));
+    bars += '<text x="'+cx.toFixed(1)+'" y="'+(h-6)+'" font-size="10" text-anchor="middle" fill="#888">'+mesi[i]+'</text>';
+  }
+  return '<svg viewBox="0 0 '+w+' '+h+'" width="100%" height="'+h+'" style="display:block">' +
+    bars +
+    '<polyline points="'+lineAttPts.join(' ')+'" fill="none" stroke="#f59e0b" stroke-width="2.4"/>' +
+    '<polyline points="'+linePrecPts.join(' ')+'" fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-dasharray="4,3"/>' +
+    '</svg>';
+}
+function repRenderRevenue(el){
+  var datiAtt=[], datiPrec=[];
+  for (var m=0;m<12;m++){ datiAtt.push(repRevCalcolaMese(repRevAnno,m)); datiPrec.push(repRevCalcolaMese(repRevAnnoPrec,m)); }
+  var mesi = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+  var totAtt = datiAtt.reduce(function(s,m){return s+m.revenue;},0);
+  var totPrec = datiPrec.reduce(function(s,m){return s+m.revenue;},0);
+  var opzioniAnno = ''; for (var y=new Date().getFullYear()-4;y<=new Date().getFullYear()+1;y++) opzioniAnno += '<option value="'+y+'">'+y+'</option>';
+
+  el.innerHTML =
+    '<div style="font-size:12.5px;color:var(--text3);margin-bottom:12px">Confronto ricavi e occupazione mese per mese tra un anno e l\'anno precedente. Gli importi sono ripartiti per notte di competenza (una prenotazione a cavallo tra due mesi viene divisa proporzionalmente).</div>'+
+    '<div style="background:var(--surface2);border:.5px solid var(--border2);border-radius:8px;padding:8px 12px;margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
+      '<span style="font-size:11px;color:var(--text3)">Attuale</span>'+
+      '<select id="reprev-anno" style="font-size:11px;padding:3px 6px;border:.5px solid var(--border2);border-radius:5px">'+opzioniAnno.replace('value="'+repRevAnno+'"','value="'+repRevAnno+'" selected')+'</select>'+
+      '<span style="font-size:11px;color:var(--text3)">Precedente</span>'+
+      '<select id="reprev-annoprec" style="font-size:11px;padding:3px 6px;border:.5px solid var(--border2);border-radius:5px">'+opzioniAnno.replace('value="'+repRevAnnoPrec+'"','value="'+repRevAnnoPrec+'" selected')+'</select>'+
+      '<button class="btn btn-primary btn-sm" style="font-size:11px" onclick="repRevAnno=Number(document.getElementById(\'reprev-anno\').value);repRevAnnoPrec=Number(document.getElementById(\'reprev-annoprec\').value);repSwitchTab(\'revenue\')">Applica</button>'+
+    '</div>'+
+    '<div class="metrics-grid" style="margin-bottom:16px">'+
+      '<div class="metric-card"><div class="metric-label">Ricavi '+repRevAnno+'</div><div class="metric-value">'+fmtCurrency(totAtt)+'</div></div>'+
+      '<div class="metric-card"><div class="metric-label">Ricavi '+repRevAnnoPrec+'</div><div class="metric-value">'+fmtCurrency(totPrec)+'</div></div>'+
+      '<div class="metric-card"><div class="metric-label">Differenza</div><div class="metric-value" style="color:'+(totAtt>=totPrec?'var(--green)':'var(--red)')+'">'+fmtCurrency(totAtt-totPrec)+'</div></div>'+
+    '</div>'+
+    '<div class="card" style="padding:14px;margin-bottom:16px">'+
+      '<div style="display:flex;gap:16px;font-size:11px;color:var(--text3);margin-bottom:8px">'+
+        '<span>🟦 Ricavi '+repRevAnno+'</span><span>⬜ Ricavi '+repRevAnnoPrec+'</span><span style="color:#f59e0b">— Occupazione '+repRevAnno+'</span><span style="color:#94a3b8">┄ Occupazione '+repRevAnnoPrec+'</span>'+
+      '</div>'+
+      repRevSvgChart(datiAtt, datiPrec) +
+    '</div>'+
+    '<div class="card" style="overflow-x:auto">'+
+    '<table style="width:100%;border-collapse:collapse;font-size:12px">'+
+    '<thead><tr style="color:var(--text3)"><th style="text-align:left">Mese</th>'+
+      '<th style="text-align:right">Ricavi '+repRevAnno+'</th><th style="text-align:right">Ricavi '+repRevAnnoPrec+'</th>'+
+      '<th style="text-align:right">Occ. '+repRevAnno+'</th><th style="text-align:right">Occ. '+repRevAnnoPrec+'</th>'+
+      '<th style="text-align:right">ADR '+repRevAnno+'</th><th style="text-align:right">ADR '+repRevAnnoPrec+'</th>'+
+      '<th style="text-align:right">REVPAR '+repRevAnno+'</th><th style="text-align:right">REVPAR '+repRevAnnoPrec+'</th>'+
+    '</tr></thead><tbody>'+
+    mesi.map(function(nome,i){
+      var a=datiAtt[i], p=datiPrec[i];
+      return '<tr style="border-top:1px solid var(--border)">'+
+        '<td style="padding:6px 4px">'+nome+'</td>'+
+        '<td style="text-align:right">'+fmtCurrency(a.revenue)+'</td><td style="text-align:right;color:var(--text3)">'+fmtCurrency(p.revenue)+'</td>'+
+        '<td style="text-align:right">'+a.occPct.toFixed(1)+'%</td><td style="text-align:right;color:var(--text3)">'+p.occPct.toFixed(1)+'%</td>'+
+        '<td style="text-align:right">'+fmtCurrency(a.adr)+'</td><td style="text-align:right;color:var(--text3)">'+fmtCurrency(p.adr)+'</td>'+
+        '<td style="text-align:right">'+fmtCurrency(a.revpar)+'</td><td style="text-align:right;color:var(--text3)">'+fmtCurrency(p.revpar)+'</td>'+
+      '</tr>';
+    }).join('')+
+    '</tbody></table></div>';
+}
+
+// ── Report Nazionalità: aggrega le prenotazioni per nazionalità dell'ospite
+// (campo Nazionalità in Anagrafica) nel periodo/riferimento scelto ──
+var repNazDal='', repNazAl='', repNazRif='soggiorno', repNazAggrega=true;
+function repRenderNazionalita(el){
+  if (!repNazDal || !repNazAl) { var pu = repPrimoUltimoGiornoMese(); repNazDal = pu[0]; repNazAl = pu[1]; }
+  var bookings = DB.get('bookings').filter(function(b){ return b.status!=='cancellata' && !b.escludiConteggi; });
+  var guests = DB.get('guests');
+  var guestById = {}; guests.forEach(function(g){ guestById[g.id]=g; });
+
+  var inRange = bookings.filter(function(b){
+    if (repNazRif==='checkin') return b.checkin>=repNazDal && b.checkin<=repNazAl;
+    return b.checkin<=repNazAl && b.checkout>repNazDal; // soggiorno: sovrapposizione col periodo
+  });
+
+  var gruppi = {}; // chiave nazionalità (o raw) -> {ospiti,notti,ricavo,prenotazioni}
+  inRange.forEach(function(b){
+    var g = guestById[b.guestId];
+    var rawNaz = (g && g.nazionalita) ? g.nazionalita.trim() : '';
+    var chiave = rawNaz ? (repNazAggrega ? rawNaz.toLowerCase() : rawNaz) : '(non specificata)';
+    var etichetta = rawNaz ? (repNazAggrega ? (rawNaz.charAt(0).toUpperCase()+rawNaz.slice(1).toLowerCase()) : rawNaz) : '(non specificata)';
+    if (!gruppi[chiave]) gruppi[chiave] = { etichetta:etichetta, ospiti:0, notti:0, ricavo:0, prenotazioni:0 };
+    var n = nights(b.checkin,b.checkout)||1;
+    var notti = n;
+    if (repNazRif==='soggiorno') {
+      // conta solo le notti che ricadono davvero nel periodo selezionato
+      var inizio = b.checkin>repNazDal ? b.checkin : repNazDal;
+      var fine = b.checkout<repNazAl ? b.checkout : addDays(repNazAl,1);
+      notti = Math.max(0, nights(inizio, fine));
+    }
+    var ricavo = (Number(b.totalPrice)||0) * (notti/n);
+    gruppi[chiave].ospiti += (Number(b.adults||0)+Number(b.children||0));
+    gruppi[chiave].notti += notti;
+    gruppi[chiave].ricavo += ricavo;
+    gruppi[chiave].prenotazioni += 1;
+  });
+
+  var righe = Object.values(gruppi).sort(function(a,b){ return b.ospiti-a.ospiti; });
+  var totOspiti = righe.reduce(function(s,r){return s+r.ospiti;},0);
+  var totNotti = righe.reduce(function(s,r){return s+r.notti;},0);
+  var totRicavo = righe.reduce(function(s,r){return s+r.ricavo;},0);
+
+  el.innerHTML =
+    '<div style="background:var(--surface2);border:.5px solid var(--border2);border-radius:8px;padding:8px 12px;margin-bottom:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
+      '<span style="font-size:11px;color:var(--text3)">Da</span>'+
+      '<input type="date" id="repnaz-dal" value="'+repNazDal+'" style="font-size:11px;padding:3px 6px;border:.5px solid var(--border2);border-radius:5px;width:118px">'+
+      '<span style="font-size:11px;color:var(--text3)">A</span>'+
+      '<input type="date" id="repnaz-al" value="'+repNazAl+'" style="font-size:11px;padding:3px 6px;border:.5px solid var(--border2);border-radius:5px;width:118px">'+
+      '<span style="font-size:11px;color:var(--text3)">Riferimento</span>'+
+      '<select id="repnaz-rif" style="font-size:11px;padding:3px 6px;border:.5px solid var(--border2);border-radius:5px">'+
+        '<option value="soggiorno" '+(repNazRif==='soggiorno'?'selected':'')+'>Soggiorno (sovrapposizione)</option>'+
+        '<option value="checkin" '+(repNazRif==='checkin'?'selected':'')+'>Check-in</option>'+
+      '</select>'+
+      '<label style="font-size:11px;color:var(--text3);display:flex;align-items:center;gap:4px"><input type="checkbox" id="repnaz-agg" '+(repNazAggrega?'checked':'')+'> Aggrega (ignora maiuscole/spazi)</label>'+
+      '<button class="btn btn-primary btn-sm" style="font-size:11px" onclick="repNazDal=document.getElementById(\'repnaz-dal\').value;repNazAl=document.getElementById(\'repnaz-al\').value;repNazRif=document.getElementById(\'repnaz-rif\').value;repNazAggrega=document.getElementById(\'repnaz-agg\').checked;repSwitchTab(\'nazionalita\')">Applica</button>'+
+      '<button class="btn btn-sm" style="font-size:11px" onclick="repNazEsportaXLSX()">📊 Export XLS</button>'+
+    '</div>'+
+    '<div class="metrics-grid" style="margin-bottom:16px">'+
+      '<div class="metric-card"><div class="metric-label">Totale Ospiti</div><div class="metric-value">'+totOspiti+'</div></div>'+
+      '<div class="metric-card"><div class="metric-label">Totale Notti</div><div class="metric-value">'+totNotti+'</div></div>'+
+      '<div class="metric-card"><div class="metric-label">Nazionalità</div><div class="metric-value">'+righe.length+'</div></div>'+
+      '<div class="metric-card"><div class="metric-label">Ricavo Totale</div><div class="metric-value">'+fmtCurrency(totRicavo)+'</div></div>'+
+    '</div>'+
+    '<div class="card" style="overflow-x:auto">'+
+    (righe.length===0 ? '<div class="empty-state" style="padding:24px"><p>Nessun record trovato</p></div>' :
+    '<table style="width:100%;border-collapse:collapse;font-size:12.5px">'+
+    '<thead><tr style="color:var(--text3)"><th style="text-align:left;padding:8px 6px">Nazionalità</th><th style="text-align:right">Ospiti</th><th style="text-align:right">Notti</th><th style="text-align:right">Ricavo</th><th style="text-align:right">ADR</th><th style="text-align:right">Media Pax</th><th style="text-align:right">Media Notti</th><th style="text-align:right">%</th></tr></thead><tbody>'+
+    righe.map(function(r){
+      var adr = r.notti>0 ? r.ricavo/r.notti : 0;
+      var mediaPax = r.prenotazioni>0 ? r.ospiti/r.prenotazioni : 0;
+      var mediaNotti = r.prenotazioni>0 ? r.notti/r.prenotazioni : 0;
+      var pct = totOspiti>0 ? r.ospiti/totOspiti*100 : 0;
+      return '<tr style="border-top:1px solid var(--border)">'+
+        '<td style="padding:7px 6px;font-weight:600">'+r.etichetta+'</td>'+
+        '<td style="text-align:right">'+r.ospiti+'</td>'+
+        '<td style="text-align:right">'+r.notti+'</td>'+
+        '<td style="text-align:right">'+fmtCurrency(r.ricavo)+'</td>'+
+        '<td style="text-align:right">'+fmtCurrency(adr)+'</td>'+
+        '<td style="text-align:right">'+mediaPax.toFixed(1)+'</td>'+
+        '<td style="text-align:right">'+mediaNotti.toFixed(1)+'</td>'+
+        '<td style="text-align:right">'+pct.toFixed(1)+'%</td>'+
+      '</tr>';
+    }).join('')+
+    '</tbody></table>') +
+    '</div>';
+}
+function repNazEsportaXLSX(){
+  var XL = typeof XLSX !== 'undefined' ? XLSX : null;
+  if(!XL){showToast('Libreria XLSX non disponibile');return;}
+  var bookings = DB.get('bookings').filter(function(b){ return b.status!=='cancellata' && !b.escludiConteggi; });
+  var guests = DB.get('guests'); var guestById={}; guests.forEach(function(g){guestById[g.id]=g;});
+  var inRange = bookings.filter(function(b){
+    if (repNazRif==='checkin') return b.checkin>=repNazDal && b.checkin<=repNazAl;
+    return b.checkin<=repNazAl && b.checkout>repNazDal;
+  });
+  var gruppi = {};
+  inRange.forEach(function(b){
+    var g = guestById[b.guestId];
+    var rawNaz = (g && g.nazionalita) ? g.nazionalita.trim() : '';
+    var chiave = rawNaz ? (repNazAggrega ? rawNaz.toLowerCase() : rawNaz) : '(non specificata)';
+    var etichetta = rawNaz ? (repNazAggrega ? (rawNaz.charAt(0).toUpperCase()+rawNaz.slice(1).toLowerCase()) : rawNaz) : '(non specificata)';
+    if (!gruppi[chiave]) gruppi[chiave] = { etichetta:etichetta, ospiti:0, notti:0, ricavo:0, prenotazioni:0 };
+    var n = nights(b.checkin,b.checkout)||1;
+    var notti = n;
+    if (repNazRif==='soggiorno') {
+      var inizio = b.checkin>repNazDal ? b.checkin : repNazDal;
+      var fine = b.checkout<repNazAl ? b.checkout : addDays(repNazAl,1);
+      notti = Math.max(0, nights(inizio, fine));
+    }
+    gruppi[chiave].ospiti += (Number(b.adults||0)+Number(b.children||0));
+    gruppi[chiave].notti += notti;
+    gruppi[chiave].ricavo += (Number(b.totalPrice)||0) * (notti/n);
+    gruppi[chiave].prenotazioni += 1;
+  });
+  var righe = Object.values(gruppi).sort(function(a,b){ return b.ospiti-a.ospiti; });
+  var hdr = ['Nazionalità','Ospiti','Notti','Ricavo','ADR','Media Pax','Media Notti'];
+  var rows = righe.map(function(r){
+    var adr = r.notti>0 ? r.ricavo/r.notti : 0;
+    return [r.etichetta, r.ospiti, r.notti, Number(r.ricavo.toFixed(2)), Number(adr.toFixed(2)),
+      Number((r.ospiti/(r.prenotazioni||1)).toFixed(1)), Number((r.notti/(r.prenotazioni||1)).toFixed(1))];
+  });
+  var ws=XL.utils.aoa_to_sheet([hdr,...rows]);
+  var wb=XL.utils.book_new();
+  XL.utils.book_append_sheet(wb,ws,'Report Nazionalità');
+  XL.writeFile(wb,'report-nazionalita-'+repNazDal+'_'+repNazAl+'.xlsx');
+  showToast('Report Nazionalità esportato in Excel');
 }
 
 
