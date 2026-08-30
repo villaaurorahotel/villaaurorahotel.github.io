@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 30/08/2026 · 06:32</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 30/08/2026 · 06:45</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -12906,8 +12906,9 @@ function vediPreventivo(id) {
     +'<tr><td style="padding:7px 0;color:var(--text2)">Notti</td><td id="qc-notti-live">'+n+'</td></tr>'
     +'<tr><td style="padding:7px 0;color:var(--text2)">Ospiti</td><td>'+q.adults+' adulti'+(q.children>0?', '+q.children+' bambini':'')+'</td></tr>'
     +'<tr><td style="padding:7px 0;color:var(--text2)">Totale</td><td><input type="number" id="qc-prezzo" value="'+Number(q.totalPrice||0)+'" step="0.01" style="width:120px;padding:5px 8px;border:.5px solid var(--border2);border-radius:6px;font-weight:700;font-size:13px"></td></tr>'
-    +(q.expiry?'<tr><td style="padding:7px 0;color:var(--text2)">Valido fino al</td><td>'+fmtDate(q.expiry)+'</td></tr>':'')
-    +(q.notes?'<tr><td style="padding:7px 0;color:var(--text2)">Note</td><td>'+q.notes+'</td></tr>':'')
+    +'<tr><td style="padding:7px 0;color:var(--text2)">Colazione inclusa</td><td><input type="checkbox" id="qc-colazione" '+(q.colazioneInclusa!==false?'checked':'')+' style="width:auto"></td></tr>'
+    +'<tr><td style="padding:7px 0;color:var(--text2)">Valido fino al</td><td><input type="date" id="qc-scadenza" value="'+(q.expiry||'')+'" style="padding:5px 8px;border:.5px solid var(--border2);border-radius:6px;font-size:13px"></td></tr>'
+    +'<tr><td style="padding:7px 0;color:var(--text2);vertical-align:top">Note</td><td><textarea id="qc-note" rows="2" style="width:100%;padding:5px 8px;border:.5px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;box-sizing:border-box">'+(q.notes||'')+'</textarea></td></tr>'
     +'<tr><td style="padding:7px 0;color:var(--text2)">Disponibilità</td><td>'+dispoLabel+'</td></tr>'
     +'</table>',
     '<button class="btn" onclick="closeModal()">Chiudi</button>'
@@ -12968,6 +12969,9 @@ function aggiornaClientePreventivo(quoteId) {
   quotes[qi].clientName = nome;
   quotes[qi].clientEmail = document.getElementById('qc-email')?.value.trim() || '';
   quotes[qi].clientPhone = document.getElementById('qc-telefono')?.value.trim() || '';
+  quotes[qi].colazioneInclusa = !!document.getElementById('qc-colazione')?.checked;
+  quotes[qi].expiry = document.getElementById('qc-scadenza')?.value || '';
+  quotes[qi].notes = document.getElementById('qc-note')?.value.trim() || '';
   if (window._qcRichiamatoGuestId) quotes[qi].guestId = window._qcRichiamatoGuestId;
   DB.set('quotes', quotes);
   window._qcRichiamatoGuestId = null;
@@ -13207,6 +13211,39 @@ function eseguiInvioPreventivo(id, metodo) {
   const subject = encodeURIComponent(subjectRaw);
   const body = encodeURIComponent(bodyRaw);
 
+  // NOVITÀ richiesta da Gian: prima di inviare davvero, mostra un'anteprima del testo (con la
+  // possibilità di correggerlo al volo) — l'invio vero e proprio parte solo dopo aver premuto
+  // "Invia" in quella schermata. Per WhatsApp mostro il testo già con ** convertite in *, per gli
+  // altri canali il testo semplice — è lo stesso testo che verrà davvero usato per l'invio.
+  window._anteprimaInvioPrev = { id: id, metodo: metodo, to: to, subjectRaw: subjectRaw };
+  apriAnteprimaInvioPreventivo(to, subjectRaw, metodo === 'whatsapp' ? bodyWhatsapp : bodyRaw);
+}
+
+// Mostra il testo del preventivo prima dell'invio vero e proprio — modificabile qui per un'ultima
+// correzione al volo. Il pulsante "Invia" richiama confermaInvioPreventivoConTesto(), che esegue
+// l'invio effettivo usando esattamente il testo presente in questa casella in quel momento.
+function apriAnteprimaInvioPreventivo(to, subjectRaw, testo) {
+  showModal('Anteprima messaggio',
+    '<div style="font-size:12px;color:var(--text3);margin-bottom:8px">Controlla il testo prima di inviarlo — puoi ancora correggerlo qui sotto.</div>'
+    +(to?'<div style="font-size:12.5px;margin-bottom:6px"><strong>A:</strong> '+to+'</div>':'')
+    +'<div style="font-size:12.5px;margin-bottom:10px"><strong>Oggetto:</strong> '+subjectRaw.replace(/</g,'&lt;')+'</div>'
+    +'<textarea id="anteprima-testo-invio" rows="16" style="width:100%;font-family:inherit;font-size:13px;padding:10px;box-sizing:border-box;border:.5px solid var(--border2);border-radius:8px">'+testo.replace(/</g,'&lt;')+'</textarea>',
+    '<button class="btn" onclick="closeModal()">↩ Torna indietro</button>'
+    +'<button class="btn btn-primary" onclick="confermaInvioPreventivoConTesto()">📤 Invia</button>'
+  );
+}
+
+// Esegue l'invio vero e proprio, usando il testo (eventualmente corretto) dalla casella di
+// anteprima — replica esattamente la logica per canale che prima stava in eseguiInvioPreventivo.
+function confermaInvioPreventivoConTesto() {
+  const ctx = window._anteprimaInvioPrev;
+  if (!ctx) return;
+  const id = ctx.id, metodo = ctx.metodo, to = ctx.to, subjectRaw = ctx.subjectRaw;
+  const testoArea = document.getElementById('anteprima-testo-invio');
+  const testo = testoArea ? testoArea.value : '';
+  const subject = encodeURIComponent(subjectRaw);
+  const body = encodeURIComponent(testo);
+
   function marcaInviatoEChiudi(msg) {
     const quotes = DB.get('quotes');
     const qi = quotes.findIndex(x=>x.id===id);
@@ -13217,7 +13254,7 @@ function eseguiInvioPreventivo(id, metodo) {
   }
 
   if (metodo === 'copia') {
-    const fullText = (to?'A: '+to+'\n':'')+'Oggetto: '+subjectRaw+'\n\n'+bodyRaw;
+    const fullText = (to?'A: '+to+'\n':'')+'Oggetto: '+subjectRaw+'\n\n'+testo;
     const fallbackCopy = function() {
       const ta = document.createElement('textarea');
       ta.value = fullText;
@@ -13229,29 +13266,30 @@ function eseguiInvioPreventivo(id, metodo) {
     };
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(fullText).then(function(){
-        registraComunicazioneQuote(id, {canale:'copia', oggetto:subjectRaw, testo:bodyRaw, destinatario:to, esito:'copiata'});
+        registraComunicazioneQuote(id, {canale:'copia', oggetto:subjectRaw, testo:testo, destinatario:to, esito:'copiata'});
         marcaInviatoEChiudi('Testo del preventivo copiato negli appunti — incollalo dove preferisci (email, WhatsApp, ecc.)');
       }).catch(function(){
         fallbackCopy();
-        registraComunicazioneQuote(id, {canale:'copia', oggetto:subjectRaw, testo:bodyRaw, destinatario:to, esito:'copiata'});
+        registraComunicazioneQuote(id, {canale:'copia', oggetto:subjectRaw, testo:testo, destinatario:to, esito:'copiata'});
         marcaInviatoEChiudi('Testo del preventivo copiato negli appunti');
       });
     } else {
       fallbackCopy();
-      registraComunicazioneQuote(id, {canale:'copia', oggetto:subjectRaw, testo:bodyRaw, destinatario:to, esito:'copiata'});
+      registraComunicazioneQuote(id, {canale:'copia', oggetto:subjectRaw, testo:testo, destinatario:to, esito:'copiata'});
       marcaInviatoEChiudi('Testo del preventivo copiato negli appunti');
     }
     return;
   }
 
   if (metodo === 'whatsapp') {
-    let phone = (q.clientPhone || '').replace(/[^\d+]/g, '');
+    const q = DB.get('quotes').find(x=>x.id===id);
+    let phone = (q && q.clientPhone || '').replace(/[^\d+]/g, '');
     if (!phone) { showToast('Nessun numero di telefono salvato su questo preventivo'); return; }
     if (phone.startsWith('00')) phone = '+' + phone.slice(2);
     if (!phone.startsWith('+')) phone = '+39' + phone.replace(/^0+/, ''); // assume Italia se manca il prefisso
-    const waText = encodeURIComponent(bodyWhatsapp);
+    const waText = encodeURIComponent(testo);
     window.open('https://wa.me/'+phone.replace('+','')+'?text='+waText, '_blank');
-    registraComunicazioneQuote(id, {canale:'whatsapp', oggetto:subjectRaw, testo:bodyWhatsapp, destinatario:phone, esito:'aperto per invio'});
+    registraComunicazioneQuote(id, {canale:'whatsapp', oggetto:subjectRaw, testo:testo, destinatario:phone, esito:'aperto per invio'});
     marcaInviatoEChiudi('WhatsApp aperto con il preventivo pronto da inviare');
     return;
   }
@@ -13262,13 +13300,14 @@ function eseguiInvioPreventivo(id, metodo) {
     if (!s.supabaseUrl || !s.supabaseKey) { showToast('Configura prima Supabase in Impostazioni'); return; }
     showToast('Invio in corso…');
     const functionUrl = s.supabaseUrl.replace(/\/$/,'') + '/functions/v1/invio-ricevuta';
+    const q = DB.get('quotes').find(x=>x.id===id);
     fetch(functionUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer '+s.supabaseKey, 'apikey': s.supabaseKey },
-      body: JSON.stringify({ to: to, toName: q.clientName, subject: subjectRaw, message: bodyRaw })
+      body: JSON.stringify({ to: to, toName: q ? q.clientName : '', subject: subjectRaw, message: testo })
     }).then(function(res){ return res.json(); }).then(function(data){
       if (!data.ok) throw new Error(data.errore || 'Invio non riuscito');
-      registraComunicazioneQuote(id, {canale:'gmailreale', oggetto:subjectRaw, testo:bodyRaw, destinatario:to, esito:'inviata realmente'});
+      registraComunicazioneQuote(id, {canale:'gmailreale', oggetto:subjectRaw, testo:testo, destinatario:to, esito:'inviata realmente'});
       marcaInviatoEChiudi('Preventivo inviato da villaaurorahoteldolomiti@gmail.com a '+to);
     }).catch(function(err){
       console.error('Errore invio Gmail:', err);
@@ -13278,7 +13317,7 @@ function eseguiInvioPreventivo(id, metodo) {
   }
 
   window.open('mailto:'+to+'?subject='+subject+'&body='+body, '_blank');
-  registraComunicazioneQuote(id, {canale:'mailto', oggetto:subjectRaw, testo:bodyRaw, destinatario:to, esito:'aperto per invio'});
+  registraComunicazioneQuote(id, {canale:'mailto', oggetto:subjectRaw, testo:testo, destinatario:to, esito:'aperto per invio'});
   marcaInviatoEChiudi('Preventivo pronto per l\'invio');
 }
 
