@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 30/08/2026 · 09:42</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 30/08/2026 · 17:56</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -10468,7 +10468,7 @@ function isOverbooking(b, allBookings){
       o.checkin < b.checkout && o.checkout > b.checkin;
   });
 }
-function fmtCurrency(n){var cfg=DB.getObj('settings',{currency:'€'});return (cfg.currency||'€')+' '+parseFloat(n||0).toFixed(2);}
+function fmtCurrency(n){var cfg=DB.getObj('settings',{currency:'€'});return (cfg.currency||'€')+' '+parseFloat(n||0).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2,useGrouping:true});}
 
 // Restituisce SOLO la tipologia della camera (es. "Camera Family"), mai il nome/numero interno
 // (es. "116" o "Camera 3") — da usare in ogni testo rivolto al cliente: email, WhatsApp, messaggi.
@@ -11278,7 +11278,7 @@ function tsSegnaVersato() {
   bookings.forEach(function(b){ totTax += tsCalcolaBooking(b, s, periodo).tax; });
   showModal('Registra versamento — '+periodo.label+' '+tsState.year,
     '<div class="form-grid">'
-    +'<div class="form-group"><label>Importo versato ('+(s.currency||'€')+' '+')</label><input type="number" id="ts-importo" value="'+totTax.toFixed(2)+'" step="0.01" min="0"></div>'
+    +'<div class="form-group"><label>Importo versato ('+fmtCurrency(')</label><input type="number" id="ts-importo" value="'+totTax)+'" step="0.01" min="0"></div>'
     +'<div class="form-group"><label>Data versamento</label><input type="date" id="ts-data" value="'+today()+'"></div>'
     +'<div class="form-group full"><label>Note (facoltativo)</label><input type="text" id="ts-note" placeholder="Es. estremi F24/versamento..."></div>'
     +'</div>',
@@ -13077,7 +13077,7 @@ async function scaricaPdfRicevuta(bookingId) {
   const n = nights(b.checkin, b.checkout);
   const taxInfo = calcTassaSoggiorno(b);
   const totale = corrRowTotal(corrTx);
-  const metodiPag = (b.pagamenti||[]).map(p=>p.metodo+' '+(cfg.currency||'€')+' '+parseFloat(p.importo).toFixed(2)).join(', ');
+  const metodiPag = (b.pagamenti||[]).map(p=>p.metodo+' '+fmtCurrency(parseFloat(p.importo))).join(', ');
 
   showToast('Preparazione PDF…');
   try {
@@ -13094,9 +13094,9 @@ async function scaricaPdfRicevuta(bookingId) {
       ['Ospite', b.guestName],
       ['Camera', b.roomName],
       ['Check-in → Check-out', fmtDate(b.checkin)+' → '+fmtDate(b.checkout)+' ('+n+' nott'+(n===1?'e':'i')+')'],
-      ['Soggiorno', (cfg.currency||'€')+' '+parseFloat(b.totalPrice||0).toFixed(2)],
-      ['Tassa di soggiorno', (cfg.currency||'€')+' '+taxInfo.tax.toFixed(2)],
-      ['Totale', (cfg.currency||'€')+' '+totale.toFixed(2)],
+      ['Soggiorno', fmtCurrency(parseFloat(b.totalPrice||0))],
+      ['Tassa di soggiorno', fmtCurrency(taxInfo.tax)],
+      ['Totale', fmtCurrency(totale)],
     ];
     if (metodiPag) righe.push(['Pagamento', metodiPag]);
     righe.forEach(function(r){
@@ -13150,14 +13150,14 @@ function eseguiInvioPreventivo(id, metodo) {
           + q.periodi.map(function(p,i){
               var tot = p.roomOptions.reduce(function(s,o){return s+(o.total||0);},0);
               var camere = p.roomOptions.map(function(o){ return (o.qty>1?o.qty+'x ':'')+o.type; }).join(', ');
-              return (i+1)+') '+fmtDate(p.checkin)+' - '+fmtDate(p.checkout)+' ('+nights(p.checkin,p.checkout)+' nights): '+camere+' — '+(cfg.currency||'€')+' '+tot.toFixed(2);
+              return (i+1)+') '+fmtDate(p.checkin)+' - '+fmtDate(p.checkout)+' ('+nights(p.checkin,p.checkout)+' nights): '+camere+' — '+fmtCurrency(tot);
             }).join('\n')
           + '\n\n'
         : 'Il preventivo comprende '+q.periodi.length+' periodi di soggiorno separati:\n\n'
           + q.periodi.map(function(p,i){
               var tot = p.roomOptions.reduce(function(s,o){return s+(o.total||0);},0);
               var camere = p.roomOptions.map(function(o){ return (o.qty>1?o.qty+'x ':'')+o.type; }).join(', ');
-              return (i+1)+') '+fmtDate(p.checkin)+' - '+fmtDate(p.checkout)+' ('+nights(p.checkin,p.checkout)+' notti): '+camere+' — '+(cfg.currency||'€')+' '+tot.toFixed(2);
+              return (i+1)+') '+fmtDate(p.checkin)+' - '+fmtDate(p.checkout)+' ('+nights(p.checkin,p.checkout)+' notti): '+camere+' — '+fmtCurrency(tot);
             }).join('\n')
           + '\n\n')
     : '';
@@ -13180,7 +13180,7 @@ function eseguiInvioPreventivo(id, metodo) {
       +(piuPeriodi ? '' : 'Check-in: '+fmtDate(q.checkin)+' - Check-out: '+fmtDate(q.checkout)+' - '+n+' night'+(n===1?'':'s')+'\n\n')
       +elencoCamere
       +(piuOpzioni && linkScelta ? 'You can also choose your preferred option directly here:\n'+linkScelta+'\n\n' : '')
-      +(piuOpzioni ? '' : 'Total stay'+(q.colazioneInclusa!==false?' with breakfast':'')+': '+(cfg.currency||'€')+' '+Number(q.totalPrice).toFixed(2)+'\n\n')
+      +(piuOpzioni ? '' : 'Total stay'+(q.colazioneInclusa!==false?' with breakfast':'')+': '+fmtCurrency(Number(q.totalPrice))+'\n\n')
       +notaCaparraEn
       +'We remain at your disposal for any further information.\n'
     // Modello personalizzabile da Impostazioni → Modello messaggio preventivo (segnaposto sostituiti
@@ -13198,7 +13198,7 @@ function eseguiInvioPreventivo(id, metodo) {
           .replace(/\{periodo\}/g, piuPeriodi ? '' : 'Check-in: '+fmtDate(q.checkin)+' - Check-out: '+fmtDate(q.checkout)+' - per notti '+n+'\n\n')
           .replace(/\{camere\}/g, elencoCamere)
           .replace(/\{link_scelta\}/g, (piuOpzioni && linkScelta) ? 'Può anche scegliere la soluzione che preferisce direttamente da qui:\n'+linkScelta+'\n\n' : '')
-          .replace(/\{totale\}/g, piuOpzioni ? '' : 'Totale soggiorno'+(q.colazioneInclusa!==false?' con Prima Colazione':'')+': '+(cfg.currency||'€')+' '+Number(q.totalPrice).toFixed(2)+'\n\n');
+          .replace(/\{totale\}/g, piuOpzioni ? '' : 'Totale soggiorno'+(q.colazioneInclusa!==false?' con Prima Colazione':'')+': '+fmtCurrency(Number(q.totalPrice))+'\n\n');
       })();
   const firma = (en ? '\nBest regards,\n' : '\nCordiali saluti,\n')+cfg.propertyName
     +(cfg.telefono?'\n'+cfg.telefono:'')
@@ -13405,7 +13405,7 @@ async function notificaConfermaPrenotazione(b) {
       +'Check-out: '+fmtDate(b.checkout)+'\n'
       +'Notti: '+n+(n===1?' notte':' notti')+'\n'
       +'Ospiti: '+(b.adults||1)+' adult'+((b.adults||1)===1?'o':'i')+(b.children?' + '+b.children+' bambin'+(b.children===1?'o':'i'):'')+'\n'
-      +'Totale: '+(s.currency||'€')+' '+parseFloat(b.totalPrice||0).toFixed(2)+'\n';
+      +'Totale: '+fmtCurrency(parseFloat(b.totalPrice||0))+'\n';
     const functionUrl = s.supabaseUrl.replace(/\/$/,'') + '/functions/v1/invio-ricevuta';
     const res = await fetch(functionUrl, {
       method: 'POST',
@@ -15441,7 +15441,7 @@ function lstUpdateMassPreview() {
     const prev = document.getElementById('mass-preview-'+t+'-'+pk);
     if (!prev) return;
     const v = valore[t+'|'+pk];
-    prev.textContent = v != null ? ((cfg.currency||'€')+' '+v.toFixed(2)) : '—';
+    prev.textContent = v != null ? (fmtCurrency(v)) : '—';
   });
 }
 
@@ -15931,7 +15931,7 @@ function elaboraModificaEmail(testo, idDallaFrase) {
     return '<tr><td>'+(b.roomName||'—')+'</td>'
       +'<td>'+fmtDate(b.checkin)+' → '+fmtDate(b.checkout)+(cambiaDate?' <b style="color:var(--amber)">→ '+fmtDate(nuovoCheckin)+' → '+fmtDate(nuovoCheckout)+'</b>':'')+'</td>'
       +'<td>'+(b.adults||1)+' ad. + '+(b.children||0)+' bamb.'+(cambiaOspiti?' <b style="color:var(--amber)">→ '+(nuoviAdulti!=null?nuoviAdulti:b.adults)+' ad. + '+(nuoviBambini!=null?nuoviBambini:(b.children||0))+' bamb.</b>':'')+'</td>'
-      +'<td>'+(b.totalPrice||0).toFixed(2)+' €'+(cambiaPrezzo?' <b style="color:var(--amber)">→ '+nuovoPrezzo.toFixed(2)+' €</b>':'')+'</td>'
+      +'<td>'+fmtCurrency(b.totalPrice||0)+(cambiaPrezzo?' <b style="color:var(--amber)">→ '+fmtCurrency(nuovoPrezzo)+'</b>':'')+'</td>'
       +'</tr>';
   }).join('');
 
@@ -16284,9 +16284,9 @@ function updateTotalPrice() {
     const childrenUnderP = parseInt((document.getElementById('f-childrenUnderAge')||{value:0}).value)||0;
     const tassaInfo = calcTassaSoggiorno({checkin, checkout, adults:adultsP, children:childrenP, childrenUnderAge:childrenUnderP});
     const prezzoTxt = ppn > 0
-      ? (cfg.currency||'€') + ppn.toFixed(2) + '/notte × ' + n + ' nott' + (n===1?'e':'i') + ' = ' + (cfg.currency||'€') + total.toFixed(2)
+      ? fmtCurrency(ppn) + '/notte × ' + n + ' nott' + (n===1?'e':'i') + ' = ' + fmtCurrency(total)
       : 'Nessun prezzo nel listino — inserisci manualmente';
-    const tassaTxt = tassaInfo.tax > 0 ? ' &nbsp;·&nbsp; + tassa di soggiorno ' + (cfg.currency||'€') + tassaInfo.tax.toFixed(2) : '';
+    const tassaTxt = tassaInfo.tax > 0 ? ' &nbsp;·&nbsp; + tassa di soggiorno ' + fmtCurrency(tassaInfo.tax) : '';
     priceDetail.innerHTML = '<span style="color:'+(ppn>0?'var(--green)':'var(--amber)')+'">'+prezzoTxt+'</span>' + (tassaTxt ? '<span style="color:var(--text3)">'+tassaTxt+'</span>' : '');
   }
 }
@@ -16674,20 +16674,20 @@ function aggiornaRiepilogoEdit() {
   var totale = prezzoAlloggio + totExtra + tassaValore;
   var caparra = parseFloat((document.getElementById('f-caparra')||{value:0}).value)||0;
   var saldo = totale - caparra;
-  var rows = '<div style="display:flex;justify-content:space-between;padding:2px 0"><span>Soggiorno</span><span>'+(cfg.currency||'€')+' '+prezzoAlloggio.toFixed(2)+'</span></div>';
+  var rows = '<div style="display:flex;justify-content:space-between;padding:2px 0"><span>Soggiorno</span><span>'+fmtCurrency(prezzoAlloggio)+'</span></div>';
   extras.forEach(function(e){
-    rows += '<div style="display:flex;justify-content:space-between;padding:2px 0;color:var(--text2)"><span>'+e.nome+' × '+e.qty+'</span><span>'+(cfg.currency||'€')+' '+e.totale.toFixed(2)+'</span></div>';
+    rows += '<div style="display:flex;justify-content:space-between;padding:2px 0;color:var(--text2)"><span>'+e.nome+' × '+e.qty+'</span><span>'+fmtCurrency(e.totale)+'</span></div>';
   });
   rows += '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;color:var(--text2);gap:8px">' +
     '<span>Tassa di soggiorno'+(tassaManuale?' <span class="badge badge-amber" style="font-size:9px">manuale</span>':'')+'</span>' +
-    '<span style="display:flex;align-items:center;gap:6px">'+(cfg.currency||'€')+' '+
-    '<input type="number" step="0.01" id="f-tassa-input" value="'+tassaValore.toFixed(2)+'" data-manual="'+(tassaManuale?'1':'0')+'" style="width:80px;padding:3px 6px;border:.5px solid var(--border2);border-radius:6px;text-align:right" oninput="this.dataset.manual=\'1\'; aggiornaRiepilogoEdit();">' +
+    '<span style="display:flex;align-items:center;gap:6px">'+fmtCurrency(
+    '<input type="number" step="0.01" id="f-tassa-input" value="'+tassaValore)+'" data-manual="'+(tassaManuale?'1':'0')+'" style="width:80px;padding:3px 6px;border:.5px solid var(--border2);border-radius:6px;text-align:right" oninput="this.dataset.manual=\'1\'; aggiornaRiepilogoEdit();">' +
     (tassaManuale ? '<button type="button" class="btn btn-sm" style="padding:2px 6px;font-size:10px" onclick="document.getElementById(\'f-tassa-input\').dataset.manual=\'0\'; aggiornaRiepilogoEdit();" title="Torna al calcolo automatico">↺</button>' : '') +
     '</span></div>';
-  rows += '<div style="display:flex;justify-content:space-between;padding:7px 0;margin-top:4px;border-top:.5px solid var(--border)"><span style="text-transform:uppercase;font-size:11px;letter-spacing:.4px;font-weight:700;color:var(--text2)">Totale conto</span><span style="font-weight:800;font-size:16px">'+(cfg.currency||'€')+' '+totale.toFixed(2)+'</span></div>';
+  rows += '<div style="display:flex;justify-content:space-between;padding:7px 0;margin-top:4px;border-top:.5px solid var(--border)"><span style="text-transform:uppercase;font-size:11px;letter-spacing:.4px;font-weight:700;color:var(--text2)">Totale conto</span><span style="font-weight:800;font-size:16px">'+fmtCurrency(totale)+'</span></div>';
   if(caparra>0){
-    rows += '<div style="display:flex;justify-content:space-between;padding:2px 0;color:var(--text2)"><span>Caparra versata</span><span>-'+(cfg.currency||'€')+' '+caparra.toFixed(2)+'</span></div>';
-    rows += '<div style="display:flex;justify-content:space-between;padding:2px 0;font-weight:700;color:'+(saldo>0?'var(--amber)':'var(--green)')+'"><span>Saldo da pagare</span><span>'+(cfg.currency||'€')+' '+saldo.toFixed(2)+'</span></div>';
+    rows += '<div style="display:flex;justify-content:space-between;padding:2px 0;color:var(--text2)"><span>Caparra versata</span><span>-'+fmtCurrency(caparra)+'</span></div>';
+    rows += '<div style="display:flex;justify-content:space-between;padding:2px 0;font-weight:700;color:'+(saldo>0?'var(--amber)':'var(--green)')+'"><span>Saldo da pagare</span><span>'+fmtCurrency(saldo)+'</span></div>';
   }
   body.innerHTML = rows;
 }
@@ -17208,16 +17208,18 @@ function savePrenotazione(editId) {
   };
 
   const bookings = DB.get('bookings');
+  let righeModificaEdit = null; // calcolato qui (serve confrontare col vecchio prima di sovrascrivere),
+                                 // ma scritto nel Registro Modifiche solo DOPO il salvataggio principale
+                                 // qui sotto — altrimenti in modalità offline rischia di essere perso
+                                 // (stessa causa già trovata per il conto di gruppo)
   if (editId) {
     const idx = bookings.findIndex(b => b.id === editId);
     const old = bookings[idx] || {};
     bookings[idx] = booking;
-    // Registro Modifiche: confronta vecchio/nuovo e registra una riga per ogni campo importante
-    // cambiato — non blocca il salvataggio principale se qualcosa va storto qui.
     try {
       const righeModifica = lstDescriviModificaCampo(old, booking);
-      if (righeModifica.length) registraModificaPrenotazione(editId, 'modifica', righeModifica.join(' · '));
-    } catch(errRegistro) { console.error('Registro Modifiche non aggiornato:', errRegistro); }
+      if (righeModifica.length) righeModificaEdit = righeModifica.join(' · ');
+    } catch(errRegistro) { console.error('Registro Modifiche non calcolato:', errRegistro); }
     // Se la caparra è cambiata, aggiorna il movimento in cassa
     if (booking.caparra > 0 && booking.caparra !== (old.caparra||0)) {
       const movs = DB.get('movimenti');
@@ -17315,6 +17317,8 @@ function savePrenotazione(editId) {
   DB.set('bookings', bookings);
   if (!editId) {
     try { registraModificaPrenotazione(booking.id, 'creazione', 'Prenotazione creata — '+booking.roomName+' · '+fmtDate(booking.checkin)+' → '+fmtDate(booking.checkout)+' · '+fmtCurrency(booking.totalPrice)); } catch(errRegistro) { console.error('Registro Modifiche non aggiornato:', errRegistro); }
+  } else if (righeModificaEdit) {
+    try { registraModificaPrenotazione(editId, 'modifica', righeModificaEdit); } catch(errRegistro) { console.error('Registro Modifiche non aggiornato:', errRegistro); }
   }
   if (groupId && useColor && groupColor) setGroupColor(groupId, groupColor);
   renderPage(currentPage);
@@ -17997,12 +18001,12 @@ function eseguiInvioRicevuta(bookingId, metodo, to) {
   const numero = corrTx ? corrTx.numero : '';
   const dataDoc = corrTx ? fmtDate(corrTx.date) : fmtDate(today());
   const totale = corrTx ? corrRowTotal(corrTx) : (parseFloat(b.totalPrice||0)+calcTassaSoggiorno(b).tax);
-  const metodiPag = (b.pagamenti||[]).map(p=>p.metodo+' '+(cfg.currency||'€')+' '+parseFloat(p.importo).toFixed(2)).join(', ');
+  const metodiPag = (b.pagamenti||[]).map(p=>p.metodo+' '+fmtCurrency(parseFloat(p.importo))).join(', ');
   const subjectRaw = 'Ricevuta N. '+numero+' — '+cfg.propertyName;
   const bodyBase =
     'Gentile '+titoloOspite(b.guestName)+' '+b.guestName+',\n\n'
     +'in allegato/di seguito la ricevuta N. '+numero+' del '+dataDoc+' relativa al Suo soggiorno presso '+cfg.propertyName+'.\n\n'
-    +'Totale: '+(cfg.currency||'€')+' '+totale.toFixed(2)+'\n'
+    +'Totale: '+fmtCurrency(totale)+'\n'
     +(metodiPag ? 'Pagamento: '+metodiPag+'\n' : '')
     +'\nGrazie e a presto,\n';
   const bodyRaw = bodyBase + '\nCordiali saluti,\n'+cfg.propertyName;
@@ -18501,9 +18505,9 @@ function aggiornaTotaleDettaglioGiornaliero() {
   if (extraRow && !extraRow.querySelector('#dg-sub-grandtotale')) {
     extraTotale = parseFloat(extraRow.querySelector('span:last-child').textContent.replace(/[^0-9.,-]/g,'').replace(',','.')) || 0;
   }
-  if (subSoggiorno) subSoggiorno.textContent = (cfg.currency||'€')+' '+totSoggiorno.toFixed(2);
-  if (subTassa) subTassa.textContent = (cfg.currency||'€')+' '+totTassa.toFixed(2);
-  if (subTotale) subTotale.textContent = (cfg.currency||'€')+' '+(totSoggiorno+totTassa+extraTotale).toFixed(2);
+  if (subSoggiorno) subSoggiorno.textContent = fmtCurrency(totSoggiorno);
+  if (subTassa) subTassa.textContent = fmtCurrency(totTassa);
+  if (subTotale) subTotale.textContent = fmtCurrency((totSoggiorno+totTassa+extraTotale));
 }
 
 function salvaDettaglioGiornaliero(bookingId) {
@@ -20983,6 +20987,8 @@ async function saveCheckinDataGruppo() {
   const tipoAllogScelto = document.getElementById('ci-tipoallog')?.value || '';
   let totComponenti = 0, totMancanti = 0;
   const nowIso = new Date().toISOString();
+  const logCheckinDaScrivere = []; // {bid, testo} — scritti solo DOPO il DB.set qui sotto, altrimenti
+                                    // in modalità offline il salvataggio finale può sovrascriverli
 
   bookingIds.forEach(function(bid){
     const idx = bks.findIndex(x=>x.id===bid);
@@ -20994,7 +21000,7 @@ async function saveCheckinDataGruppo() {
     // La scelta manuale di tipo alloggiato riguarda l'intestatario, quindi solo la sua camera
     // (la prima del gruppo, quella con l'ospite di indice 0) la riceve.
     if (bid === slots[0].bookingId) bks[idx].tipoAlloggiatoManuale = tipoAllogScelto;
-    registraModificaPrenotazione(bid, 'checkin', 'Check-in con dati ospite completato ('+componenti.length+' ospit'+(componenti.length===1?'e':'i')+')');
+    logCheckinDaScrivere.push({ bid: bid, testo: 'Check-in con dati ospite completato ('+componenti.length+' ospit'+(componenti.length===1?'e':'i')+')' });
     totComponenti += componenti.length;
     totMancanti   += componenti.filter(c=>!c || !c.cognome || !c.nome).length;
     console.log('🔍 DIAGNOSTICA CHECK-IN — prenotazione '+bid+': salvo '+componenti.length+' componenti ->', JSON.stringify(componenti.map(c=>c&&(c.cognome+' '+c.nome))));
@@ -21019,6 +21025,7 @@ async function saveCheckinDataGruppo() {
     }
   });
   DB.set('bookings', bks);
+  logCheckinDaScrivere.forEach(function(v){ registraModificaPrenotazione(v.bid, 'checkin', v.testo); });
   // Nota: DB.set sincronizza già con Supabase in background (senza bloccare) — se Supabase è lento o
   // momentaneamente irraggiungibile, il check-in resta comunque salvato qui in locale e si sincronizzerà
   // da solo appena la connessione torna disponibile, invece di far perdere il lavoro allo staff.
@@ -21821,7 +21828,7 @@ function camPriceRows(capMin, capMax, listinoEntry, cfg) {
       <div style="flex:1;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
         <span style="font-size:12px;color:var(--text3)">${cfg.currency||'€'}</span>
         <input type="number" id="c-pax${p}" value="${val}" min="0" step="0.50" placeholder="—"
-          oninput="document.getElementById('c-pax${p}-ota').textContent = this.value ? ('OTA: '+(cfg.currency||'€')+' '+(parseFloat(this.value)*(1+${markupOTA}/100)).toFixed(2)) : '';"
+          oninput="document.getElementById('c-pax${p}-ota').textContent = this.value ? ('OTA: '+fmtCurrency((parseFloat(this.value)*(1+${markupOTA}/100)))) : '';"
           style="width:90px;padding:5px 8px;font-size:13px;font-weight:600;border:.5px solid var(--border2);border-radius:6px;text-align:right">
         <span style="font-size:11px;color:var(--text3)">/notte (tariffa base)</span>
         ${markupOTA ? `<span id="c-pax${p}-ota" style="font-size:11px;color:var(--accent);font-weight:700;margin-left:4px" title="Prezzo suggerito per Booking.com/Airbnb, con margine +${markupOTA}%">${otaVal?('OTA: '+(cfg.currency||'€')+' '+otaVal):''}</span>` : `<span id="c-pax${p}-ota"></span>`}
@@ -22606,7 +22613,7 @@ function stampaScheda(guestId) {
     .filter(b => b.guestId === guestId && b.status !== 'cancellata')
     .sort((a,b) => b.checkin.localeCompare(a.checkin));
   const s = DB.getObj('settings',{});
-  const fC = v => (s.currency||'€')+' '+parseFloat(v||0).toFixed(2);
+  const fC = v => fmtCurrency(parseFloat(v||0));
   const totSpeso = bookings.reduce((sm,b)=>sm+(b.totalPrice||0),0);
   const totNotti = bookings.reduce((sm,b)=>sm+nights(b.checkin,b.checkout),0);
   const rows = bookings.map(b =>
@@ -24651,7 +24658,7 @@ function tipoStampa(){
       for(var p=1;p<=maxCapAll;p++){
         if(p>cap){cells+='<td style="color:#ccc">—</td>';continue;}
         var v=e&&e.prezzi&&e.prezzi['PAX'+p]!=null?e.prezzi['PAX'+p]:null;
-        cells+='<td style="text-align:right">'+(v!=null?(cfg.currency||'€')+' '+parseFloat(v).toFixed(2):'—')+'</td>';
+        cells+='<td style="text-align:right">'+(v!=null?fmtCurrency(parseFloat(v)):'—')+'</td>';
       }
       cells+='<td style="text-align:center">'+getMinNottiTipo(t, today())+'</td>';
       return '<tr>'+cells+'</tr>';
@@ -26387,10 +26394,10 @@ function applicaSegnaposto(testo, b, guest) {
     '{notti}': String(n),
     '{persone}': b ? (b.adults||1)+' adulti'+(b.children?' + '+b.children+' bambini':'') : '',
     '{struttura}': cfg.propertyName || '',
-    '{totale}': b ? (cfg.currency||'€')+' '+parseFloat(b.totalPrice||0).toFixed(2) : '',
-    '{tassa}': b ? (cfg.currency||'€')+' '+taxInfoSeg.tax.toFixed(2) : '',
-    '{extra}': b ? (cfg.currency||'€')+' '+extrasTotSeg.toFixed(2) : '',
-    '{totale_completo}': b ? (cfg.currency||'€')+' '+totaleCompletoSeg.toFixed(2) : '',
+    '{totale}': b ? fmtCurrency(parseFloat(b.totalPrice||0)) : '',
+    '{tassa}': b ? fmtCurrency(taxInfoSeg.tax) : '',
+    '{extra}': b ? fmtCurrency(extrasTotSeg) : '',
+    '{totale_completo}': b ? fmtCurrency(totaleCompletoSeg) : '',
     '{telefono_struttura}': cfg.phone || ''
   };
   let out = testo || '';
@@ -26684,7 +26691,7 @@ function renderRevenue() {
                 var calc=calcolaPrezzoConsigliato(repRoom, ds, cfg, spinta);
                 if(!calc) return '<td colspan="2" style="color:var(--text3);font-size:11px">nessun prezzo base</td>';
                 var diff=calc.base>0 ? Math.round((calc.suggerito-calc.base)/calc.base*100) : 0;
-                var detail='Base '+(ccfg.currency||'€')+' '+calc.base.toFixed(2)+' · Occ. '+calc.occ+'% ('+(calc.occAdj>=0?'+':'')+calc.occAdj+'%)'+(calc.weekend?' · Weekend +'+calc.weekendAdj+'%':'')+(calc.eventAdj?' · Eventi '+(calc.eventAdj>=0?'+':'')+calc.eventAdj+'%':'')+(calc.spintaExtra?' · Spinta obiettivo +'+calc.spintaExtra+'%':'');
+                var detail='Base '+fmtCurrency(calc.base)+' · Occ. '+calc.occ+'% ('+(calc.occAdj>=0?'+':'')+calc.occAdj+'%)'+(calc.weekend?' · Weekend +'+calc.weekendAdj+'%':'')+(calc.eventAdj?' · Eventi '+(calc.eventAdj>=0?'+':'')+calc.eventAdj+'%':'')+(calc.spintaExtra?' · Spinta obiettivo +'+calc.spintaExtra+'%':'');
                 return '<td style="text-align:right" title="'+detail.replace(/"/g,'&quot;')+'"><strong style="color:'+(diff>0?'var(--green)':diff<0?'var(--red)':'var(--text2)')+'">'+fmtCurrency(calc.suggerito)+'</strong><div style="font-size:9.5px;color:var(--text3)">base '+fmtCurrency(calc.base)+' ('+(diff>=0?'+':'')+diff+'%)</div></td>'+
                   '<td><button class="btn btn-sm" style="font-size:10px;padding:2px 6px" onclick="applicaPrezzoConsigliatoTipologia(\'' + encodeURIComponent(cat) + '\',\'' + ds + '\')">✓</button></td>';
               }).join('') +
@@ -28569,13 +28576,13 @@ function schedaPrenotazioneHTML(b, cfg) {
     row('Stato', b.status||'') +
     (b.groupId ? row('Gruppo camere', b.groupId) : '') +
     '<div class="section-title">Conto</div>' +
-    row('Soggiorno', (cfg.currency||'€')+' '+parseFloat(b.totalPrice||0).toFixed(2)) +
-    (b.extras && b.extras.length ? b.extras.map(ex=>row('Extra — '+ex.nome+' ×'+ex.qty, (cfg.currency||'€')+' '+parseFloat(ex.totale||0).toFixed(2))).join('') : '') +
-    (taxInfo.tax > 0 ? row('Tassa di soggiorno', (cfg.currency||'€')+' '+taxInfo.tax.toFixed(2)) : '') +
-    '<div class="row total"><span>Totale dovuto</span><span>'+(cfg.currency||'€')+' '+totaleDovuto.toFixed(2)+'</span></div>' +
-    row('Caparra', (cfg.currency||'€')+' '+parseFloat(b.caparra||0).toFixed(2)) +
-    (pagatoConPagamentiSch>0 ? row('Pagato', (cfg.currency||'€')+' '+pagatoConPagamentiSch.toFixed(2)) : '') +
-    (daPagare>0.001 ? '<div class="row" style="font-weight:800;color:#b5482f"><span>RIMANENZA DA PAGARE</span><span>'+(cfg.currency||'€')+' '+daPagare.toFixed(2)+'</span></div>' : '<div class="row" style="font-weight:700;color:var(--green,#1a7a3c)"><span>✓ Pagato</span><span>'+(cfg.currency||'€')+' '+totaleDovuto.toFixed(2)+'</span></div>') +
+    row('Soggiorno', fmtCurrency(parseFloat(b.totalPrice||0))) +
+    (b.extras && b.extras.length ? b.extras.map(ex=>row('Extra — '+ex.nome+' ×'+ex.qty, fmtCurrency(parseFloat(ex.totale||0)))).join('') : '') +
+    (taxInfo.tax > 0 ? row('Tassa di soggiorno', fmtCurrency(taxInfo.tax)) : '') +
+    '<div class="row total"><span>Totale dovuto</span><span>'+fmtCurrency(totaleDovuto)+'</span></div>' +
+    row('Caparra', fmtCurrency(parseFloat(b.caparra||0))) +
+    (pagatoConPagamentiSch>0 ? row('Pagato', fmtCurrency(pagatoConPagamentiSch)) : '') +
+    (daPagare>0.001 ? '<div class="row" style="font-weight:800;color:#b5482f"><span>RIMANENZA DA PAGARE</span><span>'+fmtCurrency(daPagare)+'</span></div>' : '<div class="row" style="font-weight:700;color:var(--green,#1a7a3c)"><span>✓ Pagato</span><span>'+fmtCurrency(totaleDovuto)+'</span></div>') +
     (b.notes ? '<div class="section-title">Note</div><div class="notes-box">'+b.notes.replace(/</g,'&lt;').replace(/\n/g,'<br>')+'</div>' : '') +
     '</div>';
 }
@@ -28594,7 +28601,7 @@ function schedaGruppoHTML(bookings, cfg) {
       '<tr><td style="color:#666;padding:2px 0">Ospiti</td><td>'+(b.adults||1)+' adulti'+(b.children?' + '+b.children+' bambini':'')+'</td></tr>' +
       '<tr><td style="color:#666;padding:2px 0">Tipologia</td><td>'+(b.trattamento||'—')+'</td></tr>' +
       '<tr><td style="color:#666;padding:2px 0">Fonte</td><td>'+(b.source||'—')+'</td></tr>' +
-      '<tr><td style="color:#666;padding:2px 0;font-weight:700">Totale (incl. tassa)</td><td style="font-weight:700">'+(cfg.currency||'€')+' '+tot.toFixed(2)+'</td></tr>' +
+      '<tr><td style="color:#666;padding:2px 0;font-weight:700">Totale (incl. tassa)</td><td style="font-weight:700">'+fmtCurrency(tot)+'</td></tr>' +
       '</table>' +
       '</div>';
   }).join('');
@@ -28603,7 +28610,7 @@ function schedaGruppoHTML(bookings, cfg) {
     '<p class="sub">Scheda di gruppo — '+(bookings[0].groupId||'')+'</p>' +
     '<div class="section-title">Camere collegate ('+bookings.length+')</div>' +
     righeCamere +
-    '<div class="row total" style="margin-top:12px"><span>Totale complessivo gruppo</span><span>'+(cfg.currency||'€')+' '+totaleGenerale.toFixed(2)+'</span></div>' +
+    '<div class="row total" style="margin-top:12px"><span>Totale complessivo gruppo</span><span>'+fmtCurrency(totaleGenerale)+'</span></div>' +
     '</div>';
 }
 
@@ -28858,6 +28865,10 @@ function contoGruppoStampaEDeposita(groupId) {
                                   // — i valori veri da rimettere sulla prenotazione DOPO aver
                                   // stampato/registrato il conto di oggi con l'importo ridotto
   const tabellaConto = document.getElementById('conto-gruppo-tabella');
+  const logDaScrivere = []; // {id, testo} — scritti SOLO dopo il salvataggio principale qui sotto,
+                             // altrimenti registraModificaPrenotazione legge/scrive una copia dei
+                             // dati non ancora aggiornata con i nuovi prezzi (rischio di perdita
+                             // della voce di log se il PMS non è connesso a Supabase in quel momento)
   if (tabellaConto) {
     tabellaConto.querySelectorAll('tr[data-riga-booking]').forEach(function(tr){
       const bId = tr.getAttribute('data-riga-booking');
@@ -28874,12 +28885,12 @@ function contoGruppoStampaEDeposita(groupId) {
         if (nuovoPrezzo !== prezzoOriginale) {
           if (nuovoPrezzo > prezzoOriginale) {
             bk.totalPrice = nuovoPrezzo;
-            registraModificaPrenotazione(bId, 'modifica', 'Prezzo soggiorno aggiornato dal conto di gruppo: '+fmtCurrency(prezzoOriginale)+' → '+fmtCurrency(nuovoPrezzo));
+            logDaScrivere.push({ id: bId, testo: 'Prezzo soggiorno aggiornato dal conto di gruppo: '+fmtCurrency(prezzoOriginale)+' → '+fmtCurrency(nuovoPrezzo) });
           } else {
             const differenza = prezzoOriginale - nuovoPrezzo;
             bk.totalPrice = nuovoPrezzo; // temporaneo: solo per calcolare/stampare il conto di oggi
             getRipristino().prezzoOriginale = prezzoOriginale;
-            registraModificaPrenotazione(bId, 'modifica', 'Conto di gruppo: soggiorno registrato a '+fmtCurrency(nuovoPrezzo)+' invece di '+fmtCurrency(prezzoOriginale)+' — rimanenza di '+fmtCurrency(differenza)+' lasciata sulla prenotazione (il prezzo vero resta '+fmtCurrency(prezzoOriginale)+')');
+            logDaScrivere.push({ id: bId, testo: 'Conto di gruppo: soggiorno registrato a '+fmtCurrency(nuovoPrezzo)+' invece di '+fmtCurrency(prezzoOriginale)+' — rimanenza di '+fmtCurrency(differenza)+' lasciata sulla prenotazione (il prezzo vero resta '+fmtCurrency(prezzoOriginale)+')' });
           }
         }
       }
@@ -28891,7 +28902,7 @@ function contoGruppoStampaEDeposita(groupId) {
           if (nuovaTassa > tassaOriginale) {
             bk.tassaManuale = true;
             bk.tassaSoggiornoOverride = nuovaTassa;
-            registraModificaPrenotazione(bId, 'modifica', 'Tassa di soggiorno aggiornata dal conto di gruppo: '+fmtCurrency(tassaOriginale)+' → '+fmtCurrency(nuovaTassa));
+            logDaScrivere.push({ id: bId, testo: 'Tassa di soggiorno aggiornata dal conto di gruppo: '+fmtCurrency(tassaOriginale)+' → '+fmtCurrency(nuovaTassa) });
           } else {
             const differenza = tassaOriginale - nuovaTassa;
             const r = getRipristino();
@@ -28899,7 +28910,7 @@ function contoGruppoStampaEDeposita(groupId) {
             r.tassaOverrideOriginale = bk.tassaSoggiornoOverride != null ? bk.tassaSoggiornoOverride : null;
             bk.tassaManuale = true;
             bk.tassaSoggiornoOverride = nuovaTassa; // temporaneo: solo per calcolare/stampare il conto di oggi
-            registraModificaPrenotazione(bId, 'modifica', 'Conto di gruppo: tassa di soggiorno registrata a '+fmtCurrency(nuovaTassa)+' invece di '+fmtCurrency(tassaOriginale)+' — rimanenza di '+fmtCurrency(differenza)+' lasciata sulla prenotazione (la tassa vera resta '+fmtCurrency(tassaOriginale)+')');
+            logDaScrivere.push({ id: bId, testo: 'Conto di gruppo: tassa di soggiorno registrata a '+fmtCurrency(nuovaTassa)+' invece di '+fmtCurrency(tassaOriginale)+' — rimanenza di '+fmtCurrency(differenza)+' lasciata sulla prenotazione (la tassa vera resta '+fmtCurrency(tassaOriginale)+')' });
           }
         }
       }
@@ -28928,6 +28939,9 @@ function contoGruppoStampaEDeposita(groupId) {
     if (fatturaGruppo) b.fattura = fatturaGruppo;
   });
   DB.set('bookings', bookings);
+  // Ora che soggiorno/tassa/pagamenti sono già salvati, si può scrivere in sicurezza il Registro
+  // modifiche di ogni prenotazione toccata (vedi nota sopra sul perché l'ordine conta qui).
+  logDaScrivere.forEach(function(v){ registraModificaPrenotazione(v.id, 'modifica', v.testo); });
 
   if (incassato) {
     corrSyncGruppoToRegister(groupId, true, tipoDoc);
@@ -28973,8 +28987,8 @@ function costruisciContoGruppoHTML(groupId) {
       '<table style="width:100%;font-size:12px;border-collapse:collapse">'+
       '<tr><td style="color:#666;padding:2px 0;width:45%">Ospite</td><td>'+b.guestName+'</td></tr>'+
       '<tr><td style="color:#666;padding:2px 0">Check-in → Check-out</td><td>'+fmtDate(b.checkin)+' → '+fmtDate(b.checkout)+' ('+n+' nott'+(n===1?'e':'i')+')</td></tr>'+
-      (b.pagamenti && b.pagamenti.length ? b.pagamenti.map(p=>'<tr><td style="color:#666;padding:2px 0">Pagato con '+p.metodo+'</td><td>'+(cfg.currency||'€')+' '+parseFloat(p.importo||0).toFixed(2)+'</td></tr>').join('') : '')+
-      '<tr><td style="color:#666;padding:2px 0;font-weight:700">Totale camera</td><td style="font-weight:700">'+(cfg.currency||'€')+' '+totale.toFixed(2)+'</td></tr>'+
+      (b.pagamenti && b.pagamenti.length ? b.pagamenti.map(p=>'<tr><td style="color:#666;padding:2px 0">Pagato con '+p.metodo+'</td><td>'+fmtCurrency(parseFloat(p.importo||0))+'</td></tr>').join('') : '')+
+      '<tr><td style="color:#666;padding:2px 0;font-weight:700">Totale camera</td><td style="font-weight:700">'+fmtCurrency(totale)+'</td></tr>'+
       '</table></div>';
   }).join('');
   const totaleGenerale = bookings.reduce((s,b) => s + parseFloat(b.totalPrice||0) + calcTassaSoggiorno(b).tax + (b.extras||[]).reduce((s2,ex)=>s2+(Number(ex.totale)||0),0), 0);
@@ -28995,10 +29009,10 @@ function costruisciContoGruppoHTML(groupId) {
     '<p class="sub">Conto unico di gruppo — camere collegate</p>'+
     '<div class="section-title">Camere collegate ('+bookings.length+')</div>'+
     righe+
-    '<div class="row total" style="margin-top:12px"><span>Totale complessivo gruppo</span><span>'+(cfg.currency||'€')+' '+totaleGenerale.toFixed(2)+'</span></div>'+
-    (caparraGenerale>0 ? '<div class="row"><span>Caparra</span><span>'+(cfg.currency||'€')+' '+caparraGenerale.toFixed(2)+'</span></div>' : '')+
-    (pagatoGenerale>0 ? '<div class="row"><span>Pagato</span><span>'+(cfg.currency||'€')+' '+pagatoGenerale.toFixed(2)+'</span></div>' : '')+
-    (rimanenzaGenerale>0.001 ? '<div class="row" style="font-weight:800;color:#b5482f"><span>RIMANENZA DA PAGARE</span><span>'+(cfg.currency||'€')+' '+rimanenzaGenerale.toFixed(2)+'</span></div>' : '<div class="row" style="font-weight:700;color:var(--green,#1a7a3c)"><span>✓ Pagato</span><span>'+(cfg.currency||'€')+' '+totaleGenerale.toFixed(2)+'</span></div>')+
+    '<div class="row total" style="margin-top:12px"><span>Totale complessivo gruppo</span><span>'+fmtCurrency(totaleGenerale)+'</span></div>'+
+    (caparraGenerale>0 ? '<div class="row"><span>Caparra</span><span>'+fmtCurrency(caparraGenerale)+'</span></div>' : '')+
+    (pagatoGenerale>0 ? '<div class="row"><span>Pagato</span><span>'+fmtCurrency(pagatoGenerale)+'</span></div>' : '')+
+    (rimanenzaGenerale>0.001 ? '<div class="row" style="font-weight:800;color:#b5482f"><span>RIMANENZA DA PAGARE</span><span>'+fmtCurrency(rimanenzaGenerale)+'</span></div>' : '<div class="row" style="font-weight:700;color:var(--green,#1a7a3c)"><span>✓ Pagato</span><span>'+fmtCurrency(totaleGenerale)+'</span></div>')+
     '</div>';
   return { content: content, bookings: bookings };
 }
@@ -29449,7 +29463,7 @@ function costruisciContoHTML(bid) {
   // solo la caparra, quindi un pagamento parziale registrato qui non faceva scendere la rimanenza.
   var pagatoConPagamenti = (b.pagamenti||[]).reduce(function(s,p){return s+(Number(p.importo)||0);},0);
   var daPagare = Math.max(0, totaleDovuto - parseFloat(b.caparra||0) - pagatoConPagamenti);
-  var taxDetail = taxInfo.payingFull+' pers. a tariffa piena'+(taxInfo.childrenUnder>0?' + '+taxInfo.childrenUnder+' bambin'+(taxInfo.childrenUnder===1?'o':'i')+' fino a '+taxInfo.childAge+' anni a '+(cfg.currency||'€')+' '+parseFloat(taxInfo.rateChild).toFixed(2)+'/notte':'');
+  var taxDetail = taxInfo.payingFull+' pers. a tariffa piena'+(taxInfo.childrenUnder>0?' + '+taxInfo.childrenUnder+' bambin'+(taxInfo.childrenUnder===1?'o':'i')+' fino a '+taxInfo.childAge+' anni a '+fmtCurrency(parseFloat(taxInfo.rateChild))+'/notte':'');
   var isPagato = b.pagato === 'si';
   // Numero scontrino/fattura, nome cliente personalizzato e servizi aggiuntivi: recuperati dalla
   // registrazione collegata nel registro Corrispettivi, se esiste e se sono stati personalizzati
@@ -29457,7 +29471,7 @@ function costruisciContoHTML(bid) {
   var numeroDocRiga = corrTx && corrTx.numero ? ('N. '+corrTx.numero+(corrTx.date?(' del '+fmtDate(corrTx.date)):'')) : '';
   var nomeClienteRicevuta = (corrTx && corrTx.clienteNome) ? corrTx.clienteNome : b.guestName;
   var serviziAggiuntiviHTML = (corrTx && corrTx.serviziCustom && corrTx.serviziCustom.length)
-    ? corrTx.serviziCustom.map(function(v){ return '<div class="row"><span>'+(v.desc||'Servizio')+'</span><span>'+(cfg.currency||'€')+' '+parseFloat(v.importo||0).toFixed(2)+'</span></div>'; }).join('')
+    ? corrTx.serviziCustom.map(function(v){ return '<div class="row"><span>'+(v.desc||'Servizio')+'</span><span>'+fmtCurrency(parseFloat(v.importo||0))+'</span></div>'; }).join('')
     : '';
   var indirizzoRiga = [cfg.address, [cfg.city, cfg.provincia?('('+cfg.provincia+')'):''].filter(Boolean).join(' ')].filter(Boolean).join(' — ');
   var contattiRiga = [cfg.telefono?('Tel. '+cfg.telefono):'', cfg.email?('Email '+cfg.email):''].filter(Boolean).join(' — ');
@@ -29512,18 +29526,18 @@ function costruisciContoHTML(bid) {
     '<div class="row"><span>Check-out</span><span>'+fmtDate(b.checkout)+'</span></div>' +
     '<div class="row"><span>Notti</span><span>'+n+'</span></div>' +
     '<div class="row"><span>Persone</span><span>'+(b.adults||1)+' adulti'+(b.children?' + '+b.children+' bambini':'')+'</span></div>' +
-    '<div class="row" style="margin-top:8px"><span>Soggiorno</span><span>'+(cfg.currency||'€')+' '+parseFloat(b.totalPrice||0).toFixed(2)+'</span></div>' +
-    (extrasTotal>0 ? (b.extras||[]).map(function(ex){return '<div class="row"><span>Extra — '+ex.nome+' ×'+ex.qty+'</span><span>'+(cfg.currency||'€')+' '+parseFloat(ex.totale||0).toFixed(2)+'</span></div>';}).join('') : '<div class="row"><span>Extra</span><span>'+(cfg.currency||'€')+' 0.00</span></div>') +
+    '<div class="row" style="margin-top:8px"><span>Soggiorno</span><span>'+fmtCurrency(parseFloat(b.totalPrice||0))+'</span></div>' +
+    (extrasTotal>0 ? (b.extras||[]).map(function(ex){return '<div class="row"><span>Extra — '+ex.nome+' ×'+ex.qty+'</span><span>'+fmtCurrency(parseFloat(ex.totale||0))+'</span></div>';}).join('') : '<div class="row"><span>Extra</span><span>'+(cfg.currency||'€')+' 0.00</span></div>') +
     serviziAggiuntiviHTML +
-    '<div class="row"><span>Tassa di soggiorno</span><span>'+(cfg.currency||'€')+' '+tax.toFixed(2)+'</span></div>' +
+    '<div class="row"><span>Tassa di soggiorno</span><span>'+fmtCurrency(tax)+'</span></div>' +
     (tax > 0 ? '<div class="sub">'+taxDetail+' × '+taxInfo.n+' nott'+(taxInfo.n===1?'e':'i')+(taxInfo.maxNights>0 && taxInfo.nReali>taxInfo.maxNights ? ' (tetto massimo di '+taxInfo.maxNights+' notti applicato)' : '')+'</div>' : '') +
-    '<div class="row total" style="margin-top:5px;font-size:15px"><span>TOTALE DOVUTO</span><span>'+(cfg.currency||'€')+' '+totaleDovuto.toFixed(2)+'</span></div>' +
-    '<div class="row"><span>Caparra</span><span>'+(cfg.currency||'€')+' '+parseFloat(b.caparra||0).toFixed(2)+'</span></div>' +
-    (pagatoConPagamenti>0 ? '<div class="row"><span>Pagato ora</span><span>'+(cfg.currency||'€')+' '+pagatoConPagamenti.toFixed(2)+'</span></div>' : '') +
-    (daPagare>0.001 ? '<div class="row" style="font-weight:800;color:#b5482f"><span>RIMANENZA DA PAGARE</span><span>'+(cfg.currency||'€')+' '+daPagare.toFixed(2)+'</span></div>' : '<div class="row" style="font-weight:700;color:var(--green,#1a7a3c)"><span>✓ Pagato</span><span>'+(cfg.currency||'€')+' '+totaleDovuto.toFixed(2)+'</span></div>') +
+    '<div class="row total" style="margin-top:5px;font-size:15px"><span>TOTALE DOVUTO</span><span>'+fmtCurrency(totaleDovuto)+'</span></div>' +
+    '<div class="row"><span>Caparra</span><span>'+fmtCurrency(parseFloat(b.caparra||0))+'</span></div>' +
+    (pagatoConPagamenti>0 ? '<div class="row"><span>Pagato ora</span><span>'+fmtCurrency(pagatoConPagamenti)+'</span></div>' : '') +
+    (daPagare>0.001 ? '<div class="row" style="font-weight:800;color:#b5482f"><span>RIMANENZA DA PAGARE</span><span>'+fmtCurrency(daPagare)+'</span></div>' : '<div class="row" style="font-weight:700;color:var(--green,#1a7a3c)"><span>✓ Pagato</span><span>'+fmtCurrency(totaleDovuto)+'</span></div>') +
     '<div class="doc-title" style="font-size:11px;margin:10px 0 2px;letter-spacing:.5px">PAGAMENTO</div>' +
     ((b.pagamenti && b.pagamenti.length)
-      ? b.pagamenti.map(function(p){return '<div class="row" style="border-bottom:none"><span>'+p.metodo+'</span><span>'+(cfg.currency||'€')+' '+parseFloat(p.importo||0).toFixed(2)+'</span></div>';}).join('')
+      ? b.pagamenti.map(function(p){return '<div class="row" style="border-bottom:none"><span>'+p.metodo+'</span><span>'+fmtCurrency(parseFloat(p.importo||0))+'</span></div>';}).join('')
       : '<div class="row" style="border-bottom:none;margin-top:4px"><span>Modalità di pagamento</span><span>'+(b.metodoPagamento||'—')+'</span></div>');
   return {contoHTML: contoHTML, cfg: cfg, corrTx: corrTx, b: b, numeroDocRiga: numeroDocRiga};
 }
