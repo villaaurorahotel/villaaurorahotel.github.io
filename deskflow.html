@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 30/08/2026 · 05:42</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 30/08/2026 · 06:32</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -12722,14 +12722,17 @@ function renderRiepilogoPrevRooms() {
     box.innerHTML =
       '<div style="border:1px solid var(--border2);border-radius:8px;padding:10px;background:var(--surface2)">'+
       sel.map(function(r){
-        return '<div style="padding:5px 4px">'+
-          '<div style="display:flex;justify-content:space-between;align-items:center">'+
-          '<span style="font-size:12.5px"><strong>'+(r.qty>1?r.qty+'× ':'')+r.type+'</strong>'+(r.sconto?' <span style="font-size:10px;color:var(--green);font-weight:700">(-'+r.sconto+'%)</span>':'')+'</span>'+
-          '<span style="display:flex;align-items:center;gap:10px">'+
-          '<strong style="font-size:13px;color:var(--accent)">'+fmtCurrency(r.total)+'</strong>'+
+        return '<div style="padding:6px 4px">'+
+          '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+
+          '<div>'+
+            '<span style="font-size:13px"><strong>'+(r.qty>1?r.qty+'× ':'')+r.type+'</strong>'+(r.sconto?' <span style="font-size:10px;color:var(--green);font-weight:700">(-'+r.sconto+'%)</span>':'')+'</span>'+
+            '<div style="font-size:12.5px;color:var(--text2);font-weight:600;margin-top:2px">'+(r.qty||1)+' camera'+((r.qty||1)>1?'e':'')+' · '+(r.persone||'?')+' person'+(r.persone===1?'a':'e')+' a camera · allestimento '+(r.allestimento||'—')+'</div>'+
+          '</div>'+
+          '<span style="display:flex;align-items:center;gap:8px;flex-shrink:0">'+
+          '<span style="display:flex;align-items:center;gap:2px"><span style="font-size:13px;color:var(--accent)">€</span>'+
+          '<input type="number" step="1" min="0" value="'+(r.prezzoTotaleManuale!=null?r.prezzoTotaleManuale:Math.round(r.total))+'" onchange="modificaPrezzoPrevTipo(\''+encodeURIComponent(r.type)+'\',this.value)" style="width:74px;padding:3px 5px;border:.5px solid var(--border2);border-radius:5px;font-size:13px;font-weight:700;color:var(--accent)"></span>'+
           '<button type="button" class="btn btn-sm" style="padding:2px 8px;color:var(--red);border-color:var(--red-bg)" onclick="rimuoviPrevRoom(\''+r.type.replace(/'/g,"\\'")+'\')" title="Togli dalla selezione">✕</button>'+
           '</span></div>'+
-          '<div style="font-size:11px;color:var(--text3);margin-top:1px">'+(r.qty||1)+' camera'+((r.qty||1)>1?'e':'')+' · '+(r.persone||'?')+' person'+(r.persone===1?'a':'e')+' a camera · allestimento '+(r.allestimento||'—')+'</div>'+
         '</div>';
       }).join('') +
       '<div style="display:flex;justify-content:space-between;padding:8px 4px 2px;font-weight:800;font-size:14px;border-top:1px solid var(--border2);margin-top:4px">'+
