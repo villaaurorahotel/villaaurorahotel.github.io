@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 30/08/2026 · 08:11</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 30/08/2026 · 09:42</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -1089,7 +1089,7 @@ function handleBlobRealtimeChange(payload) {
   if (payload.eventType === 'DELETE') { delete _blobsCache[key]; }
   else { _blobsCache[key] = payload.new.data; }
   if (key === 'settings') {
-    var lbl = document.getElementById('property-name-label');
+    var lbl = document.getElementById('prop-name');
     if (lbl && _blobsCache.settings) lbl.textContent = _blobsCache.settings.propertyName || 'La tua struttura';
   }
   if (isSupabaseSyncing()) return;
@@ -1924,7 +1924,7 @@ async function refreshDatiCorrenti() {
       }
       await Promise.all(jobs);
       invalidateGuestDatalistCache();
-      var lbl = document.getElementById('property-name-label');
+      var lbl = document.getElementById('prop-name');
       if (lbl && _blobsCache.settings) lbl.textContent = _blobsCache.settings.propertyName || 'La tua struttura';
       showToast('✅ Dati aggiornati');
     } catch (err) {
@@ -27647,7 +27647,7 @@ function saveImpostazioni() {
   s.stuUser       = document.getElementById('s-stuUser')?.value || '';
   s.stuPass       = document.getElementById('s-stuPass')?.value || '';
   DB.setObj('settings', s);
-  var propLbl = document.getElementById('property-name-label');
+  var propLbl = document.getElementById('prop-name');
   if (propLbl) propLbl.textContent = s.propertyName || 'La tua struttura';
   if (s.supabaseUrl && s.supabaseKey && !supabaseReady) {
     showToast('Impostazioni salvate — ricarica la pagina per attivare la connessione a Supabase');
@@ -29655,6 +29655,9 @@ async function corrLoadData(){
   if(!corrState.uscite) corrState.uscite = [];
   if(!corrState.chiusure) corrState.chiusure = {};
   if(!corrState.log) corrState.log = [];
+  // Il nome struttura non si rinomina più qui: viene sempre preso dal vero nome impostato in
+  // Impostazioni → Struttura, così i due posti non possono più disallinearsi.
+  corrState.hotelName = DB.getObj('settings', {}).propertyName || 'La tua struttura';
 }
 
 let corrLastSaveError = '';
@@ -29767,12 +29770,10 @@ function corrRenderTopbar(){
     <div class="brand-row">
       <div>
         <span class="thin">Registro corrispettivi</span>
-        <h1 class="brand-name">${corrEscapeHtml(corrState.hotelName)} <button id="quickRename" title="Cambia nome struttura" style="background:none;border:none;color:rgba(255,255,255,.85);font-size:14px;cursor:pointer;vertical-align:middle;font-family:inherit;text-decoration:underline;">rinomina</button></h1>
+        <h1 class="brand-name">${corrEscapeHtml(corrState.hotelName)}</h1>
       </div>
       <div style="display:flex;gap:10px;align-items:center;">
         <span class="status-pill" id="statusPill">${corrRenderStatusText()}</span>
-        <button class="btn ghost small" id="saveNowBtn" style="background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.35)">${corrIsSaving? 'Salvataggio...' : 'Salva ora'}</button>
-        <button class="btn ghost small" id="refreshBtn" style="background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.35)">Aggiorna</button>
       </div>
     </div>
     <nav class="tabs">
@@ -30844,7 +30845,7 @@ function corrRenderImpostazioniTab(){
     <div class="grid" style="grid-template-columns:1fr 1fr;max-width:600px;">
       <div>
         <label>Nome struttura</label>
-        <input type="text" id="setHotelName" value="${corrEscapeHtml(corrState.hotelName)}">
+        <div style="padding:8px 0;color:var(--muted,#666)">${corrEscapeHtml(corrState.hotelName)} <span style="font-size:11px">(preso da Impostazioni → Struttura, non modificabile qui)</span></div>
       </div>
       <div>
         <label>Fondo cassa di partenza (se non ci sono chiusure precedenti)</label>
@@ -30892,23 +30893,6 @@ function corrAttachHandlers(){
   document.querySelectorAll('nav.tabs button').forEach(b=>{
     b.onclick = ()=>{ corrTab=b.dataset.corrTab; corrEditingId=null; corrRender(); };
   });
-  const refreshBtn = document.getElementById('refreshBtn');
-  if(refreshBtn) refreshBtn.onclick = async ()=>{
-    if(corrIsDirty && !confirm('Ci sono modifiche non ancora salvate. Aggiornando perderesti quelle modifiche. Continuare comunque?')) return;
-    corrStatusMsg='aggiornamento...'; corrRender();
-    await corrLoadData();
-    corrStatusMsg='dati aggiornati'; corrIsDirty=false; corrRender();
-  };
-  const renameBtn = document.getElementById('quickRename');
-  if(renameBtn) renameBtn.onclick = async ()=>{
-    const newName = prompt('Nome della struttura:', corrState.hotelName);
-    if(newName && newName.trim()){
-      corrState.hotelName = newName.trim();
-      await corrPersist('nome aggiornato');
-    }
-  };
-  const saveNowBtn = document.getElementById('saveNowBtn');
-  if(saveNowBtn) saveNowBtn.onclick = ()=> corrPersist('salvato');
 
   if(corrTab==='nuovo') corrAttachNuovoHandlers();
   if(corrTab==='registro') corrAttachRegistroHandlers();
@@ -31096,7 +31080,6 @@ function corrAttachChiusuraHandlers(){
 
 function corrAttachImpostazioniHandlers(){
   document.getElementById('saveSettings').onclick = async ()=>{
-    corrState.hotelName = document.getElementById('setHotelName').value || 'Hotel';
     corrState.fondoCassaIniziale = Number(document.getElementById('setFondo').value)||0;
     await corrPersist('impostazioni salvate');
   };
