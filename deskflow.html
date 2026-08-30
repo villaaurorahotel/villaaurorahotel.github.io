@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 30/08/2026 · 06:45</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 30/08/2026 · 08:11</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -12802,21 +12802,28 @@ function savePreventivo() {
   renderPreventivi();
 }
 
-// Segna quale tipologia, tra quelle proposte nel preventivo, è quella scelta (dal cliente via telefono/email/
-// whatsapp o dalla pagina pubblica di scelta) — la camera specifica verrà assegnata solo alla conferma
-function sceltaCameraPreventivo(quoteId, tipo) {
+// Segna quale/i tipologia/e, tra quelle proposte nel preventivo, sono quelle da confermare —
+// più di una selezionata insieme copre il caso di una famiglia/gruppo con tipologie diverse: alla
+// conferma verranno create tutte le camere spuntate, raggruppate insieme (vedi convertiPreventivo).
+function toggleSelezioneCameraPreventivo(quoteId, tipo) {
   const quotes = DB.get('quotes');
   const qi = quotes.findIndex(x=>x.id===quoteId);
   if (qi<0) return;
   const opt = (quotes[qi].roomOptions||[]).find(o=>o.type===tipo);
   if (!opt) return;
+  const eraSelezionata = opt.selezionata !== false;
+  opt.selezionata = !eraSelezionata;
+  // Ricalcola totale e ospiti in automatico in base alle camere ora spuntate (l'utente può comunque
+  // correggerli a mano subito dopo — vedi campi qc-prezzo/qc-ospiti)
+  const selezionate = (quotes[qi].roomOptions||[]).filter(o=>o.selezionata!==false);
+  quotes[qi].totalPrice = selezionate.reduce((s,o)=>s+(Number(o.total)||0),0);
+  quotes[qi].adults = selezionate.reduce((s,o)=>s+(Number(o.persone)||0),0) || quotes[qi].adults;
+  if (selezionate.length) {
+    quotes[qi].roomType = selezionate[0].type;
+    quotes[qi].tariffaId = selezionate[0].tariffaId||'standard';
+  }
   quotes[qi].roomId = '';
-  quotes[qi].roomName = opt.type||'';
-  quotes[qi].roomType = opt.type||'';
-  quotes[qi].tariffaId = opt.tariffaId||'standard';
-  quotes[qi].totalPrice = opt.total||0;
   DB.set('quotes', quotes);
-  showToast('Tipologia scelta aggiornata: '+opt.type);
   vediPreventivo(quoteId);
 }
 
@@ -12865,7 +12872,6 @@ function vediPreventivo(id) {
       +(linkedGuest ? '🔗 Collegato all\'anagrafica: '+linkedGuest.name : 'Non ancora collegato a un ospite in anagrafica — verrà cercato per nome alla conferma.')
     +'</div>'
     +'<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">'
-      +'<button type="button" class="btn btn-sm" onclick="aggiornaClientePreventivo(\''+id+'\')">💾 Salva modifiche</button>'
       +'<button type="button" class="btn btn-sm" onclick="salvaClientePreventivoInAnagrafica(\''+id+'\')">📇 Salva anche in anagrafica</button>'
       +'<button type="button" class="btn btn-sm" onclick="apriStoricoMessaggiPreventivo(\''+id+'\')">💬 Messaggi'+(q.comunicazioni&&q.comunicazioni.length?' ('+q.comunicazioni.length+')':'')+'</button>'
     +'</div>'
@@ -12886,33 +12892,35 @@ function vediPreventivo(id) {
       ? '<div style="margin-bottom:12px">'
         +(q.clientChosenAt
             ? '<div style="font-size:11.5px;color:var(--green);margin-bottom:6px">✅ Il cliente ha scelto direttamente dal link il '+fmtDate(q.clientChosenAt.slice(0,10))+' — puoi comunque cambiarla qui sotto se serve</div>'
-            : '<div style="font-size:11.5px;color:var(--text2);margin-bottom:6px">Tipologie proposte al cliente — segna quale ha scelto (di default risulta la prima)</div>')
+            : '<div style="font-size:11.5px;color:var(--text2);margin-bottom:6px">Tipologie proposte al cliente — spunta una o più camere da confermare insieme (es. una famiglia con 2 tipologie diverse)</div>')
         +q.roomOptions.map(function(o){
-          const isChosen = o.type === q.roomType;
+          const isChosen = o.selezionata !== false; // di default tutte selezionate (compatibile con i preventivi già esistenti)
           return '<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:1.5px solid '+(isChosen?'var(--accent)':'var(--border)')+';border-radius:7px;margin-bottom:5px;cursor:pointer;background:'+(isChosen?'var(--accent-light)':'')+'">'
-            +'<input type="radio" name="qc-room-opt" style="width:auto" '+(isChosen?'checked':'')+' onchange="sceltaCameraPreventivo(\''+id+'\',\''+o.type.replace(/'/g,"\\'")+'\')">'
-            +'<span style="flex:1;font-size:12.5px"><strong>'+o.type+'</strong></span>'
+            +'<input type="checkbox" style="width:auto" '+(isChosen?'checked':'')+' onchange="toggleSelezioneCameraPreventivo(\''+id+'\',\''+o.type.replace(/'/g,"\\'")+'\')">'
+            +'<span style="flex:1;font-size:12.5px"><strong>'+o.type+'</strong> <span style="color:var(--text3);font-weight:400">· '+(o.persone||'?')+' pers. × '+(o.qty||1)+'</span></span>'
             +'<strong style="font-size:13px">'+fmtCurrency(o.total)+'</strong>'
             +'</label>';
         }).join('')
+        +'<div style="font-size:11px;color:var(--text3);margin-top:4px">Le camere spuntate sono quelle che verranno prenotate insieme alla conferma — il Totale e gli Ospiti qui sotto si aggiornano di conseguenza (puoi comunque correggerli a mano).</div>'
         +'</div>'
       : '')
     +'<table style="width:100%;font-size:13px;border-collapse:collapse">'
-    +'<tr><td style="padding:7px 0;color:var(--text2);width:40%">Tipologia'+(q.roomOptions&&q.roomOptions.length>1?' (scelta)':'')+'</td><td>'+(q.roomType||'—')+'</td></tr>'
+    +'<tr><td style="padding:7px 0;color:var(--text2);width:40%">Tipologia'+(q.roomOptions&&q.roomOptions.length>1?' (scelta)':'')+'</td><td>'+(q.roomOptions&&q.roomOptions.length>1?q.roomOptions.filter(function(o){return o.selezionata!==false;}).map(function(o){return o.type;}).join(', ')||'—':(q.roomType||'—'))+'</td></tr>'
     +'<tr><td style="padding:7px 0;color:var(--text2)">Camera assegnata</td><td>'+(q.roomId ? q.roomName : '<span style="color:var(--text3)">— sarà assegnata alla conferma, in base alla prima libera</span>')+'</td></tr>'
     +'<tr><td style="padding:7px 0;color:var(--text2)">Tariffa</td><td>'+getTariffaNome(q.tariffaId)+'</td></tr>'
     +'<tr><td style="padding:7px 0;color:var(--text2)">Check-in</td><td><input type="date" id="qc-checkin" value="'+q.checkin+'" onchange="document.getElementById(\'qc-notti-live\').textContent=nights(this.value,document.getElementById(\'qc-checkout\').value)" style="padding:5px 8px;border:.5px solid var(--border2);border-radius:6px;font-size:13px"></td></tr>'
     +'<tr><td style="padding:7px 0;color:var(--text2)">Check-out</td><td><input type="date" id="qc-checkout" value="'+q.checkout+'" onchange="document.getElementById(\'qc-notti-live\').textContent=nights(document.getElementById(\'qc-checkin\').value,this.value)" style="padding:5px 8px;border:.5px solid var(--border2);border-radius:6px;font-size:13px"></td></tr>'
     +'<tr><td style="padding:7px 0;color:var(--text2)">Notti</td><td id="qc-notti-live">'+n+'</td></tr>'
-    +'<tr><td style="padding:7px 0;color:var(--text2)">Ospiti</td><td>'+q.adults+' adulti'+(q.children>0?', '+q.children+' bambini':'')+'</td></tr>'
-    +'<tr><td style="padding:7px 0;color:var(--text2)">Totale</td><td><input type="number" id="qc-prezzo" value="'+Number(q.totalPrice||0)+'" step="0.01" style="width:120px;padding:5px 8px;border:.5px solid var(--border2);border-radius:6px;font-weight:700;font-size:13px"></td></tr>'
+    +'<tr><td style="padding:7px 0;color:var(--text2)">Ospiti (totale persone)</td><td><input type="number" id="qc-ospiti" min="1" value="'+Number(q.adults||1)+'" step="1" style="width:80px;padding:5px 8px;border:.5px solid var(--border2);border-radius:6px;font-size:13px"> adulti'+(q.children>0?' <span style="color:var(--text3)">+ '+q.children+' bambini</span>':'')+'</td></tr>'
+    +'<tr><td style="padding:7px 0;color:var(--text2)">Totale'+(q.roomOptions&&q.roomOptions.length>1?' complessivo':'')+'</td><td><input type="number" id="qc-prezzo" value="'+Number(q.totalPrice||0)+'" step="0.01" style="width:120px;padding:5px 8px;border:.5px solid var(--border2);border-radius:6px;font-weight:700;font-size:13px"></td></tr>'
     +'<tr><td style="padding:7px 0;color:var(--text2)">Colazione inclusa</td><td><input type="checkbox" id="qc-colazione" '+(q.colazioneInclusa!==false?'checked':'')+' style="width:auto"></td></tr>'
     +'<tr><td style="padding:7px 0;color:var(--text2)">Valido fino al</td><td><input type="date" id="qc-scadenza" value="'+(q.expiry||'')+'" style="padding:5px 8px;border:.5px solid var(--border2);border-radius:6px;font-size:13px"></td></tr>'
     +'<tr><td style="padding:7px 0;color:var(--text2);vertical-align:top">Note</td><td><textarea id="qc-note" rows="2" style="width:100%;padding:5px 8px;border:.5px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;box-sizing:border-box">'+(q.notes||'')+'</textarea></td></tr>'
     +'<tr><td style="padding:7px 0;color:var(--text2)">Disponibilità</td><td>'+dispoLabel+'</td></tr>'
     +'</table>',
     '<button class="btn" onclick="closeModal()">Chiudi</button>'
-    +'<button class="btn btn-primary" onclick="closeModal();inviaPreventivo(\''+id+'\')">📤 Invia email</button>'
+    +'<button class="btn btn-primary" onclick="aggiornaClientePreventivo(\''+id+'\')">💾 Salva modifiche</button>'
+    +'<button class="btn" onclick="closeModal();inviaPreventivo(\''+id+'\')">📤 Invia email</button>'
     +(nonDisponibile?'':'<button class="btn" style="background:var(--amber-bg);color:var(--amber)" onclick="closeModal();metteInOpzionePreventivo(\''+id+'\')">📌 Metti in opzione</button>')
     +'<button class="btn" style="background:var(--green-bg);color:var(--green)" onclick="closeModal();convertiPreventivo(\''+id+'\')">✓ Converti</button>'
   );
@@ -12946,16 +12954,19 @@ function aggiornaClientePreventivo(quoteId) {
   if (duplicato) { showToast('Il numero '+nuovoNum+' è già usato dal preventivo di '+duplicato.clientName+' — scegline un altro'); return; }
   quotes[qi].num = nuovoNum;
 
-  // Prezzo totale — modificabile a mano; se il preventivo ha più tipologie proposte,
-  // aggiorna anche l'importo della tipologia attualmente scelta tra le opzioni
+  // Prezzo totale — modificabile a mano; se il preventivo ha più tipologie proposte, aggiorna
+  // anche l'importo della tipologia scelta (se una sola) o resta un override del totale complessivo
+  // (se più di una è selezionata insieme — vedi toggleSelezioneCameraPreventivo)
   const nuovoPrezzo = parseFloat(document.getElementById('qc-prezzo')?.value);
   if (!isNaN(nuovoPrezzo) && nuovoPrezzo >= 0) {
     quotes[qi].totalPrice = nuovoPrezzo;
-    if (quotes[qi].roomOptions && quotes[qi].roomOptions.length) {
-      const opt = quotes[qi].roomOptions.find(o => o.type === quotes[qi].roomType);
-      if (opt) opt.total = nuovoPrezzo;
-    }
+    const selezionate = (quotes[qi].roomOptions||[]).filter(o=>o.selezionata!==false);
+    if (selezionate.length === 1) selezionate[0].total = nuovoPrezzo;
   }
+
+  // Ospiti (totale persone) — modificabile a mano
+  const nuoviOspiti = parseInt(document.getElementById('qc-ospiti')?.value, 10);
+  if (!isNaN(nuoviOspiti) && nuoviOspiti >= 1) quotes[qi].adults = nuoviOspiti;
 
   // Date del soggiorno — modificabili come il prezzo; validiamo che il check-out sia dopo il check-in
   const nuovoCheckin = document.getElementById('qc-checkin')?.value;
@@ -13434,7 +13445,7 @@ function convertiPreventivo(id) {
   // della conferma, le prime camere libere di ciascuna tipologia richiesta, nella quantità scelta —
   // così teniamo conto delle prenotazioni arrivate nel frattempo dopo l'invio del preventivo.
   // Se il preventivo ha più periodi di date, ripetiamo la ricerca per ciascun periodo separatamente.
-  const periodiConv = (q.periodi && q.periodi.length) ? q.periodi : [{checkin:q.checkin, checkout:q.checkout, roomOptions: (q.roomOptions && q.roomOptions.length) ? q.roomOptions : (q.roomType ? [{type:q.roomType, tariffaId:q.tariffaId||'standard', qty:1, ppn:0, total:q.totalPrice}] : [])}];
+  const periodiConv = (q.periodi && q.periodi.length) ? q.periodi.map(function(p){ return { checkin:p.checkin, checkout:p.checkout, roomOptions:(p.roomOptions||[]).filter(function(o){return o.selezionata!==false;}) }; }) : [{checkin:q.checkin, checkout:q.checkout, roomOptions: (q.roomOptions && q.roomOptions.length) ? q.roomOptions.filter(function(o){return o.selezionata!==false;}) : (q.roomType ? [{type:q.roomType, tariffaId:q.tariffaId||'standard', qty:1, ppn:0, total:q.totalPrice}] : [])}];
   if (!periodiConv.some(function(p){return p.roomOptions.length;})) { showToast('Nessuna tipologia indicata sul preventivo'); return; }
 
   const tuttiRooms = DB.get('rooms');
