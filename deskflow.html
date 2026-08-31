@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 30/08/2026 · 17:56</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 31/08/2026 · 05:40</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -28682,10 +28682,14 @@ const SCHEDA_PRENOTAZIONE_CSS = '<style>' +
 // Stessa impaginazione del conto, ma dimensionata a metà tra A5 e A4 (~176mm di larghezza, formato
 // B5) — più compatta di un foglio A4 pieno ma più leggibile di un A5, mentre in stampa continua a
 // usare la carta A4 normale già caricata nella stampante (il contenuto viene centrato sul foglio).
+// NOTA: il body resta un normale blocco (non flex) apposta — con più schede stampate insieme
+// (stampaTutteSchedePrenotazioni), i vari <div class="page-break"> tra una scheda e l'altra devono
+// restare fratelli di blocco in sequenza perché "page-break-after" funzioni; dentro un body flex
+// diventerebbero elementi flessibili e le schede finivano affiancate invece che una per pagina.
 const SCHEDA_PRENOTAZIONE_CSS_A5 = SCHEDA_PRENOTAZIONE_CSS.replace('</style>',
   '@page{size:A4;margin:10mm}' +
-  'body{padding:0;display:flex;justify-content:center;align-items:flex-start;font-size:13px}' +
-  '.sheet{width:176mm;max-width:176mm;padding:12mm;box-sizing:border-box;border:.5px dashed #ccc}' +
+  'body{padding:0;font-size:13px}' +
+  '.sheet{width:176mm;max-width:176mm;padding:12mm;box-sizing:border-box;border:.5px dashed #ccc;margin:0 auto}' +
   '@media print{.sheet{border:none}}' +
   'h1{font-size:18px}.doc-title{font-size:14px}.room-box{font-size:27px;padding:9px 12px}.guest-box{font-size:22px}' +
   '</style>');
