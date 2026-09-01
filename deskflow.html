@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 01/09/2026 · 11:05</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 01/09/2026 · 12:26</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -24440,7 +24440,68 @@ function livApplicaAlListino(id) {
   });
   DB.set('listino', lst);
   lstPropagaDaStandard(standardRooms[0].id, 'PAX2', l.base, {dal:lstSelFrom, al:lstSelTo});
+  livSegnaGiorni(lstSelFrom, lstSelTo, id);
   showToast('Livello '+l.nome+' applicato al periodo '+fmtDate(lstSelFrom)+' → '+fmtDate(lstSelTo)+' — vai sul Listino per vederlo');
+}
+
+// ── Mappa data → livello applicato, e cambio livello direttamente dalla griglia del Listino ──
+function livGetMappaGiorni() { return DB.get('listinoLivelli') || []; }
+function livGiornoDi(ds) {
+  var e = livGetMappaGiorni().find(function(x){ return x.data===ds; });
+  return e ? e.livelloId : '';
+}
+function livNomeById(id) {
+  if (!id) return '';
+  var l = livGetLivelli().find(function(x){return x.id===id;});
+  return l ? l.nome : '';
+}
+// Segna nella mappa quale livello è attivo per ogni giorno da dal ad al (o lo toglie se livelloId è vuoto)
+function livSegnaGiorni(dal, al, livelloId) {
+  var mappa = livGetMappaGiorni();
+  var d = dal, guard = 0;
+  while (d <= al && guard < 400) {
+    var idx = mappa.findIndex(function(x){ return x.data===d; });
+    if (!livelloId) { if (idx>=0) mappa.splice(idx,1); }
+    else if (idx>=0) mappa[idx].livelloId = livelloId;
+    else mappa.push({data:d, livelloId:livelloId});
+    d = addDays(d,1); guard++;
+  }
+  DB.set('listinoLivelli', mappa);
+}
+// Cambia il livello direttamente dal menu a tendina nel Listino — se il giorno cliccato fa parte del
+// periodo attualmente selezionato (Da → A), si applica a TUTTO il periodo, altrimenti solo a quel
+// singolo giorno (stessa convenzione già usata per le celle prezzo del Listino).
+function livCambiaGiorno(ds, livelloId) {
+  var targetDal = ds, targetAl = ds;
+  if (lstSelFrom && lstSelTo && ds>=lstSelFrom && ds<=lstSelTo) { targetDal = lstSelFrom; targetAl = lstSelTo; }
+  livSegnaGiorni(targetDal, targetAl, livelloId);
+  if (livelloId) {
+    var l = livGetLivelli().find(function(x){return x.id===livelloId;});
+    if (l) {
+      var rooms = DB.get('rooms') || [];
+      var info = lstCalcolaRiferimentiCelle(rooms);
+      var standardRooms = rooms.filter(function(r){ return normCatType(r.type)===info.masterType; });
+      if (standardRooms.length) {
+        var grigliaCompleta = livRisolviGrigliaCompleta(l.base);
+        var maxCapMaster = lstMaxCapOf(info.masterType, rooms);
+        var lst = DB.get('listino') || [];
+        standardRooms.forEach(function(room){
+          var e = lst.find(function(x){ return x.roomId===room.id && (x.tariffaId||'standard')===lstTariffaId; });
+          if (!e) { e = {roomId:room.id, tariffaId:lstTariffaId, prezzi:{}, periodi:[]}; lst.push(e); }
+          if (!e.periodi) e.periodi = [];
+          var p = e.periodi.find(function(pp){ return pp.dal===targetDal && pp.al===targetAl; });
+          if (!p) { p = {dal:targetDal, al:targetAl, prezzi:{}}; e.periodi.push(p); }
+          for (var pax=1; pax<=maxCapMaster; pax++) {
+            var pk='PAX'+pax, v=grigliaCompleta.valore[info.masterType+'|'+pk];
+            if (v!=null) p.prezzi[pk] = v;
+          }
+        });
+        DB.set('listino', lst);
+        lstPropagaDaStandard(standardRooms[0].id, 'PAX2', l.base, {dal:targetDal, al:targetAl});
+      }
+    }
+  }
+  renderListino();
 }
 
 // Pasqua col metodo di Gauss (calendario gregoriano) — serve per calcolare Carnevale, Pasquetta ecc.,
@@ -24592,11 +24653,13 @@ function renderListino() {
   var mTH=mspans.map(function(s){return '<th colspan="'+s.s+'" style="min-width:'+s.s*COL+'px;padding:8px 6px;text-align:center;font-size:16px;font-weight:700;color:var(--text1);background:var(--surface2);border-left:.5px solid var(--border2);border-bottom:.5px solid var(--border)">'+s.l+'</th>';}).join('');
   var dTH=allDays.map(function(d){var ds=fmt(d),iT=ds===tod,iW=d.getDay()===0||d.getDay()===6,iS=lstSelFrom&&lstSelTo&&ds>=lstSelFrom&&ds<=lstSelTo;return '<th style="min-width:'+COL+'px;width:'+COL+'px;padding:3px 1px;text-align:center;font-size:10px;border-left:.5px solid var(--border);background:'+(iS?'#fff3cd':iT?'var(--accent)':iW?'var(--accent-light)':'var(--surface2)')+';color:'+(iS?'#856404':iT?'#fff':iW?'var(--accent)':'var(--text2)')+';font-weight:'+(iW||iT?'700':'400')+'"><div style="font-size:13px;font-weight:600">'+d.getDate()+'</div><div style="font-size:9px;opacity:.7">'+dow[d.getDay()]+'</div></th>';}).join('');
   var aTH=allDays.map(function(d){
-    var ds=fmt(d), agg=aggGiornoDi(ds), v=agg?agg.valore:'';
+    var ds=fmt(d), livId=livGiornoDi(ds), livelliList=livGetLivelli();
+    var opzioni='<option value="">—</option>'+livelliList.map(function(l){
+      return '<option value="'+l.id+'"'+(l.id===livId?' selected':'')+'>'+l.nome+'</option>';
+    }).join('');
     return '<th style="min-width:'+COL+'px;width:'+COL+'px;padding:3px 2px;text-align:center;border-left:.5px solid var(--border);background:var(--surface2)">'+
-      '<input type="number" value="'+v+'" placeholder="±%" title="Aumenta o diminuisci tutte le tariffe di questo giorno di una percentuale — es. -10 per uno sconto del 10%, 15 per un aumento del 15%. Lascia vuoto per nessuna variazione." '+
-      'style="width:'+(COL-14)+'px;text-align:center;padding:2px 1px;font-size:11px;border:.5px solid var(--border2);border-radius:4px;background:var(--surface)" '+
-      'onchange="applyAggiustamentoGiorno(\''+ds+'\', this.value)"></th>';
+      '<select onchange="livCambiaGiorno(\''+ds+'\', this.value)" title="Livello tariffario per questo giorno — se hai selezionato un periodo (Da → A), si applica a tutto il periodo" '+
+      'style="width:'+(COL-10)+'px;text-align:center;padding:2px 1px;font-size:10px;border:.5px solid var(--border2);border-radius:4px;background:var(--surface);font-weight:'+(livId?'700':'400')+';color:'+(livId?'var(--accent)':'var(--text3)')+'">'+opzioni+'</select></th>';
   }).join('');
   var body='';
   var currentCat=null;
@@ -24634,6 +24697,15 @@ function renderListino() {
         periodBtn+'</div>'+
         '<div style="font-size:8px;color:var(--accent);font-weight:700;margin-top:2px;text-transform:uppercase">min.n. / chiusura ↴</div>'+
         '</div></td>'+catCells+'</tr>';
+
+      // Riga livello (sola lettura, uguale per tutte le tipologie — il livello si sceglie dal menu
+      // in alto sotto la data, qui è solo un riferimento veloce mentre guardi questa tipologia)
+      var livCells=allDays.map(function(d){
+        var ds=fmt(d), livNome=livNomeById(livGiornoDi(ds));
+        return '<td style="padding:2px 1px;border-left:.5px solid var(--border);border-bottom:1px solid var(--border2);background:var(--surface2);text-align:center">'+
+          '<span style="font-size:10px;font-weight:700;color:'+(livNome?'var(--accent)':'var(--text3)')+'">'+(livNome||'—')+'</span></td>';
+      }).join('');
+      body+='<tr><td colspan="2" style="padding:2px 8px;background:var(--surface2);border-bottom:1px solid var(--border2);position:sticky;left:0;z-index:3;border-right:1px solid var(--border2);font-size:8px;color:var(--text3);text-transform:uppercase">🎚 Livello ↴</td>'+livCells+'</tr>';
 
       // Riga occupazione % per questa tipologia, giorno per giorno — influenza il prezzo tramite le
       // soglie di occupazione impostate sopra (stessa logica di "Prezzo consigliato")
@@ -24847,7 +24919,7 @@ if(lstSelFrom&&lstSelTo){
     '<th style="background:var(--surface2);position:sticky;left:'+CSIDE+'px;z-index:11;border-right:.5px solid var(--border2)"></th>'+mTH+'</tr>'+
     '<tr><th style="min-width:'+CSIDE+'px;background:var(--surface2);position:sticky;left:0;z-index:11;border-right:.5px solid var(--border2)"></th>'+
     '<th style="background:var(--surface2);position:sticky;left:'+CSIDE+'px;z-index:11;border-right:.5px solid var(--border2)"></th>'+dTH+'</tr>'+
-    '<tr><th style="min-width:'+CSIDE+'px;background:var(--surface2);position:sticky;left:0;z-index:11;border-right:.5px solid var(--border2);font-size:10px;color:var(--text3);padding:3px 8px">Variazione ± %</th>'+
+    '<tr><th style="min-width:'+CSIDE+'px;background:var(--surface2);position:sticky;left:0;z-index:11;border-right:.5px solid var(--border2);font-size:10px;color:var(--text3);padding:3px 8px">🎚 Livello</th>'+
     '<th style="background:var(--surface2);position:sticky;left:'+CSIDE+'px;z-index:11;border-right:.5px solid var(--border2)"></th>'+aTH+'</tr></thead><tbody>'+body+'</tbody></table></div>'+
     '<!-- Barra di scorrimento fissa sotto il listino -->'+
     '<div style="background:var(--surface);padding:10px 0;border-top:1px solid var(--border2);z-index:100">'+
