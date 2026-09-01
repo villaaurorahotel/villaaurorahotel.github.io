@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 01/09/2026 · 12:44</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 01/09/2026 · 12:56</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -23282,13 +23282,17 @@ function renderCalendario() {
   // tendina già presente nel Listino prezzi: cambiarlo da qui applica il livello a quel giorno (o a
   // tutto il periodo selezionato nel Listino, se ce n'è uno) esattamente come farebbe da lì.
   {
+    // Letti UNA volta sola qui (non dentro il ciclo dei giorni) — prima venivano riletti dal
+    // database per ognuno dei giorni della vista, rendendo la pagina lenta ad ogni apertura.
+    const livLivelliCacheCal = livGetLivelli();
+    const livMappaIndexCal = {}; livGetMappaGiorni().forEach(function(x){ livMappaIndexCal[x.data] = x.livelloId; });
     const livCellsCal = allDays.map(function(d){
-      var ds = fmt(d), livId = livGiornoDi(ds), livelliList = livGetLivelli();
-      var opzioni = '<option value="">—</option>'+livelliList.map(function(l){
-        return '<option value="'+l.id+'"'+(l.id===livId?' selected':'')+'>'+l.nome+'</option>';
+      var ds = fmt(d), livId = livMappaIndexCal[ds] || '';
+      var opzioni = '<option value="">—</option>'+livLivelliCacheCal.map(function(l){
+        return '<option value="'+l.id+'"'+(l.id===livId?' selected':'')+'>'+l.nome+'-'+Math.round(l.base)+'</option>';
       }).join('');
       return '<td style="padding:2px 1px;text-align:center;background:var(--surface2);border-left:1px solid var(--border);border-bottom:1px solid var(--border2)">'+
-        '<select onchange="livCambiaGiorno(\''+ds+'\', this.value); renderCalendario();" title="Livello tariffario per questo giorno — se hai selezionato un periodo nel Listino, si applica a tutto il periodo" '+
+        '<select onchange="livCambiaGiorno(\''+ds+'\', this.value); setTimeout(renderCalendario, 0);" title="Livello tariffario per questo giorno — se hai selezionato un periodo nel Listino, si applica a tutto il periodo" '+
         'style="width:'+(CELL_W-10)+'px;text-align:center;padding:1px;font-size:10px;border:.5px solid var(--border2);border-radius:4px;background:var(--surface);font-weight:'+(livId?'700':'400')+';color:'+(livId?'var(--accent)':'var(--text3)')+'">'+opzioni+'</select></td>';
     }).join('');
     bodyHTML += '<tr><td style="padding:3px 10px;background:var(--surface2);position:sticky;left:0;z-index:3;border-right:1px solid var(--border2);border-bottom:1px solid var(--border2);font-size:9px;color:var(--text3);text-transform:uppercase;font-weight:700">🎚 Livello</td>'+livCellsCal+'</tr>';
@@ -24516,7 +24520,6 @@ function livCambiaGiorno(ds, livelloId) {
       }
     }
   }
-  renderListino();
 }
 
 // Pasqua col metodo di Gauss (calendario gregoriano) — serve per calcolare Carnevale, Pasquetta ecc.,
@@ -24668,13 +24671,19 @@ function renderListino() {
   if(cmlbl)mspans.push({l:cmlbl,s:cscnt});
   var mTH=mspans.map(function(s){return '<th colspan="'+s.s+'" style="min-width:'+s.s*COL+'px;padding:8px 6px;text-align:center;font-size:16px;font-weight:700;color:var(--text1);background:var(--surface2);border-left:.5px solid var(--border2);border-bottom:.5px solid var(--border)">'+s.l+'</th>';}).join('');
   var dTH=allDays.map(function(d){var ds=fmt(d),iT=ds===tod,iW=d.getDay()===0||d.getDay()===6,iS=lstSelFrom&&lstSelTo&&ds>=lstSelFrom&&ds<=lstSelTo;return '<th style="min-width:'+COL+'px;width:'+COL+'px;padding:3px 1px;text-align:center;font-size:10px;border-left:.5px solid var(--border);background:'+(iS?'#fff3cd':iT?'var(--accent)':iW?'var(--accent-light)':'var(--surface2)')+';color:'+(iS?'#856404':iT?'#fff':iW?'var(--accent)':'var(--text2)')+';font-weight:'+(iW||iT?'700':'400')+'"><div style="font-size:13px;font-weight:600">'+d.getDate()+'</div><div style="font-size:9px;opacity:.7">'+dow[d.getDay()]+'</div></th>';}).join('');
+  // Letti UNA volta sola qui (non dentro il ciclo dei giorni) — prima venivano riletti dal
+  // database per ognuno dei ~60 giorni della vista, rendendo la pagina lenta ad ogni apertura.
+  var livLivelliCache = livGetLivelli();
+  var livMappaIndex = {}; livGetMappaGiorni().forEach(function(x){ livMappaIndex[x.data] = x.livelloId; });
+  function livGiornoVeloce(ds) { return livMappaIndex[ds] || ''; }
+  function livEtichettaConPrezzo(l) { return l ? (l.nome+'-'+Math.round(l.base)) : ''; }
   var aTH=allDays.map(function(d){
-    var ds=fmt(d), livId=livGiornoDi(ds), livelliList=livGetLivelli();
-    var opzioni='<option value="">—</option>'+livelliList.map(function(l){
-      return '<option value="'+l.id+'"'+(l.id===livId?' selected':'')+'>'+l.nome+'</option>';
+    var ds=fmt(d), livId=livGiornoVeloce(ds);
+    var opzioni='<option value="">—</option>'+livLivelliCache.map(function(l){
+      return '<option value="'+l.id+'"'+(l.id===livId?' selected':'')+'>'+livEtichettaConPrezzo(l)+'</option>';
     }).join('');
     return '<th style="min-width:'+COL+'px;width:'+COL+'px;padding:3px 2px;text-align:center;border-left:.5px solid var(--border);background:var(--surface2)">'+
-      '<select onchange="livCambiaGiorno(\''+ds+'\', this.value)" title="Livello tariffario per questo giorno — se hai selezionato un periodo (Da → A), si applica a tutto il periodo" '+
+      '<select onchange="livCambiaGiorno(\''+ds+'\', this.value); setTimeout(renderListino, 0);" title="Livello tariffario per questo giorno — se hai selezionato un periodo (Da → A), si applica a tutto il periodo" '+
       'style="width:'+(COL-10)+'px;text-align:center;padding:2px 1px;font-size:10px;border:.5px solid var(--border2);border-radius:4px;background:var(--surface);font-weight:'+(livId?'700':'400')+';color:'+(livId?'var(--accent)':'var(--text3)')+'">'+opzioni+'</select></th>';
   }).join('');
   var body='';
@@ -24720,7 +24729,7 @@ function renderListino() {
       // non lo rimostrano più qui.
       if (cat === lstMasterType) {
         var livCells=allDays.map(function(d){
-          var ds=fmt(d), livNome=livNomeById(livGiornoDi(ds));
+          var ds=fmt(d), livObj=livLivelliCache.find(function(x){return x.id===livGiornoVeloce(ds);}), livNome=livEtichettaConPrezzo(livObj);
           return '<td style="padding:2px 1px;border-left:.5px solid var(--border);border-bottom:1px solid var(--border2);background:var(--surface2);text-align:center">'+
             '<span style="font-size:10px;font-weight:700;color:'+(livNome?'var(--accent)':'var(--text3)')+'">'+(livNome||'—')+'</span></td>';
         }).join('');
