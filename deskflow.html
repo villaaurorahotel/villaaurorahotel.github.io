@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 01/09/2026 · 12:26</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 01/09/2026 · 12:44</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -23278,6 +23278,21 @@ function renderCalendario() {
 
   // Body righe
   let bodyHTML = '';
+  // Riga Livello, tra l'intestazione dei giorni e la prima tipologia (Standard) — stesso menu a
+  // tendina già presente nel Listino prezzi: cambiarlo da qui applica il livello a quel giorno (o a
+  // tutto il periodo selezionato nel Listino, se ce n'è uno) esattamente come farebbe da lì.
+  {
+    const livCellsCal = allDays.map(function(d){
+      var ds = fmt(d), livId = livGiornoDi(ds), livelliList = livGetLivelli();
+      var opzioni = '<option value="">—</option>'+livelliList.map(function(l){
+        return '<option value="'+l.id+'"'+(l.id===livId?' selected':'')+'>'+l.nome+'</option>';
+      }).join('');
+      return '<td style="padding:2px 1px;text-align:center;background:var(--surface2);border-left:1px solid var(--border);border-bottom:1px solid var(--border2)">'+
+        '<select onchange="livCambiaGiorno(\''+ds+'\', this.value); renderCalendario();" title="Livello tariffario per questo giorno — se hai selezionato un periodo nel Listino, si applica a tutto il periodo" '+
+        'style="width:'+(CELL_W-10)+'px;text-align:center;padding:1px;font-size:10px;border:.5px solid var(--border2);border-radius:4px;background:var(--surface);font-weight:'+(livId?'700':'400')+';color:'+(livId?'var(--accent)':'var(--text3)')+'">'+opzioni+'</select></td>';
+    }).join('');
+    bodyHTML += '<tr><td style="padding:3px 10px;background:var(--surface2);position:sticky;left:0;z-index:3;border-right:1px solid var(--border2);border-bottom:1px solid var(--border2);font-size:9px;color:var(--text3);text-transform:uppercase;font-weight:700">🎚 Livello</td>'+livCellsCal+'</tr>';
+  }
   let currentCat = null;
   const calSearchQ = (calSearchQuery||'').trim().toLowerCase();
   let calPrimoMatchTrovato = false;
@@ -24631,6 +24646,7 @@ function renderListino() {
   var lstMarkupOTA = cfg.markupOTA || 0;
   var lstTarObj=getTariffaObj(lstTariffaId);
   var lstIsDerivata=lstTariffaId!=='standard' && !!lstTarObj.modalita;
+  var lstMasterType = lstCalcolaRiferimentiCelle(rooms).masterType; // per mostrare la riga Livello solo qui
   if(rooms.length===0){document.getElementById('page-listino').innerHTML='<div class="page-header"><div><div class="page-title">Listino prezzi</div></div></div><div class="page-content"><div class="empty-state"><p>Aggiungi prima le camere.</p></div></div>';return;}
   // Calcola finestra di 60 giorni centrata sul target
   var startD=parseLD(globalDate||today());
@@ -24698,14 +24714,18 @@ function renderListino() {
         '<div style="font-size:8px;color:var(--accent);font-weight:700;margin-top:2px;text-transform:uppercase">min.n. / chiusura ↴</div>'+
         '</div></td>'+catCells+'</tr>';
 
-      // Riga livello (sola lettura, uguale per tutte le tipologie — il livello si sceglie dal menu
-      // in alto sotto la data, qui è solo un riferimento veloce mentre guardi questa tipologia)
-      var livCells=allDays.map(function(d){
-        var ds=fmt(d), livNome=livNomeById(livGiornoDi(ds));
-        return '<td style="padding:2px 1px;border-left:.5px solid var(--border);border-bottom:1px solid var(--border2);background:var(--surface2);text-align:center">'+
-          '<span style="font-size:10px;font-weight:700;color:'+(livNome?'var(--accent)':'var(--text3)')+'">'+(livNome||'—')+'</span></td>';
-      }).join('');
-      body+='<tr><td colspan="2" style="padding:2px 8px;background:var(--surface2);border-bottom:1px solid var(--border2);position:sticky;left:0;z-index:3;border-right:1px solid var(--border2);font-size:8px;color:var(--text3);text-transform:uppercase">🎚 Livello ↴</td>'+livCells+'</tr>';
+      // Riga livello (sola lettura) — SOLO sopra la tipologia base (Standard): il livello vale per
+      // tutta la struttura, quindi ripeterlo su ogni tipologia era ridondante. Le altre tipologie
+      // continuano comunque a calcolare/ricevere i prezzi giusti in base al livello, semplicemente
+      // non lo rimostrano più qui.
+      if (cat === lstMasterType) {
+        var livCells=allDays.map(function(d){
+          var ds=fmt(d), livNome=livNomeById(livGiornoDi(ds));
+          return '<td style="padding:2px 1px;border-left:.5px solid var(--border);border-bottom:1px solid var(--border2);background:var(--surface2);text-align:center">'+
+            '<span style="font-size:10px;font-weight:700;color:'+(livNome?'var(--accent)':'var(--text3)')+'">'+(livNome||'—')+'</span></td>';
+        }).join('');
+        body+='<tr><td colspan="2" style="padding:2px 8px;background:var(--surface2);border-bottom:1px solid var(--border2);position:sticky;left:0;z-index:3;border-right:1px solid var(--border2);font-size:8px;color:var(--text3);text-transform:uppercase">🎚 Livello ↴</td>'+livCells+'</tr>';
+      }
 
       // Riga occupazione % per questa tipologia, giorno per giorno — influenza il prezzo tramite le
       // soglie di occupazione impostate sopra (stessa logica di "Prezzo consigliato")
