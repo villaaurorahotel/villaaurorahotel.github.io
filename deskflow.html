@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 01/09/2026 · 10:13</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 01/09/2026 · 11:05</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -24381,6 +24381,35 @@ function lstRisolviGrigliaDaBase(baseStandard2p) {
   return { info: info, valore: valore };
 }
 
+// Estende lstRisolviGrigliaDaBase aggiungendo anche le fasce PROPRIE della tipologia base
+// (es. "Standard 1 Pax"), che lstCalcolaRiferimentiCelle non tratta mai — per come è fatto il
+// Listino, quella tipologia è "la radice" della catena, quindi le sue altre fasce (1p, 3p, 4p se
+// presenti) non derivano da nessun'altra tipologia ma restano comunque uno scostamento dalla
+// PROPRIA fascia 2 Pax, esattamente con la stessa regola già usata per tutte le altre tipologie
+// (e con lo stesso scostamento che imposti in Aggiornamento Massivo per quelle celle).
+function livRisolviGrigliaCompleta(baseStandard2p) {
+  var r = lstRisolviGrigliaDaBase(baseStandard2p);
+  var rooms = DB.get('rooms') || [];
+  var scostamenti = DB.get('listinoScostamenti') || [];
+  function scostamentoDi(t, pk) {
+    var s = scostamenti.find(function(x){ return x.tipo===t && x.pax===pk; });
+    return s ? { valore: s.valore, unita: s.unita||'€' } : { valore: 0, unita: '€' };
+  }
+  function applicaOffset(base, off) {
+    return Math.max(0, Math.round(off.unita==='%' ? base*(1+off.valore/100) : base + off.valore));
+  }
+  var maxCap = lstMaxCapOf(r.info.masterType, rooms);
+  for (var p=1; p<=maxCap; p++) {
+    var pk = 'PAX'+p;
+    if (pk === 'PAX2') continue; // è la base, già impostata
+    var paxRifPropria = (pk === 'PAX4') ? 'PAX3' : 'PAX2';
+    var baseRif = r.valore[r.info.masterType+'|'+paxRifPropria];
+    if (baseRif == null) continue;
+    r.valore[r.info.masterType+'|'+pk] = applicaOffset(baseRif, scostamentoDi(r.info.masterType, pk));
+  }
+  return r;
+}
+
 // Applica il prezzo Standard 2 Pax di un livello al periodo attualmente selezionato nel Listino
 // (lstSelFrom/lstSelTo) — scrive su tutte le camere Standard e fa propagare automaticamente le
 // altre tipologie con la stessa funzione già usata quando modifichi una cella a mano nel Listino.
@@ -24393,6 +24422,10 @@ function livApplicaAlListino(id) {
   var info = lstCalcolaRiferimentiCelle(rooms);
   var standardRooms = rooms.filter(function(r){ return normCatType(r.type)===info.masterType; });
   if (!standardRooms.length) { showToast('Nessuna camera della tipologia base (Standard) trovata'); return; }
+  // Calcola anche le fasce proprie della Standard (1p, ecc.) — non solo la 2p — così vengono
+  // scritte insieme sul Listino invece di lasciarle come prima al valore vecchio.
+  var grigliaCompleta = livRisolviGrigliaCompleta(l.base);
+  var maxCapMaster = lstMaxCapOf(info.masterType, rooms);
   var lst = DB.get('listino') || [];
   standardRooms.forEach(function(room){
     var e = lst.find(function(x){ return x.roomId===room.id && (x.tariffaId||'standard')===lstTariffaId; });
@@ -24400,7 +24433,10 @@ function livApplicaAlListino(id) {
     if (!e.periodi) e.periodi = [];
     var p = e.periodi.find(function(pp){ return pp.dal===lstSelFrom && pp.al===lstSelTo; });
     if (!p) { p = {dal:lstSelFrom, al:lstSelTo, prezzi:{}}; e.periodi.push(p); }
-    p.prezzi.PAX2 = l.base;
+    for (var pax=1; pax<=maxCapMaster; pax++) {
+      var pk='PAX'+pax, v=grigliaCompleta.valore[info.masterType+'|'+pk];
+      if (v!=null) p.prezzi[pk] = v;
+    }
   });
   DB.set('listino', lst);
   lstPropagaDaStandard(standardRooms[0].id, 'PAX2', l.base, {dal:lstSelFrom, al:lstSelTo});
@@ -24449,8 +24485,15 @@ function renderLivelliTariffari() {
   var rooms = DB.get('rooms') || [];
   var info = lstCalcolaRiferimentiCelle(rooms);
   var tipiOrdinati = [info.masterType].concat(info.types.filter(function(t){return t!==info.masterType;}));
-  // Colonne: una per ogni combinazione tipologia|pax presente nella catena, in ordine leggibile
-  var colonne = [{t:info.masterType, pk:'PAX2', label:info.masterType+' 2p'}];
+  // Colonne: prima TUTTE le fasce della tipologia base (1p, 2p, 3p... nell'ordine, con la 2p come
+  // unica modificabile — le altre sue fasce, tipo "Standard 1p", sono calcolate come tutte le altre
+  // tipologie, scostando dalla propria 2p), poi le altre tipologie in catena.
+  var maxCapMaster = lstMaxCapOf(info.masterType, rooms);
+  var colonne = [];
+  for (var pMaster=1; pMaster<=maxCapMaster; pMaster++) {
+    var pkMaster = 'PAX'+pMaster;
+    colonne.push({t:info.masterType, pk:pkMaster, label:info.masterType+' '+pMaster+'p', isBase:(pkMaster==='PAX2')});
+  }
   tipiOrdinati.slice(1).forEach(function(t){
     Object.keys(info.cellRef).filter(function(k){return info.cellRef[k].t===t;}).sort().forEach(function(k){
       colonne.push({t:t, pk:info.cellRef[k].pk, label:t+' '+info.cellRef[k].pk.replace('PAX','')+'p'});
@@ -24491,15 +24534,15 @@ function renderLivelliTariffari() {
     (periodoAttivo ? '<div style="background:#fff3cd;border:.5px solid #f0ad4e;border-radius:6px;padding:6px 10px;font-size:12px;color:#856404;margin-bottom:10px">📅 Periodo selezionato per l\'applicazione: <strong>'+periodoAttivo+'</strong> — clicca "Applica" su un livello per scrivere i suoi prezzi su queste date.</div>' : '<div style="background:var(--surface2);border-radius:6px;padding:6px 10px;font-size:12px;color:var(--text3);margin-bottom:10px">Nessun periodo selezionato — vai sul Listino, seleziona Da/A, poi torna qui per applicare un livello.</div>')+
     '<table style="width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap">'+
     '<thead><tr style="color:var(--text3)"><th style="text-align:left;padding:5px 8px">Livello</th>'+
-      colonne.map(function(c,i){ return '<th style="text-align:right;padding:5px 8px'+(i===0?';color:var(--accent);font-weight:800':'')+'">'+c.label+'</th>'; }).join('')+
+      colonne.map(function(c){ return '<th style="text-align:right;padding:5px 8px'+(c.isBase?';color:var(--accent);font-weight:800':'')+'">'+c.label+'</th>'; }).join('')+
       '<th></th>'+
     '</tr></thead><tbody>'+
     livelli.map(function(l){
-      var r = lstRisolviGrigliaDaBase(l.base);
+      var r = livRisolviGrigliaCompleta(l.base);
       return '<tr style="border-top:1px solid var(--border)">'+
         '<td style="padding:5px 8px"><a href="#" onclick="livRinominaLivello(\''+l.id+'\');return false" style="font-weight:700;color:var(--text1);text-decoration:none" title="Clicca per rinominare">'+l.nome+'</a></td>'+
-        colonne.map(function(c,i){
-          if (i===0) return '<td style="text-align:right;padding:5px 8px"><input type="number" step="1" min="0" value="'+l.base+'" onchange="livSalvaLivello(\''+l.id+'\',this.value)" style="width:70px;text-align:right;padding:3px 5px;border:.5px solid var(--accent);border-radius:5px;font-weight:700;color:var(--accent)"></td>';
+        colonne.map(function(c){
+          if (c.isBase) return '<td style="text-align:right;padding:5px 8px"><input type="number" step="1" min="0" value="'+l.base+'" onchange="livSalvaLivello(\''+l.id+'\',this.value)" style="width:70px;text-align:right;padding:3px 5px;border:.5px solid var(--accent);border-radius:5px;font-weight:700;color:var(--accent)"></td>';
           var v = r.valore[c.t+'|'+c.pk];
           return '<td style="text-align:right;padding:5px 8px;color:var(--text2)">'+(v!=null?fmtCurrency(v):'—')+'</td>';
         }).join('')+
