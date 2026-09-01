@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 01/09/2026 · 12:56</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 01/09/2026 · 17:28</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -488,6 +488,7 @@ const DB = {
     if (k==='extras' && supabaseReady && _blobsReady['extras']) return _blobsCache['extras'] || [];
     if (k==='movimenti' && supabaseReady && _blobsReady['movimenti']) return _blobsCache['movimenti'] || [];
     if (k==='tassaSoggiornoLog' && supabaseReady && _blobsReady['tassaSoggiornoLog']) return _blobsCache['tassaSoggiornoLog'] || [];
+    if (k==='listinoLivelli' && supabaseReady && _blobsReady['listinoLivelli']) return _blobsCache['listinoLivelli'] || [];
     try{return JSON.parse(localStorage.getItem('pms_'+k))||[];}catch{return[];}
   },
   set(k,v){
@@ -510,14 +511,15 @@ const DB = {
     if (k==='extras' && supabaseReady && _blobsReady['extras']) { _blobsCache['extras'] = v; setTimeout(()=>syncBlobToSupabase('extras', v),0); return; }
     if (k==='movimenti' && supabaseReady && _blobsReady['movimenti']) { _blobsCache['movimenti'] = v; setTimeout(()=>syncBlobToSupabase('movimenti', v),0); return; }
     if (k==='tassaSoggiornoLog' && supabaseReady && _blobsReady['tassaSoggiornoLog']) { _blobsCache['tassaSoggiornoLog'] = v; setTimeout(()=>syncBlobToSupabase('tassaSoggiornoLog', v),0); return; }
+    if (k==='listinoLivelli' && supabaseReady && _blobsReady['listinoLivelli']) { _blobsCache['listinoLivelli'] = v; setTimeout(()=>syncBlobToSupabase('listinoLivelli', v),0); return; }
     localStorage.setItem('pms_'+k,JSON.stringify(v));
   },
   getObj(k,def){
-    if ((k==='settings'||k==='corrispettivi'||k==='revenueConfig'||k==='categoryOrder'||k==='groupColors'||k==='hkData'||k==='regoleTipo'||k==='tassaSoggiornoDettaglio'||k==='ical_portals') && supabaseReady && _blobsReady[k]) return _blobsCache[k] || def;
+    if ((k==='settings'||k==='corrispettivi'||k==='revenueConfig'||k==='categoryOrder'||k==='groupColors'||k==='hkData'||k==='regoleTipo'||k==='tassaSoggiornoDettaglio'||k==='ical_portals'||k==='livelliTariffari') && supabaseReady && _blobsReady[k]) return _blobsCache[k] || def;
     try{return JSON.parse(localStorage.getItem('pms_'+k))||def;}catch{return def;}
   },
   setObj(k,v){
-    if ((k==='settings'||k==='corrispettivi'||k==='revenueConfig'||k==='categoryOrder'||k==='groupColors'||k==='hkData'||k==='regoleTipo'||k==='tassaSoggiornoDettaglio'||k==='ical_portals') && supabaseReady && _blobsReady[k]) { _blobsCache[k] = v; setTimeout(()=>syncBlobToSupabase(k, v),0); return; }
+    if ((k==='settings'||k==='corrispettivi'||k==='revenueConfig'||k==='categoryOrder'||k==='groupColors'||k==='hkData'||k==='regoleTipo'||k==='tassaSoggiornoDettaglio'||k==='ical_portals'||k==='livelliTariffari') && supabaseReady && _blobsReady[k]) { _blobsCache[k] = v; setTimeout(()=>syncBlobToSupabase(k, v),0); return; }
     localStorage.setItem('pms_'+k,JSON.stringify(v));
   }
 };
@@ -918,14 +920,14 @@ async function initSupabase() {
 
     // Impostazioni e Corrispettivi: tabella facoltativa "app_blobs" (un blocco unico di dati per chiave)
     try {
-      const {data:blobs, error:err8} = await supabaseClient.from('app_blobs').select('*').in('key', ['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals']);
+      const {data:blobs, error:err8} = await supabaseClient.from('app_blobs').select('*').in('key', ['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli']);
       if (err8) throw err8;
       (blobs||[]).forEach(row => { _blobsCache[row.key] = row.data; _blobsReady[row.key] = true; });
       // Se una delle chiavi non esiste ancora su Supabase, la creiamo copiando quella locale attuale
       // (per storicoOspiti/messageTemplates/listinoAggiustamenti/listinoScostamenti/competitorStrutture/
       // competitorPrices: JSON.parse restituisce [] di default, non null, quindi il controllo "local"
       // richiede che l'array abbia almeno un elemento — altrimenti non c'è nulla da migrare)
-      for (const key of ['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals']) {
+      for (const key of ['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli']) {
         if (!_blobsReady[key]) {
           const raw = localStorage.getItem('pms_'+key);
           const isArrayKey = (key==='storicoOspiti'||key==='messageTemplates'||key==='listinoAggiustamenti'||key==='listinoScostamenti'||key==='competitorStrutture'||key==='competitorPrices'||key==='blacklist'||key==='extras'||key==='movimenti'||key==='tassaSoggiornoLog'||key==='categoryOrder'||key==='ical_portals');
@@ -938,7 +940,7 @@ async function initSupabase() {
       }
     } catch (err8) {
       console.warn('Tabella app_blobs non disponibile — Impostazioni, Corrispettivi, Archivio storico ospiti, variazioni prezzo, scostamenti, Prezzo consigliato, Prezzi concorrenti e portali iCal restano locali su questo PC. Esegui lo script SQL aggiuntivo per attivarlo.', err8);
-      ['settings','corrispettivi','storicoOspiti','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals'].forEach(function(k){ _blobsReady[k] = false; });
+      ['settings','corrispettivi','storicoOspiti','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli'].forEach(function(k){ _blobsReady[k] = false; });
     }
 
     // Tempo reale su tutte le tabelle — riattivato dopo l'upgrade a compute Micro (più risorse
@@ -1087,7 +1089,7 @@ function handleQuoteRealtimeChange(payload) {
 }
 function handleBlobRealtimeChange(payload) {
   const key = payload.eventType === 'DELETE' ? payload.old.key : payload.new.key;
-  if (['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals'].indexOf(key) < 0) return;
+  if (['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli'].indexOf(key) < 0) return;
   if (payload.eventType === 'DELETE') { delete _blobsCache[key]; }
   else { _blobsCache[key] = payload.new.data; }
   if (key === 'settings') {
@@ -1148,7 +1150,8 @@ async function syncRoomsToSupabase(newRooms) {
     _segnaSincronizzato('rooms', toUpsert, []);
   } catch (err) {
     console.error('Errore sincronizzazione camere:', err);
-    showToast('⚠ Errore di salvataggio su Supabase — controlla la connessione');
+    showToast('⚠ Errore di salvataggio su Supabase — nuovo tentativo automatico in corso…');
+    scheduleSyncRetry('rooms', syncRoomsToSupabase, () => DB.get('rooms'));
     _supabaseSyncingCount = Math.max(0, _supabaseSyncingCount - 1);
     throw err;
   }
@@ -1285,7 +1288,8 @@ async function syncListinoToSupabase(newListino) {
     toUpsert.forEach(r => { const {key, ...rest} = r; m.set(key, JSON.stringify(rest)); });
   } catch (err) {
     console.error('Errore sincronizzazione listino:', err);
-    showToast('⚠ Errore di salvataggio su Supabase — controlla la connessione');
+    showToast('⚠ Errore di salvataggio su Supabase — nuovo tentativo automatico in corso…');
+    scheduleSyncRetry('listino', syncListinoToSupabase, () => DB.get('listino'));
     _supabaseSyncingCount = Math.max(0, _supabaseSyncingCount - 1);
     throw err;
   }
@@ -1304,7 +1308,8 @@ async function syncTariffeToSupabase(newTariffe) {
     _segnaSincronizzato('tariffe', toUpsert, []);
   } catch (err) {
     console.error('Errore sincronizzazione tariffe:', err);
-    showToast('⚠ Errore di salvataggio su Supabase — controlla la connessione');
+    showToast('⚠ Errore di salvataggio su Supabase — nuovo tentativo automatico in corso…');
+    scheduleSyncRetry('tariffe', syncTariffeToSupabase, () => DB.get('tariffe'));
     _supabaseSyncingCount = Math.max(0, _supabaseSyncingCount - 1);
     throw err;
   }
@@ -1321,7 +1326,8 @@ async function syncQuotesToSupabase(newQuotes) {
     _segnaSincronizzato('quotes', toUpsert, []);
   } catch (err) {
     console.error('Errore sincronizzazione preventivi:', err);
-    showToast('⚠ Errore di salvataggio su Supabase — controlla la connessione');
+    showToast('⚠ Errore di salvataggio su Supabase — nuovo tentativo automatico in corso…');
+    scheduleSyncRetry('quotes', syncQuotesToSupabase, () => DB.get('quotes'));
     _supabaseSyncingCount = Math.max(0, _supabaseSyncingCount - 1);
     throw err;
   }
@@ -1339,7 +1345,8 @@ async function syncRichiestePreventivoToSupabase(newRichieste) {
     _segnaSincronizzato('richieste_preventivo', toUpsert, []);
   } catch (err) {
     console.error('Errore sincronizzazione richieste preventivo:', err);
-    showToast('⚠ Errore di salvataggio su Supabase — controlla la connessione');
+    showToast('⚠ Errore di salvataggio su Supabase — nuovo tentativo automatico in corso…');
+    scheduleSyncRetry('richieste_preventivo', syncRichiestePreventivoToSupabase, () => DB.get('richiestePreventivo'));
     _supabaseSyncingCount = Math.max(0, _supabaseSyncingCount - 1);
     throw err;
   }
@@ -1357,7 +1364,8 @@ async function syncRoomTypeInfoToSupabase(newInfo) {
     _segnaSincronizzato('room_type_info', toUpsert, []);
   } catch (err) {
     console.error('Errore sincronizzazione descrizioni tipologie:', err);
-    showToast('⚠ Errore di salvataggio su Supabase — controlla la connessione');
+    showToast('⚠ Errore di salvataggio su Supabase — nuovo tentativo automatico in corso…');
+    scheduleSyncRetry('room_type_info', syncRoomTypeInfoToSupabase, () => DB.get('roomTypeInfo'));
     _supabaseSyncingCount = Math.max(0, _supabaseSyncingCount - 1);
     throw err;
   }
@@ -1375,7 +1383,8 @@ async function syncSiteContentToSupabase(newContent) {
     _segnaSincronizzato('site_content', toUpsert, []);
   } catch (err) {
     console.error('Errore sincronizzazione contenuti sito:', err);
-    showToast('⚠ Errore di salvataggio su Supabase — controlla la connessione');
+    showToast('⚠ Errore di salvataggio su Supabase — nuovo tentativo automatico in corso…');
+    scheduleSyncRetry('site_content', syncSiteContentToSupabase, () => DB.get('siteContent'));
     _supabaseSyncingCount = Math.max(0, _supabaseSyncingCount - 1);
     throw err;
   }
@@ -1384,6 +1393,7 @@ async function syncSiteContentToSupabase(newContent) {
 
 let _blobSyncTimers = {};
 let _blobSyncPending = {};
+let _blobRetryAttempts = {};
 
 // Invia su Supabase i dati "blob" (storicoOspiti, impostazioni, modelli di messaggio...) con un breve
 // raggruppamento: se arrivano più modifiche ravvicinate sulla stessa chiave (es. durante un check-in di
@@ -1402,9 +1412,23 @@ function syncBlobToSupabase(key, value) {
     try {
       const { error } = await supabaseClient.from('app_blobs').upsert({key, data: daInviare});
       if (error) throw error;
+      _blobRetryAttempts[key] = 0;
     } catch (err) {
       console.error('Errore sincronizzazione '+key+':', err);
-      showToast('⚠ Errore di salvataggio su Supabase — controlla la connessione');
+      // BUG TROVATO E CORRETTO ("modifiche perse su Sito web/Livelli tariffari/ecc."): questa funzione
+      // generica (usata da molte impostazioni diverse, incluse le più recenti come i Livelli tariffari)
+      // non riprovava mai da sola in caso di intoppo — falliva un colpo solo e la modifica restava solo
+      // nel browser finché non si ricaricava la pagina. Ora riprova da sola alcune volte, come già
+      // succede per prenotazioni/ospiti/camere.
+      showToast('⚠ Errore di salvataggio su Supabase — nuovo tentativo automatico in corso…');
+      _blobRetryAttempts[key] = (_blobRetryAttempts[key]||0) + 1;
+      if (_blobRetryAttempts[key] <= 5) {
+        var attesa = Math.min(60000, 5000 * _blobRetryAttempts[key]);
+        setTimeout(function(){ syncBlobToSupabase(key, daInviare); }, attesa);
+      } else {
+        _blobRetryAttempts[key] = 0;
+        showToast('⚠ Non riesco a salvare "'+key+'" su Supabase dopo diversi tentativi — i dati restano solo su questo dispositivo/scheda. Controlla la connessione, poi riapri e salva di nuovo questa modifica.');
+      }
     }
     _supabaseSyncingCount = Math.max(0, _supabaseSyncingCount - 1);
   }, 4000);
@@ -1920,7 +1944,7 @@ async function refreshDatiCorrenti() {
         r.forEach(b => { _roomBlocksCache[b.room_id+'|'+b.block_date] = true; });
       }));
       if (_blobsReady['settings'] || _blobsReady['corrispettivi'] || _blobsReady['storicoOspiti'] || _blobsReady['messageTemplates'] || _blobsReady['listinoAggiustamenti'] || _blobsReady['listinoScostamenti'] || _blobsReady['revenueConfig'] || _blobsReady['competitorStrutture'] || _blobsReady['competitorPrices'] || _blobsReady['blacklist'] || _blobsReady['extras'] || _blobsReady['movimenti'] || _blobsReady['tassaSoggiornoLog'] || _blobsReady['categoryOrder'] || _blobsReady['groupColors'] || _blobsReady['hkData'] || _blobsReady['regoleTipo'] || _blobsReady['tassaSoggiornoDettaglio'] || _blobsReady['ical_portals']) {
-        jobs.push(supabaseClient.from('app_blobs').select('*').in('key', ['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals']).then(r => {
+        jobs.push(supabaseClient.from('app_blobs').select('*').in('key', ['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli']).then(r => {
           (r.data||[]).forEach(row => { _blobsCache[row.key] = row.data; });
         }));
       }
