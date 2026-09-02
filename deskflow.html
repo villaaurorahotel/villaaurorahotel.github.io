@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 01/09/2026 · 17:28</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 02/09/2026 · 17:07</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -489,6 +489,7 @@ const DB = {
     if (k==='movimenti' && supabaseReady && _blobsReady['movimenti']) return _blobsCache['movimenti'] || [];
     if (k==='tassaSoggiornoLog' && supabaseReady && _blobsReady['tassaSoggiornoLog']) return _blobsCache['tassaSoggiornoLog'] || [];
     if (k==='listinoLivelli' && supabaseReady && _blobsReady['listinoLivelli']) return _blobsCache['listinoLivelli'] || [];
+    if (k==='listinoRegistro' && supabaseReady && _blobsReady['listinoRegistro']) return _blobsCache['listinoRegistro'] || [];
     try{return JSON.parse(localStorage.getItem('pms_'+k))||[];}catch{return[];}
   },
   set(k,v){
@@ -512,6 +513,7 @@ const DB = {
     if (k==='movimenti' && supabaseReady && _blobsReady['movimenti']) { _blobsCache['movimenti'] = v; setTimeout(()=>syncBlobToSupabase('movimenti', v),0); return; }
     if (k==='tassaSoggiornoLog' && supabaseReady && _blobsReady['tassaSoggiornoLog']) { _blobsCache['tassaSoggiornoLog'] = v; setTimeout(()=>syncBlobToSupabase('tassaSoggiornoLog', v),0); return; }
     if (k==='listinoLivelli' && supabaseReady && _blobsReady['listinoLivelli']) { _blobsCache['listinoLivelli'] = v; setTimeout(()=>syncBlobToSupabase('listinoLivelli', v),0); return; }
+    if (k==='listinoRegistro' && supabaseReady && _blobsReady['listinoRegistro']) { _blobsCache['listinoRegistro'] = v; setTimeout(()=>syncBlobToSupabase('listinoRegistro', v),0); return; }
     localStorage.setItem('pms_'+k,JSON.stringify(v));
   },
   getObj(k,def){
@@ -920,14 +922,14 @@ async function initSupabase() {
 
     // Impostazioni e Corrispettivi: tabella facoltativa "app_blobs" (un blocco unico di dati per chiave)
     try {
-      const {data:blobs, error:err8} = await supabaseClient.from('app_blobs').select('*').in('key', ['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli']);
+      const {data:blobs, error:err8} = await supabaseClient.from('app_blobs').select('*').in('key', ['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro']);
       if (err8) throw err8;
       (blobs||[]).forEach(row => { _blobsCache[row.key] = row.data; _blobsReady[row.key] = true; });
       // Se una delle chiavi non esiste ancora su Supabase, la creiamo copiando quella locale attuale
       // (per storicoOspiti/messageTemplates/listinoAggiustamenti/listinoScostamenti/competitorStrutture/
       // competitorPrices: JSON.parse restituisce [] di default, non null, quindi il controllo "local"
       // richiede che l'array abbia almeno un elemento — altrimenti non c'è nulla da migrare)
-      for (const key of ['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli']) {
+      for (const key of ['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro']) {
         if (!_blobsReady[key]) {
           const raw = localStorage.getItem('pms_'+key);
           const isArrayKey = (key==='storicoOspiti'||key==='messageTemplates'||key==='listinoAggiustamenti'||key==='listinoScostamenti'||key==='competitorStrutture'||key==='competitorPrices'||key==='blacklist'||key==='extras'||key==='movimenti'||key==='tassaSoggiornoLog'||key==='categoryOrder'||key==='ical_portals');
@@ -940,7 +942,7 @@ async function initSupabase() {
       }
     } catch (err8) {
       console.warn('Tabella app_blobs non disponibile — Impostazioni, Corrispettivi, Archivio storico ospiti, variazioni prezzo, scostamenti, Prezzo consigliato, Prezzi concorrenti e portali iCal restano locali su questo PC. Esegui lo script SQL aggiuntivo per attivarlo.', err8);
-      ['settings','corrispettivi','storicoOspiti','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli'].forEach(function(k){ _blobsReady[k] = false; });
+      ['settings','corrispettivi','storicoOspiti','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro'].forEach(function(k){ _blobsReady[k] = false; });
     }
 
     // Tempo reale su tutte le tabelle — riattivato dopo l'upgrade a compute Micro (più risorse
@@ -1089,7 +1091,7 @@ function handleQuoteRealtimeChange(payload) {
 }
 function handleBlobRealtimeChange(payload) {
   const key = payload.eventType === 'DELETE' ? payload.old.key : payload.new.key;
-  if (['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli'].indexOf(key) < 0) return;
+  if (['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro'].indexOf(key) < 0) return;
   if (payload.eventType === 'DELETE') { delete _blobsCache[key]; }
   else { _blobsCache[key] = payload.new.data; }
   if (key === 'settings') {
@@ -1944,7 +1946,7 @@ async function refreshDatiCorrenti() {
         r.forEach(b => { _roomBlocksCache[b.room_id+'|'+b.block_date] = true; });
       }));
       if (_blobsReady['settings'] || _blobsReady['corrispettivi'] || _blobsReady['storicoOspiti'] || _blobsReady['messageTemplates'] || _blobsReady['listinoAggiustamenti'] || _blobsReady['listinoScostamenti'] || _blobsReady['revenueConfig'] || _blobsReady['competitorStrutture'] || _blobsReady['competitorPrices'] || _blobsReady['blacklist'] || _blobsReady['extras'] || _blobsReady['movimenti'] || _blobsReady['tassaSoggiornoLog'] || _blobsReady['categoryOrder'] || _blobsReady['groupColors'] || _blobsReady['hkData'] || _blobsReady['regoleTipo'] || _blobsReady['tassaSoggiornoDettaglio'] || _blobsReady['ical_portals']) {
-        jobs.push(supabaseClient.from('app_blobs').select('*').in('key', ['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli']).then(r => {
+        jobs.push(supabaseClient.from('app_blobs').select('*').in('key', ['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro']).then(r => {
           (r.data||[]).forEach(row => { _blobsCache[row.key] = row.data; });
         }));
       }
@@ -10675,6 +10677,7 @@ function updateMinNottiGiorno(catTypeEnc, ds, value, fromPage){
   if(!r.minNotti[catType]) r.minNotti[catType]={};
   r.minNotti[catType][ds]=v;
   saveRegoleTipo(r);
+  if (typeof registraModificaListino === 'function') registraModificaListino(fmtDate(ds)+': <strong>'+catType+'</strong> — soggiorno minimo → '+v+' nott'+(v===1?'e':'i'));
   // Non ricarichiamo l'intera pagina per evitare di perdere il focus, ma aggiorniamo il dato nel DB
   console.log('Min. notti tipologia '+catType+' per '+ds+' impostato a '+v);
 }
@@ -10776,6 +10779,7 @@ function toggleChiusuraCategoria(catTypeEnc, ds, fromPage){
   var wasClosed = !!r.chiusure[catType][ds];
   if(wasClosed) delete r.chiusure[catType][ds]; else r.chiusure[catType][ds]=true;
   saveRegoleTipo(r);
+  if (typeof registraModificaListino === 'function') registraModificaListino(fmtDate(ds)+': <strong>'+catType+'</strong> — '+(!wasClosed?'chiusa alla vendita':'riaperta alla vendita'));
   showToast(!wasClosed ? ('Tipologia "'+catType+'" chiusa alla vendita il '+fmtDate(ds)) : ('Tipologia "'+catType+'" riaperta alla vendita il '+fmtDate(ds)));
   if(fromPage==='listino') renderListino(); else renderCalendario();
 }
@@ -15471,6 +15475,35 @@ function lstUpdateMassPreview() {
   });
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// REGISTRO LISTINO — richiesto da Gian: ogni volta che si cambia soggiorno
+// minimo, chiusure o prezzi dal Listino/Aggiornamento Massivo, resta scritto
+// COSA è stato cambiato e QUANDO (data e ora precisa) — utile per capire in
+// futuro perché un certo valore è quello che è.
+// ══════════════════════════════════════════════════════════════════════════
+function registraModificaListino(testo) {
+  try {
+    var log = DB.get('listinoRegistro') || [];
+    log.unshift({ data: new Date().toISOString(), testo: testo }); // più recenti in cima
+    if (log.length > 300) log = log.slice(0, 300); // non crescere all'infinito
+    DB.set('listinoRegistro', log);
+  } catch (err) { console.error('Registro Listino non aggiornato:', err); }
+}
+function renderRegistroListinoHTML() {
+  var log = DB.get('listinoRegistro') || [];
+  if (!log.length) return '<div style="font-size:12px;color:var(--text3);padding:12px 4px">Nessuna modifica registrata finora — comparirà qui ogni volta che cambi soggiorno minimo o altro dal Listino.</div>';
+  return '<div style="max-height:280px;overflow-y:auto;border:.5px solid var(--border2);border-radius:8px">' +
+    log.slice(0,150).map(function(v, i){
+      var d = new Date(v.data);
+      var quando = d.toLocaleDateString('it-IT') + ' · ' + d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
+      return '<div style="padding:7px 12px;'+(i>0?'border-top:1px solid var(--border);':'')+'font-size:12.5px;display:flex;gap:10px;align-items:baseline">'
+        + '<span style="color:var(--text3);white-space:nowrap;font-size:11px">' + quando + '</span>'
+        + '<span>' + v.testo + '</span>'
+        + '</div>';
+    }).join('') +
+  '</div>';
+}
+
 function doMassUpdateListinoV2() {
   const from = document.getElementById('mass-from').value;
   const to = document.getElementById('mass-to').value;
@@ -15628,6 +15661,19 @@ function doMassUpdateListinoV2() {
 
   saveRegoleTipo(regole);
   DB.set('listino', listino);
+
+  // Registra nel Registro Listino cosa è stato cambiato, per ogni tipologia toccata
+  Object.keys(dataByType).forEach(function(t){
+    var d = dataByType[t];
+    var pezzi = [];
+    if (d.minN !== null) pezzi.push('soggiorno minimo → ' + d.minN + ' nott' + (d.minN===1?'e':'i'));
+    if (d.closed !== null) pezzi.push(d.closed==='closed' ? 'chiusa alla vendita' : 'riaperta alla vendita');
+    if (offsetsInseriti[t] && Object.keys(offsetsInseriti[t]).length) pezzi.push('prezzi aggiornati (' + Object.keys(offsetsInseriti[t]).length + ' fasce)');
+    if (pezzi.length) {
+      registraModificaListino(fmtDate(from)+' → '+fmtDate(to)+': <strong>'+t+'</strong> — '+pezzi.join(', '));
+    }
+  });
+
   closeModal();
   const nScoperte = (typeof dateScoperte !== 'undefined') ? Object.keys(dateScoperte).length : 0;
   showToast('Aggiornamento massivo applicato — le tipologie collegate in catena sono state ricalcolate dal loro riferimento'
@@ -24980,7 +25026,11 @@ if(lstSelFrom&&lstSelTo){
     '<span style="font-size:10px;color:var(--accent);font-weight:800;text-transform:uppercase;white-space:nowrap">Naviga Listino ↔</span>'+
     '<input type="range" id="lst-scroll-slider" min="0" max="100" value="0" style="flex:1;cursor:pointer;accent-color:var(--accent);height:6px" '+
     'oninput="var container = document.getElementById(\'lst-wrap\'); if(container) container.scrollLeft = (this.value / 100) * (container.scrollWidth - container.clientWidth)">'+
-    '</div></div></div>';
+    '</div></div>'+
+    '<details style="margin-top:14px"><summary style="cursor:pointer;font-weight:700;font-size:13px;color:var(--text2);padding:6px 0">📋 Registro modifiche Listino</summary>'+
+    '<div style="margin-top:8px">'+renderRegistroListinoHTML()+'</div>'+
+    '</details>'+
+    '</div>';
 }
 var lstSelFrom='',lstSelTo='',listinoYear=new Date().getFullYear(),lstTariffaId='standard';
 
