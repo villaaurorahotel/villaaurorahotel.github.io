@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 02/09/2026 · 17:07</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 03/09/2026 · 15:34</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -638,14 +638,14 @@ function apriInvioCheckinOnline(bookingId) {
       '<div style="margin-bottom:10px;color:var(--text2)">Il link permette all\'ospite di inserire i dati anagrafici dei documenti da casa, prima dell\'arrivo. Una volta inviato, la prenotazione risulterà automaticamente in check-in.</div>' +
       '<label style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase">Link da inviare</label>' +
       '<input type="text" id="checkin-online-link" value="'+link+'" readonly style="width:100%;padding:8px 10px;border:.5px solid var(--border2);border-radius:8px;font-size:12.5px;margin-top:4px">' +
-      (!gmailrealePronto ? '<div style="margin-top:10px;font-size:11.5px;color:var(--text3)">Per inviare l\'email automaticamente da villaaurorahoteldolomiti@gmail.com, configura Supabase in Impostazioni — nel frattempo puoi usare Gmail, Copia link o WhatsApp.</div>' : '') +
+      (!gmailrealePronto ? '<div style="margin-top:10px;font-size:11.5px;color:var(--text3)">Per inviare l\'email automaticamente da '+emailMittenteAttuale()+', configura Supabase in Impostazioni — nel frattempo puoi usare Gmail, Copia link o WhatsApp.</div>' : '') +
     '</div>',
     '<button class="btn" onclick="closeModal()">Chiudi</button>' +
     '<button class="btn" onclick="navigator.clipboard.writeText(\''+link+'\').then(()=>showToast(\'Link copiato\'))">📋 Copia link</button>' +
     (waNum ? '<button class="btn" onclick="window.open(\'https://wa.me/'+waNum+'?text='+encodeURIComponent(testoMsg)+'\',\'_blank\'); registraCheckinOnlineInviato(\''+bookingId+'\',\'whatsapp\',\''+waNum+'\')">💬 WhatsApp</button>' : '') +
     '<button class="btn" onclick="window.open(\'https://mail.google.com/mail/?view=cm&fs=1&to='+encodeURIComponent(emailOspite)+'&su='+encodeURIComponent('Check-in online — '+(s.propertyName||''))+'&body='+encodeURIComponent(testoMsg)+'\',\'_blank\'); registraCheckinOnlineInviato(\''+bookingId+'\',\'gmail\',\''+emailOspite.replace(/'/g,"\\'")+'\')">📧 Apri Gmail</button>' +
     (gmailrealePronto && emailOspite
-      ? '<button class="btn btn-primary" onclick="inviaCheckinOnlineReale(\''+bookingId+'\', \''+link.replace(/'/g,"\\'")+'\')">📤 Invia da villaaurorahoteldolomiti@gmail.com</button>'
+      ? '<button class="btn btn-primary" onclick="inviaCheckinOnlineReale(\''+bookingId+'\', \''+link.replace(/'/g,"\\'")+'\')">📤 Invia da '+emailMittenteAttuale()+'</button>'
       : '<button class="btn btn-primary" onclick="window.open(\'mailto:'+emailOspite+'?subject='+encodeURIComponent('Check-in online — '+ (s.propertyName||''))+'&body='+encodeURIComponent(testoMsg)+'\'); registraCheckinOnlineInviato(\''+bookingId+'\',\'mailto\',\''+emailOspite.replace(/'/g,"\\'")+'\')">✉️ Email (client di posta)</button>')
   );
 }
@@ -1609,7 +1609,7 @@ async function eliminaBackupCloud(id) {
 }
 
 // Invia una email di prova al proprio indirizzo (quello impostato in "Email" nei dati struttura),
-// per verificare subito che l'invio reale da villaaurorahoteldolomiti@gmail.com funzioni davvero —
+// per verificare subito che l'invio reale dall'email configurata in Impostazioni funzioni davvero —
 // senza dover creare un preventivo di prova ogni volta
 async function inviaEmailDiProva() {
   const s = DB.getObj('settings', {});
@@ -1624,7 +1624,7 @@ async function inviaEmailDiProva() {
       body: JSON.stringify({
         to: s.email, toName: s.propertyName || 'Struttura',
         subject: '✅ Email di prova da DeskFlow',
-        message: 'Questa è una email di prova inviata da DeskFlow.\n\nSe la ricevi, l\'invio reale da villaaurorahoteldolomiti@gmail.com funziona correttamente.'
+        message: 'Questa è una email di prova inviata da DeskFlow.\n\nSe la ricevi, l\'invio reale da '+emailMittenteAttuale()+' funziona correttamente.'
       })
     });
     const data = await res.json();
@@ -10960,6 +10960,13 @@ function getTariffe(){
   if(!t||!t.length){ t=[{id:'standard',nome:'Standard',modalita:null,valore:0}]; DB.set('tariffe',t); }
   return t;
 }
+// Email di invio mostrata nei pulsanti "Invia da..." e nei messaggi — presa da Impostazioni, con
+// un'etichetta neutra di riserva se non è ancora stata configurata (utile soprattutto quando questo
+// file viene usato come base per una nuova struttura, prima che le Impostazioni siano compilate).
+function emailMittenteAttuale() {
+  var s = DB.getObj('settings', {});
+  return s.emailMittente || 'l\'email della struttura';
+}
 function getTariffaObj(id){
   return getTariffe().find(function(x){return x.id===(id||'standard');}) || {id:'standard',nome:'Standard',modalita:null,valore:0};
 }
@@ -13050,7 +13057,7 @@ function inviaPreventivo(id) {
   const gmailrealePronto = !!(s.supabaseUrl && s.supabaseKey);
   const linkScelta = s.scegliPreventivoUrl ? s.scegliPreventivoUrl.replace(/\/$/,'') + '?id=' + q.id : '';
   const canali = [
-    {metodo:'gmailreale', label:'📤 Invia da villaaurorahoteldolomiti@gmail.com', primary:true, abilitato:gmailrealePronto, motivoDisab:'Configura prima Supabase in Impostazioni'},
+    {metodo:'gmailreale', label:'📤 Invia da '+emailMittenteAttuale(), primary:true, abilitato:gmailrealePronto, motivoDisab:'Configura prima Supabase in Impostazioni'},
     {metodo:'whatsapp', label:'💬 WhatsApp', abilitato:true},
     {metodo:'copia', label:'📋 Copia testo', abilitato:true},
     {metodo:'mailto', label:'✉ Client di posta predefinito', abilitato:true}
@@ -13058,8 +13065,8 @@ function inviaPreventivo(id) {
   showModal('Invia preventivo #'+q.num,
     '<div style="font-size:13px;color:var(--text2)">Come vuoi inviare il preventivo a <strong>'+q.clientName+'</strong>'+(q.clientEmail?' ('+q.clientEmail+')':' — nessuna email salvata, potrai inserirla manualmente')+'?</div>'
     +(gmailrealePronto
-        ? '<div style="font-size:11px;color:var(--green);margin-top:6px">✅ Usa sempre "📤 Invia da villaaurorahoteldolomiti@gmail.com" per essere certo che parta dall\'indirizzo giusto della struttura.</div>'
-        : '<div style="font-size:11px;color:var(--amber);margin-top:8px;padding:8px 10px;background:var(--amber-bg);border-radius:6px">⚠ Supabase non configurato: l\'invio reale da villaaurorahoteldolomiti@gmail.com non è disponibile — configuralo in Impostazioni.</div>')
+        ? '<div style="font-size:11px;color:var(--green);margin-top:6px">✅ Usa sempre "📤 Invia da '+emailMittenteAttuale()+'" per essere certo che parta dall\'indirizzo giusto della struttura.</div>'
+        : '<div style="font-size:11px;color:var(--amber);margin-top:8px;padding:8px 10px;background:var(--amber-bg);border-radius:6px">⚠ Supabase non configurato: l\'invio reale da '+emailMittenteAttuale()+' non è disponibile — configuralo in Impostazioni.</div>')
     +(linkScelta
         ? '<div style="margin-top:12px;padding:8px 10px;background:var(--surface2);border-radius:6px;display:flex;align-items:center;gap:8px">'
           +'<input type="text" readonly value="'+linkScelta+'" style="flex:1;border:none;background:transparent;font-size:11.5px;color:var(--text2)">'
@@ -13349,7 +13356,7 @@ function confermaInvioPreventivoConTesto() {
     }).then(function(res){ return res.json(); }).then(function(data){
       if (!data.ok) throw new Error(data.errore || 'Invio non riuscito');
       registraComunicazioneQuote(id, {canale:'gmailreale', oggetto:subjectRaw, testo:testo, destinatario:to, esito:'inviata realmente'});
-      marcaInviatoEChiudi('Preventivo inviato da villaaurorahoteldolomiti@gmail.com a '+to);
+      marcaInviatoEChiudi('Preventivo inviato da '+emailMittenteAttuale()+' a '+to);
     }).catch(function(err){
       console.error('Errore invio Gmail:', err);
       showToast('Invio non riuscito: '+(err.message||'errore sconosciuto'));
@@ -13420,7 +13427,7 @@ function metteInOpzionePreventivo(id) {
   renderPreventivi();
 }
 
-// Avvisa il gestore via email reale (villaaurorahoteldolomiti@gmail.com) quando un preventivo viene
+// Avvisa il gestore via email reale (indirizzo configurato in Impostazioni) quando un preventivo viene
 // confermato e trasformato in prenotazione — così sa subito quale camera è stata bloccata e per chi.
 async function notificaConfermaPrenotazione(b) {
   const s = DB.getObj('settings', {});
@@ -16752,8 +16759,8 @@ function aggiornaRiepilogoEdit() {
   });
   rows += '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;color:var(--text2);gap:8px">' +
     '<span>Tassa di soggiorno'+(tassaManuale?' <span class="badge badge-amber" style="font-size:9px">manuale</span>':'')+'</span>' +
-    '<span style="display:flex;align-items:center;gap:6px">'+fmtCurrency(
-    '<input type="number" step="0.01" id="f-tassa-input" value="'+tassaValore)+'" data-manual="'+(tassaManuale?'1':'0')+'" style="width:80px;padding:3px 6px;border:.5px solid var(--border2);border-radius:6px;text-align:right" oninput="this.dataset.manual=\'1\'; aggiornaRiepilogoEdit();">' +
+    '<span style="display:flex;align-items:center;gap:6px">' +
+    '<input type="number" step="0.01" id="f-tassa-input" value="'+tassaValore+'" data-manual="'+(tassaManuale?'1':'0')+'" style="width:80px;padding:3px 6px;border:.5px solid var(--border2);border-radius:6px;text-align:right" oninput="this.dataset.manual=\'1\'; aggiornaRiepilogoEdit();">' +
     (tassaManuale ? '<button type="button" class="btn btn-sm" style="padding:2px 6px;font-size:10px" onclick="document.getElementById(\'f-tassa-input\').dataset.manual=\'0\'; aggiornaRiepilogoEdit();" title="Torna al calcolo automatico">↺</button>' : '') +
     '</span></div>';
   rows += '<div style="display:flex;justify-content:space-between;padding:7px 0;margin-top:4px;border-top:.5px solid var(--border)"><span style="text-transform:uppercase;font-size:11px;letter-spacing:.4px;font-weight:700;color:var(--text2)">Totale conto</span><span style="font-weight:800;font-size:16px">'+fmtCurrency(totale)+'</span></div>';
@@ -17468,7 +17475,7 @@ function apriInvioCancellazione(bookingId) {
   const t = costruisciTestoCancellazione(bookingId);
   if (!t) return;
   const canali = [
-    {metodo:'gmailreale', label:'📤 Invia da villaaurorahoteldolomiti@gmail.com', primary:true, abilitato:gmailrealePronto, motivoDisab:'Configura prima Supabase in Impostazioni'},
+    {metodo:'gmailreale', label:'📤 Invia da '+emailMittenteAttuale(), primary:true, abilitato:gmailrealePronto, motivoDisab:'Configura prima Supabase in Impostazioni'},
     {metodo:'whatsapp', label:'💬 WhatsApp', abilitato:true},
     {metodo:'copia', label:'📋 Copia testo', abilitato:true},
     {metodo:'mailto', label:'✉ Client di posta predefinito', abilitato:true}
@@ -17532,7 +17539,7 @@ function eseguiInvioCancellazione(bookingId, metodo) {
     }).then(function(res){ return res.json(); }).then(function(data){
       if (!data.ok) throw new Error(data.errore || 'Invio non riuscito');
       registraComunicazione(bookingId,{canale:'gmailreale',oggetto:subjectRaw,testo:bodyRaw,destinatario:to,esito:'inviata realmente'});
-      fine('Cancellazione inviata da villaaurorahoteldolomiti@gmail.com a '+to+' — prenotazione già cancellata');
+      fine('Cancellazione inviata da '+emailMittenteAttuale()+' a '+to+' — prenotazione già cancellata');
     }).catch(function(err){
       console.error('Errore invio Gmail:', err);
       showToast('Invio non riuscito: '+(err.message||'errore sconosciuto')+' — la prenotazione resta comunque cancellata');
@@ -17752,7 +17759,7 @@ function inviaConfermaPrenotazione(bookingId) {
   const t = costruisciTestoConferma(bookingId, hasCondizioni(), 'it');
   if (!t) return;
   const canali = [
-    {metodo:'gmailreale', label:'📤 Invia da villaaurorahoteldolomiti@gmail.com', primary:true, abilitato:gmailrealePronto, motivoDisab:'Configura prima Supabase in Impostazioni'},
+    {metodo:'gmailreale', label:'📤 Invia da '+emailMittenteAttuale(), primary:true, abilitato:gmailrealePronto, motivoDisab:'Configura prima Supabase in Impostazioni'},
     {metodo:'whatsapp', label:'💬 WhatsApp', abilitato:true},
     {metodo:'copia', label:'📋 Copia testo', abilitato:true},
     {metodo:'mailto', label:'✉ Client di posta predefinito', abilitato:true}
@@ -17835,7 +17842,7 @@ function eseguiInvioConferma(bookingId, metodo) {
     }).then(function(res){ return res.json(); }).then(function(data){
       if (!data.ok) throw new Error(data.errore || 'Invio non riuscito');
       registraSuTutteLeCamere({canale:'gmailreale',oggetto:subjectRaw,testo:bodyRaw,destinatario:to,esito:'inviata realmente'});
-      fine('Conferma inviata da villaaurorahoteldolomiti@gmail.com a '+to);
+      fine('Conferma inviata da '+emailMittenteAttuale()+' a '+to);
       // Manda anche una copia alla struttura, così risulta sempre chi ha ricevuto cosa — prima
       // questa conferma andava SOLO al cliente, la struttura non ne sapeva nulla.
       if (s.email && s.email.trim().toLowerCase() !== to.trim().toLowerCase()) {
@@ -18333,7 +18340,7 @@ function renderCanaliMessaggioLibero(bookingId) {
   const email = guest?.email || '';
   const s = DB.getObj('settings', {});
   const canali = [
-    {metodo:'gmailreale', label:'📤 Invia da villaaurorahoteldolomiti@gmail.com', primary:true, abilitato:!!(s.supabaseUrl && s.supabaseKey), motivoDisab:'Configura prima Supabase in Impostazioni'},
+    {metodo:'gmailreale', label:'📤 Invia da '+emailMittenteAttuale(), primary:true, abilitato:!!(s.supabaseUrl && s.supabaseKey), motivoDisab:'Configura prima Supabase in Impostazioni'},
     {metodo:'whatsapp', label:'💬 WhatsApp', abilitato:true},
     {metodo:'copia', label:'📋 Copia testo', abilitato:true}
   ];
@@ -18372,7 +18379,7 @@ function eseguiInvioMessaggioLibero(bookingId, metodo, to) {
     }).then(function(res){ return res.json(); }).then(function(data){
       if (!data.ok) throw new Error(data.errore || 'Invio non riuscito');
       registraComunicazione(bookingId,{canale:'gmailreale',oggetto,testo,destinatario:to,esito:'inviata realmente da Gmail'});
-      fine('Messaggio inviato da villaaurorahoteldolomiti@gmail.com a '+to);
+      fine('Messaggio inviato da '+emailMittenteAttuale()+' a '+to);
     }).catch(function(err){
       console.error('Errore invio Gmail:', err);
       showToast('Invio non riuscito: '+(err.message||'errore sconosciuto'));
@@ -23943,7 +23950,7 @@ function renderSitoWeb() {
     '<div class="modal-body">' +
       '<label style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><input type="checkbox" id="sw-showwelcome" '+(c.showWelcome?'checked':'')+' onchange="document.getElementById(\'sw-welcome-fields\').style.display=this.checked?\'\':\'none\'"> Mostra un paragrafo di benvenuto/presentazione sotto la ricerca disponibilità</label>' +
       '<div id="sw-welcome-fields" style="display:'+(c.showWelcome?'':'none')+'">' +
-        '<div class="form-group full"><label>Titolo paragrafo</label><input type="text" id="sw-welcometitle" value="'+(c.welcomeTitle||'').replace(/"/g,'&quot;')+'" placeholder="Benvenuti a Villa Aurora"></div>' +
+        '<div class="form-group full"><label>Titolo paragrafo</label><input type="text" id="sw-welcometitle" value="'+(c.welcomeTitle||'').replace(/"/g,'&quot;')+'" placeholder="Benvenuti nella nostra struttura"></div>' +
         '<div class="form-group full"><label>Testo</label><textarea id="sw-welcometext" style="min-height:90px">'+(c.welcomeText||'')+'</textarea></div>' +
       '</div>' +
       '<label style="display:flex;align-items:center;gap:8px;margin-top:10px"><input type="checkbox" id="sw-showfooter" '+(c.showFooterContacts!==false?'checked':'')+'> Mostra indirizzo/telefono/email/CIN in fondo alla pagina</label>' +
@@ -27442,6 +27449,11 @@ function renderImpostazioni() {
               <label>Nome struttura</label>
               <input type="text" id="s-name" value="${s.propertyName||''}" placeholder="Il tuo hotel">
             </div>
+            <div class="form-group full">
+              <label>Email di invio (preventivi/conferme/ricevute)</label>
+              <input type="email" id="s-email-mittente" value="${s.emailMittente||''}" placeholder="nome@tuastruttura.it">
+              <div style="font-size:11px;color:var(--text3);margin-top:3px">L'indirizzo che appare nei pulsanti "Invia da..." e nei messaggi di conferma — l'invio vero passa comunque dalla funzione Supabase configurata con le credenziali di questo indirizzo.</div>
+            </div>
             <div class="form-group">
               <label>Valuta</label>
               <select id="s-currency">
@@ -27511,7 +27523,7 @@ function renderImpostazioni() {
           <div class="form-grid">
             <div class="form-group full">
               <label>Ragione sociale</label>
-              <input type="text" id="s-ragsociale" value="${s.ragioneSociale||''}" placeholder="Es. Hotel Villa Aurora S.r.l. (se diversa dal nome struttura)">
+              <input type="text" id="s-ragsociale" value="${s.ragioneSociale||''}" placeholder="Es. Nome Struttura S.r.l. (se diversa dal nome struttura)">
             </div>
             <div class="form-group">
               <label>Provincia (es. MI)</label>
@@ -27788,7 +27800,7 @@ function renderImpostazioni() {
 
       <div class="card" style="max-width:500px;flex:1 1 460px">
         <div class="card-header"><span class="card-title">Invio email reale</span></div>
-        <div class="sub" style="margin:-6px 0 14px;font-size:12px;color:var(--text3)">Preventivi, conferme, ricevute e messaggi vengono inviati per davvero da <strong>villaaurorahoteldolomiti@gmail.com</strong> tramite la funzione Supabase già collegata sopra — non serve nessuna configurazione aggiuntiva qui, basta che Supabase sia configurato e connesso.</div>
+        <div class="sub" style="margin:-6px 0 14px;font-size:12px;color:var(--text3)">Preventivi, conferme, ricevute e messaggi vengono inviati per davvero da <strong>${s.emailMittente||'(configura l\'email qui sopra)'}</strong> tramite la funzione Supabase già collegata sopra — non serve nessuna configurazione aggiuntiva qui, basta che Supabase sia configurato e connesso.</div>
         <div class="modal-body">
           <div class="form-grid">
             <button type="button" class="btn btn-sm full" onclick="inviaEmailDiProva()">✉️ Invia email di prova a me stesso</button>
@@ -28067,6 +28079,7 @@ function rimuoviLogoStruttura() {
 function saveImpostazioni() {
   const s = DB.getObj('settings', {}); // partiamo da TUTTO quello che c'è già, non lo ricostruiamo da zero
   s.propertyName  = document.getElementById('s-name').value;
+  s.emailMittente = document.getElementById('s-email-mittente')?.value.trim() || '';
   s.currency      = document.getElementById('s-currency').value;
   // s.logo non va toccato qui: resta quello già salvato, si cambia solo con Carica/Rimuovi logo
   s.cityTax          = parseFloat(document.getElementById('s-tax').value)||0;
