@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 03/09/2026 · 15:34</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 03/09/2026 · 17:23</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -14786,6 +14786,8 @@ function renderPrenotazioni() {
         </div>
 
         <div style="display:flex;gap:6px;align-items:flex-end;padding-bottom:1px">
+          <button class="btn btn-sm" style="background:#f59e0b;color:#fff;border-color:#f59e0b" onclick="prenSetPreset('today')">Oggi</button>
+          <button class="btn btn-sm" style="background:#16a34a;color:#fff;border-color:#16a34a" onclick="prenSetPreset('tomorrow')">Domani</button>
           <button class="btn btn-sm" onclick="prenSetPreset('month')">Questo mese</button>
           <button class="btn btn-sm" onclick="prenSetPreset('next30')">Prossimi 30gg</button>
           <button class="btn btn-sm" onclick="prenSetPreset('year')">Anno corrente</button>
@@ -14883,7 +14885,14 @@ function renderPrenotazioni() {
 function prenSetPreset(p) {
   const n = new Date(); n.setHours(0,0,0,0);
   const fmt = d => (function(x){return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');})(d);
-  if (p === 'month') {
+  if (p === 'today') {
+    prenotazioniFilter.from = fmt(n);
+    prenotazioniFilter.to   = fmt(n);
+  } else if (p === 'tomorrow') {
+    const t = new Date(n); t.setDate(t.getDate()+1);
+    prenotazioniFilter.from = fmt(t);
+    prenotazioniFilter.to   = fmt(t);
+  } else if (p === 'month') {
     prenotazioniFilter.from = fmt(new Date(n.getFullYear(), n.getMonth(), 1));
     prenotazioniFilter.to   = fmt(new Date(n.getFullYear(), n.getMonth()+1, 0));
   } else if (p === 'next30') {
