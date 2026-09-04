@@ -334,10 +334,13 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 03/09/2026 · 17:23</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 04/09/2026 · 13:49</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
+    </button>
+    <button id="btn-stop-vendite" onclick="toggleStopVenditePortali()" title="Chiude/riapre subito la vendita su tutti i portali collegati — resta comunque prenotabile a mano dal PMS" style="width:calc(100% - 24px);margin:0 12px 8px;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
+      <span id="btn-stop-vendite-testo">⛔ Chiudi vendite portali</span>
     </button>
     <button id="btn-logout" onclick="doLogout()" style="display:none;width:calc(100% - 24px);margin:0 12px 12px;background:transparent;color:var(--text3,#888);border:.5px solid var(--border2,#ddd);border-radius:8px;padding:7px 12px;font-size:12px;font-weight:500;cursor:pointer;align-items:center;justify-content:center;gap:6px">
       🚪 Esci
@@ -348,6 +351,8 @@ tr:hover td{background:var(--surface2)}
   <div class="nav-item" onclick="navigate('planner')" data-page="planner">📅 Planner</div>
   <div class="nav-item" onclick="navigate('calendario')" data-page="calendario">📅 Calendario</div>
   <div class="nav-item" onclick="navigate('prenotazioni')" data-page="prenotazioni">📋 Prenotazioni</div>
+  <div class="nav-item" onclick="navigate('gruppi')" data-page="gruppi">👥 Gruppi &amp; Eventi</div>
+  <div class="nav-item" onclick="navigate('fatture')" data-page="fatture">🧾 Fatture</div>
   <div class="nav-item" onclick="navigate('arrivi-partenze')" data-page="arrivi-partenze">🗂 Check-in/out</div>
   <div class="nav-item" onclick="navigate('corrispettivi')" data-page="corrispettivi">💶 Corrispettivi</div>
   <div class="nav-item" onclick="navigate('housekeeping')" data-page="housekeeping">🧹 Housekeeping</div>
@@ -376,10 +381,12 @@ tr:hover td{background:var(--surface2)}
   <div class="nav-item" onclick="navigate('reportpasti')" data-page="reportpasti">🍽 Report Pasti</div>
   <div class="nav-section">Impostazioni</div>
   <div class="nav-item" onclick="navigate('extra')" data-page="extra">🛎 Extra/Servizi</div>
+  <div class="nav-item" onclick="navigate('manutenzione')" data-page="manutenzione">🔧 Manutenzione</div>
   <div class="nav-item" onclick="navigate('adempimenti')" data-page="adempimenti">📋 Adempimenti</div>
   <div class="nav-item" onclick="navigate('blacklist')" data-page="blacklist" style="color:var(--danger)">🚫 Blacklist</div>
   <div class="nav-item" onclick="navigate('ical')" data-page="ical">🔗 iCal/Portali</div>
   <div class="nav-item" onclick="navigate('impostazioni')" data-page="impostazioni">⚙ Impostazioni</div>
+  <div class="nav-item" onclick="navigate('utenti')" data-page="utenti">🔐 Utenti &amp; Permessi</div>
   <div class="nav-item" onclick="navigate('salvataggio')" data-page="salvataggio">💾 Salvataggio</div>
 </nav>
 
@@ -413,6 +420,8 @@ tr:hover td{background:var(--surface2)}
   <div id="page-emailmassiva" class="page"></div>
   <div id="page-calendario" class="page"></div>
   <div id="page-prenotazioni" class="page"></div>
+  <div id="page-gruppi" class="page"></div>
+  <div id="page-fatture" class="page"></div>
   <div id="page-arrivi-partenze" class="page" style="display:flex;flex-direction:column">
     <div id="ap-subtoggle"></div>
     <div id="page-checkin"></div>
@@ -442,10 +451,12 @@ tr:hover td{background:var(--surface2)}
   <div id="page-report" class="page"></div>
   <div id="page-reportpasti" class="page"></div>
   <div id="page-extra" class="page"></div>
+  <div id="page-manutenzione" class="page"></div>
   <div id="page-adempimenti" class="page"></div>
   <div id="page-blacklist" class="page"></div>
   <div id="page-ical" class="page"></div>
   <div id="page-impostazioni" class="page"></div>
+  <div id="page-utenti" class="page"></div>
   <div id="page-salvataggio" class="page"></div>
 </div>
 <div id="modal-container"></div>
@@ -490,6 +501,7 @@ const DB = {
     if (k==='tassaSoggiornoLog' && supabaseReady && _blobsReady['tassaSoggiornoLog']) return _blobsCache['tassaSoggiornoLog'] || [];
     if (k==='listinoLivelli' && supabaseReady && _blobsReady['listinoLivelli']) return _blobsCache['listinoLivelli'] || [];
     if (k==='listinoRegistro' && supabaseReady && _blobsReady['listinoRegistro']) return _blobsCache['listinoRegistro'] || [];
+    if (k==='manutenzione' && supabaseReady && _blobsReady['manutenzione']) return _blobsCache['manutenzione'] || [];
     try{return JSON.parse(localStorage.getItem('pms_'+k))||[];}catch{return[];}
   },
   set(k,v){
@@ -514,14 +526,15 @@ const DB = {
     if (k==='tassaSoggiornoLog' && supabaseReady && _blobsReady['tassaSoggiornoLog']) { _blobsCache['tassaSoggiornoLog'] = v; setTimeout(()=>syncBlobToSupabase('tassaSoggiornoLog', v),0); return; }
     if (k==='listinoLivelli' && supabaseReady && _blobsReady['listinoLivelli']) { _blobsCache['listinoLivelli'] = v; setTimeout(()=>syncBlobToSupabase('listinoLivelli', v),0); return; }
     if (k==='listinoRegistro' && supabaseReady && _blobsReady['listinoRegistro']) { _blobsCache['listinoRegistro'] = v; setTimeout(()=>syncBlobToSupabase('listinoRegistro', v),0); return; }
+    if (k==='manutenzione' && supabaseReady && _blobsReady['manutenzione']) { _blobsCache['manutenzione'] = v; setTimeout(()=>syncBlobToSupabase('manutenzione', v),0); return; }
     localStorage.setItem('pms_'+k,JSON.stringify(v));
   },
   getObj(k,def){
-    if ((k==='settings'||k==='corrispettivi'||k==='revenueConfig'||k==='categoryOrder'||k==='groupColors'||k==='hkData'||k==='regoleTipo'||k==='tassaSoggiornoDettaglio'||k==='ical_portals'||k==='livelliTariffari') && supabaseReady && _blobsReady[k]) return _blobsCache[k] || def;
+    if ((k==='settings'||k==='corrispettivi'||k==='revenueConfig'||k==='categoryOrder'||k==='groupColors'||k==='hkData'||k==='regoleTipo'||k==='tassaSoggiornoDettaglio'||k==='ical_portals'||k==='livelliTariffari'||k==='gruppiInfo'||k==='fatture'||k==='utentiPermessi') && supabaseReady && _blobsReady[k]) return _blobsCache[k] || def;
     try{return JSON.parse(localStorage.getItem('pms_'+k))||def;}catch{return def;}
   },
   setObj(k,v){
-    if ((k==='settings'||k==='corrispettivi'||k==='revenueConfig'||k==='categoryOrder'||k==='groupColors'||k==='hkData'||k==='regoleTipo'||k==='tassaSoggiornoDettaglio'||k==='ical_portals'||k==='livelliTariffari') && supabaseReady && _blobsReady[k]) { _blobsCache[k] = v; setTimeout(()=>syncBlobToSupabase(k, v),0); return; }
+    if ((k==='settings'||k==='corrispettivi'||k==='revenueConfig'||k==='categoryOrder'||k==='groupColors'||k==='hkData'||k==='regoleTipo'||k==='tassaSoggiornoDettaglio'||k==='ical_portals'||k==='livelliTariffari'||k==='gruppiInfo'||k==='fatture'||k==='utentiPermessi') && supabaseReady && _blobsReady[k]) { _blobsCache[k] = v; setTimeout(()=>syncBlobToSupabase(k, v),0); return; }
     localStorage.setItem('pms_'+k,JSON.stringify(v));
   }
 };
@@ -922,14 +935,14 @@ async function initSupabase() {
 
     // Impostazioni e Corrispettivi: tabella facoltativa "app_blobs" (un blocco unico di dati per chiave)
     try {
-      const {data:blobs, error:err8} = await supabaseClient.from('app_blobs').select('*').in('key', ['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro']);
+      const {data:blobs, error:err8} = await supabaseClient.from('app_blobs').select('*').in('key', ['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro','manutenzione','gruppiInfo','fatture','utentiPermessi']);
       if (err8) throw err8;
       (blobs||[]).forEach(row => { _blobsCache[row.key] = row.data; _blobsReady[row.key] = true; });
       // Se una delle chiavi non esiste ancora su Supabase, la creiamo copiando quella locale attuale
       // (per storicoOspiti/messageTemplates/listinoAggiustamenti/listinoScostamenti/competitorStrutture/
       // competitorPrices: JSON.parse restituisce [] di default, non null, quindi il controllo "local"
       // richiede che l'array abbia almeno un elemento — altrimenti non c'è nulla da migrare)
-      for (const key of ['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro']) {
+      for (const key of ['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro','manutenzione','gruppiInfo','fatture','utentiPermessi']) {
         if (!_blobsReady[key]) {
           const raw = localStorage.getItem('pms_'+key);
           const isArrayKey = (key==='storicoOspiti'||key==='messageTemplates'||key==='listinoAggiustamenti'||key==='listinoScostamenti'||key==='competitorStrutture'||key==='competitorPrices'||key==='blacklist'||key==='extras'||key==='movimenti'||key==='tassaSoggiornoLog'||key==='categoryOrder'||key==='ical_portals');
@@ -942,7 +955,7 @@ async function initSupabase() {
       }
     } catch (err8) {
       console.warn('Tabella app_blobs non disponibile — Impostazioni, Corrispettivi, Archivio storico ospiti, variazioni prezzo, scostamenti, Prezzo consigliato, Prezzi concorrenti e portali iCal restano locali su questo PC. Esegui lo script SQL aggiuntivo per attivarlo.', err8);
-      ['settings','corrispettivi','storicoOspiti','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro'].forEach(function(k){ _blobsReady[k] = false; });
+      ['settings','corrispettivi','storicoOspiti','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro','manutenzione','gruppiInfo','fatture','utentiPermessi'].forEach(function(k){ _blobsReady[k] = false; });
     }
 
     // Tempo reale su tutte le tabelle — riattivato dopo l'upgrade a compute Micro (più risorse
@@ -1091,7 +1104,7 @@ function handleQuoteRealtimeChange(payload) {
 }
 function handleBlobRealtimeChange(payload) {
   const key = payload.eventType === 'DELETE' ? payload.old.key : payload.new.key;
-  if (['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro'].indexOf(key) < 0) return;
+  if (['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro','manutenzione','gruppiInfo','fatture','utentiPermessi'].indexOf(key) < 0) return;
   if (payload.eventType === 'DELETE') { delete _blobsCache[key]; }
   else { _blobsCache[key] = payload.new.data; }
   if (key === 'settings') {
@@ -1946,7 +1959,7 @@ async function refreshDatiCorrenti() {
         r.forEach(b => { _roomBlocksCache[b.room_id+'|'+b.block_date] = true; });
       }));
       if (_blobsReady['settings'] || _blobsReady['corrispettivi'] || _blobsReady['storicoOspiti'] || _blobsReady['messageTemplates'] || _blobsReady['listinoAggiustamenti'] || _blobsReady['listinoScostamenti'] || _blobsReady['revenueConfig'] || _blobsReady['competitorStrutture'] || _blobsReady['competitorPrices'] || _blobsReady['blacklist'] || _blobsReady['extras'] || _blobsReady['movimenti'] || _blobsReady['tassaSoggiornoLog'] || _blobsReady['categoryOrder'] || _blobsReady['groupColors'] || _blobsReady['hkData'] || _blobsReady['regoleTipo'] || _blobsReady['tassaSoggiornoDettaglio'] || _blobsReady['ical_portals']) {
-        jobs.push(supabaseClient.from('app_blobs').select('*').in('key', ['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro']).then(r => {
+        jobs.push(supabaseClient.from('app_blobs').select('*').in('key', ['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro','manutenzione','gruppiInfo','fatture','utentiPermessi']).then(r => {
           (r.data||[]).forEach(row => { _blobsCache[row.key] = row.data; });
         }));
       }
@@ -10771,6 +10784,65 @@ function confermaSpostamentoDrag(bId, targetRoomId) {
   renderCalendario();
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// STOP VENDITE PORTALI — richiesto da Gian: un interruttore sempre visibile
+// nella barra laterale (qualunque pagina si stia guardando) per chiudere
+// SUBITO la vendita su tutti i portali collegati in caso di emergenza —
+// senza dover chiudere data per data. Riusa lo stesso meccanismo di
+// chiusura già esistente (regoleTipo.chiusure), applicandolo in un colpo
+// solo su tutte le tipologie e i prossimi 12 mesi. Prima di sovrascrivere,
+// salva lo stato di chiusura di partenza, così alla riattivazione si torna
+// ESATTAMENTE a come era prima (senza perdere chiusure specifiche che
+// magari avevi già impostato tu). Resta comunque possibile creare
+// prenotazioni a mano dal PMS: questo interruttore chiude solo la vendita
+// verso i portali esterni.
+// ══════════════════════════════════════════════════════════════════════════
+async function toggleStopVenditePortali(){
+  var r = getRegoleTipo();
+  var attivo = !!r.stopVenditePortali;
+  if (!attivo) {
+    if (!confirm('Chiudere SUBITO la vendita su tutti i portali collegati per i prossimi 12 mesi?\n\nResta comunque possibile creare prenotazioni a mano dal PMS. Potrai riattivare la vendita in qualsiasi momento con lo stesso pulsante.')) return;
+    var rooms = DB.get('rooms') || [];
+    var tipi = Array.from(new Set(rooms.map(function(rm){ return normCatType(rm.type); })));
+    var oggi = today();
+    var al = addDays(oggi, 365);
+    if (!r.chiusure) r.chiusure = {};
+    r._chiusureSnapshotPreStop = JSON.parse(JSON.stringify(r.chiusure)); // per poter tornare indietro esatti
+    tipi.forEach(function(tipo){
+      if (!r.chiusure[tipo]) r.chiusure[tipo] = {};
+      var d = oggi, guard = 0;
+      while (d <= al && guard < 400) { r.chiusure[tipo][d] = true; d = addDays(d,1); guard++; }
+    });
+    r.stopVenditePortali = true;
+  } else {
+    if (!confirm('Riaprire la vendita su tutti i portali collegati?')) return;
+    if (r._chiusureSnapshotPreStop) { r.chiusure = r._chiusureSnapshotPreStop; delete r._chiusureSnapshotPreStop; }
+    r.stopVenditePortali = false;
+  }
+  await saveRegoleTipo(r);
+  if (typeof avvisaHostexSubito === 'function') avvisaHostexSubito();
+  if (typeof registraModificaListino === 'function') registraModificaListino('Tutte le tipologie — ' + (!attivo ? '⛔ vendita ai portali CHIUSA (prossimi 12 mesi)' : '✅ vendita ai portali RIAPERTA'));
+  aggiornaBottoneStopVendite();
+  showToast(!attivo ? '⛔ Vendita ai portali chiusa — ricordati di riattivarla quando serve' : '✅ Vendita ai portali riaperta');
+}
+function aggiornaBottoneStopVendite(){
+  var btn = document.getElementById('btn-stop-vendite');
+  var testo = document.getElementById('btn-stop-vendite-testo');
+  if (!btn || !testo) return;
+  var attivo = !!(getRegoleTipo().stopVenditePortali);
+  if (attivo) {
+    btn.style.background = 'var(--green)';
+    btn.style.color = '#fff';
+    btn.style.border = 'none';
+    testo.textContent = '✅ Riattiva vendita portali';
+  } else {
+    btn.style.background = 'var(--red-bg,#fee2e2)';
+    btn.style.color = 'var(--red,#dc2626)';
+    btn.style.border = '1.5px solid var(--red,#dc2626)';
+    testo.textContent = '⛔ Chiudi vendite portali';
+  }
+}
+
 // Chiude/riapre alla vendita un singolo giorno per l'intera tipologia
 function toggleChiusuraCategoria(catTypeEnc, ds, fromPage){
   var catType = normCatType(decodeURIComponent(catTypeEnc));
@@ -10917,6 +10989,15 @@ function toggleMobileMenu() {
   document.getElementById('mobile-overlay')?.classList.toggle('mobile-open');
 }
 function navigate(page){
+  // Blocco permessi: se l'utente collegato è limitato e questa pagina non gli è consentita,
+  // impedisce l'accesso anche se qualcuno prova ad arrivarci "a mano" (es. dalla Console).
+  if (typeof window.currentUserPermessi !== 'undefined' && window.currentUserPermessi) {
+    var permessoRichiesto = (typeof PAGINE_PERMESSO !== 'undefined') ? PAGINE_PERMESSO[page] : null;
+    if (permessoRichiesto && !window.currentUserPermessi[permessoRichiesto]) {
+      showToast('⛔ Non hai accesso a questa pagina');
+      return;
+    }
+  }
   document.getElementById('sidebar')?.classList.remove('mobile-open');
   document.getElementById('mobile-overlay')?.classList.remove('mobile-open');
   document.querySelectorAll('.page').forEach(p=>p.style.display='none');
@@ -10928,13 +11009,13 @@ function navigate(page){
   if(ni)ni.classList.add('active');
   currentPage=page;
   var map={
-    dashboard:renderDashboard,calendario:renderCalendario,prenotazioni:renderPrenotazioni,mobilecheckin:renderMobileCheckin,wamassivo:renderWaMassivo,emailmassiva:renderEmailMassiva,
+    dashboard:renderDashboard,calendario:renderCalendario,prenotazioni:renderPrenotazioni,gruppi:renderGruppiEventi,fatture:renderFatture,mobilecheckin:renderMobileCheckin,wamassivo:renderWaMassivo,emailmassiva:renderEmailMassiva,
     checkin:renderCheckin,checkout:renderCheckout,'arrivi-partenze':renderArriviPartenze,checkineffettuati:renderCheckinEffettuati,checkouteffettuati:renderCheckoutEffettuati,effettuati:renderEffettuati,planner:renderPlanner,contidasaldare:renderContiDaSaldare,corrispettivi:renderCorrispettiviPage,condizioni:renderCondizioni,revenue:renderRevenue,camere:renderCamere,ospiti:renderOspiti,archivioospiti:renderArchivioOspiti,
     listino:renderListino,livelli:renderLivelliTariffari,tipologie:renderTipologie,tassasoggiorno:renderTassaSoggiorno,preventivi:renderPreventivi,addebitiextra:renderAddebitiExtra,
     housekeeping:renderHousekeeping,previsionale:renderPrevisionale,report:renderReport,biancheria:renderBiancheria,
-    extra:renderExtra,adempimenti:renderAdempimenti,reportpasti:renderReportPasti,
+    extra:renderExtra,manutenzione:renderManutenzione,adempimenti:renderAdempimenti,reportpasti:renderReportPasti,
     blacklist:renderBlacklist,ical:renderIcal,impostazioni:renderImpostazioni,
-    salvataggio:renderSalvataggio,sitoweb:renderSitoWeb
+    salvataggio:renderSalvataggio,sitoweb:renderSitoWeb,utenti:renderGestioneUtenti
   };
   if(map[page]){
     try{
@@ -14653,6 +14734,412 @@ function renderEmailMassiva() {
       )+
     '</div>'+
     '</div>';
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// GRUPPI & EVENTI — richiesto da Gian: le camere collegate allo stesso
+// gruppo esistevano già (colore condiviso, conto unico, scheda di stampa),
+// ma mancava un posto dove vederli TUTTI insieme senza dover partire da una
+// prenotazione specifica, e un referente unico per il gruppo (oggi ogni
+// camera ha solo il proprio ospite, non un punto di contatto comune).
+// ══════════════════════════════════════════════════════════════════════════
+function gruppiInfoGet(){ return DB.getObj('gruppiInfo', {}); }
+function gruppiInfoSalva(obj){ DB.setObj('gruppiInfo', obj); }
+
+function gruppiApriModaleReferente(groupId){
+  var info = gruppiInfoGet();
+  var g = info[groupId] || {};
+  showModal('Referente ed evento — '+groupId,
+    '<div class="form-grid">'+
+    '<div class="form-group full"><label>Nome evento/gruppo (facoltativo — se vuoto resta "'+groupId+'")</label><input type="text" id="grp-nomeevento" value="'+(g.nomeEvento||'').replace(/"/g,'&quot;')+'" placeholder="es. Matrimonio Rossi-Bianchi"></div>'+
+    '<div class="form-group full"><label>Referente — nome</label><input type="text" id="grp-refnome" value="'+(g.referenteNome||'').replace(/"/g,'&quot;')+'" placeholder="Persona di riferimento per tutto il gruppo"></div>'+
+    '<div class="form-group"><label>Referente — telefono</label><input type="text" id="grp-reftel" value="'+(g.referenteTelefono||'').replace(/"/g,'&quot;')+'"></div>'+
+    '<div class="form-group"><label>Referente — email</label><input type="email" id="grp-refemail" value="'+(g.referenteEmail||'').replace(/"/g,'&quot;')+'"></div>'+
+    '<div class="form-group full"><label>Note</label><textarea id="grp-note" rows="3">'+(g.note||'').replace(/</g,'&lt;')+'</textarea></div>'+
+    '</div>',
+    '<button class="btn" onclick="closeModal()">Annulla</button>'+
+    '<button class="btn btn-primary" onclick="gruppiSalvaReferente(\''+groupId.replace(/'/g,"\\'")+'\')">Salva</button>'
+  );
+}
+function gruppiSalvaReferente(groupId){
+  var info = gruppiInfoGet();
+  info[groupId] = {
+    nomeEvento: (document.getElementById('grp-nomeevento').value||'').trim(),
+    referenteNome: (document.getElementById('grp-refnome').value||'').trim(),
+    referenteTelefono: (document.getElementById('grp-reftel').value||'').trim(),
+    referenteEmail: (document.getElementById('grp-refemail').value||'').trim(),
+    note: (document.getElementById('grp-note').value||'').trim(),
+  };
+  gruppiInfoSalva(info);
+  closeModal();
+  showToast('Referente salvato');
+  renderGruppiEventi();
+}
+
+function renderGruppiEventi(){
+  var bookings = DB.get('bookings').filter(function(b){ return b.groupId && b.status !== 'cancellata'; });
+  var info = gruppiInfoGet();
+  var perGruppo = {};
+  bookings.forEach(function(b){
+    if (!perGruppo[b.groupId]) perGruppo[b.groupId] = [];
+    perGruppo[b.groupId].push(b);
+  });
+  var gruppi = Object.keys(perGruppo).map(function(gid){
+    var bks = perGruppo[gid];
+    var g = info[gid] || {};
+    var checkinMin = bks.reduce(function(m,b){ return (!m||b.checkin<m)?b.checkin:m; }, null);
+    var checkoutMax = bks.reduce(function(m,b){ return (!m||b.checkout>m)?b.checkout:m; }, null);
+    var totale = bks.reduce(function(s,b){ return s + Number(b.totalPrice||0); }, 0);
+    var ospiti = bks.reduce(function(s,b){ return s + (Number(b.adults)||0) + (Number(b.children)||0); }, 0);
+    return { id: gid, info: g, camere: bks.length, checkinMin: checkinMin, checkoutMax: checkoutMax, totale: totale, ospiti: ospiti, colore: (getGroupColors()[gid]||'#9333ea') };
+  }).sort(function(a,b){ return (a.checkinMin||'').localeCompare(b.checkinMin||''); });
+
+  var html = '<div class="page-header"><div><div class="page-title">👥 Gruppi & Eventi</div>'+
+    '<div class="page-subtitle">'+gruppi.length+' gruppi attivi (camere collegate tra loro)</div></div></div>'+
+    '<div class="page-content">';
+
+  if (!gruppi.length) {
+    html += '<div class="empty-state"><p>Nessun gruppo attivo al momento — un gruppo si crea collegando due o più prenotazioni con lo stesso "ID gruppo" nella scheda di modifica prenotazione.</p></div>';
+  } else {
+    html += '<div style="display:flex;flex-direction:column;gap:12px">' +
+      gruppi.map(function(g){
+        var titolo = g.info.nomeEvento || g.id;
+        return '<div class="card" style="padding:14px 18px;border-left:4px solid '+g.colore+'">'+
+          '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap">'+
+          '<div>'+
+            '<div style="font-weight:700;font-size:15px">'+titolo.replace(/</g,'&lt;')+(g.info.nomeEvento?' <span style="font-weight:400;color:var(--text3);font-size:12px">('+g.id+')</span>':'')+'</div>'+
+            '<div style="font-size:12px;color:var(--text3);margin-top:3px">🚪 '+g.camere+' camere · 👤 '+g.ospiti+' ospiti · '+fmtDate(g.checkinMin)+' → '+fmtDate(g.checkoutMax)+' · 💰 '+fmtCurrency(g.totale)+'</div>'+
+            (g.info.referenteNome ? '<div style="font-size:12.5px;color:var(--text2);margin-top:8px">📇 Referente: <strong>'+g.info.referenteNome.replace(/</g,'&lt;')+'</strong>'+(g.info.referenteTelefono?' · 📞 '+g.info.referenteTelefono.replace(/</g,'&lt;'):'')+(g.info.referenteEmail?' · ✉ '+g.info.referenteEmail.replace(/</g,'&lt;'):'')+'</div>' : '<div style="font-size:12px;color:var(--amber,#d97706);margin-top:8px">⚠ Nessun referente impostato</div>')+
+            (g.info.note ? '<div style="font-size:12px;color:var(--text3);margin-top:4px">📝 '+g.info.note.replace(/</g,'&lt;')+'</div>' : '')+
+          '</div>'+
+          '<div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">'+
+            '<button class="btn btn-sm" onclick="gruppiApriModaleReferente(\''+g.id.replace(/'/g,"\\'")+'\')">✏️ Referente/Evento</button>'+
+            '<button class="btn btn-sm" onclick="apriGruppoCollegato(\''+g.id.replace(/'/g,"\\'")+'\')">🔗 Vedi/Modifica camere</button>'+
+            '<button class="btn btn-sm" onclick="apriContoGruppo(\''+g.id.replace(/'/g,"\\'")+'\')">💰 Conto unico</button>'+
+            '<button class="btn btn-sm" onclick="stampaSchedaGruppo(\''+g.id.replace(/'/g,"\\'")+'\')">🖨 Stampa scheda</button>'+
+          '</div>'+
+          '</div></div>';
+      }).join('') +
+    '</div>';
+  }
+  html += '</div>';
+  document.getElementById('page-gruppi').innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// FATTURE ELETTRONICHE — richiesto da Gian: genera il file XML nel formato
+// ufficiale FatturaPA, pronto da caricare sul portale gratuito dell'Agenzia
+// delle Entrate ("Fatture e Corrispettivi") o da mandare al commercialista.
+// NON manda nulla direttamente al Sistema di Interscambio — l'invio vero
+// richiede una firma digitale/un canale certificato che va oltre quello che
+// è prudente costruire qui dentro il PMS. Legge i dati fiscali della
+// struttura da Impostazioni → Dati società (P.IVA, Regime fiscale, ecc.).
+// ══════════════════════════════════════════════════════════════════════════
+function fattureGetLista(){ return DB.get('fatture') || []; }
+function fattureSalvaLista(lista){ DB.set('fatture', lista); }
+function fattureProssimoNumero(){
+  var lista = fattureGetLista();
+  var anno = new Date().getFullYear();
+  var delAnno = lista.filter(function(f){ return f.numero && f.numero.indexOf('/'+anno)>=0; });
+  return (delAnno.length+1) + '/' + anno;
+}
+
+function fatturaApriModaleNuova(bookingId){
+  var s = DB.getObj('settings', {});
+  if (!s.piva) { showToast('Prima inserisci i dati fiscali della struttura in Impostazioni → Dati società (almeno la P.IVA)'); return; }
+  var b = bookingId ? DB.get('bookings').find(function(x){return x.id===bookingId;}) : null;
+  var descrizioneDefault = b ? ('Soggiorno alberghiero dal '+fmtDate(b.checkin)+' al '+fmtDate(b.checkout)+' — camera '+b.roomName) : '';
+  var importoDefault = b ? b.totalPrice : '';
+  var nomeDefault = b ? b.guestName : '';
+  showModal('Nuova fattura elettronica',
+    '<div style="font-size:11.5px;color:var(--text3);background:var(--surface2);padding:8px 10px;border-radius:6px;margin-bottom:12px">⚠ Genera il file XML pronto da caricare sul portale "Fatture e Corrispettivi" dell\'Agenzia delle Entrate, o da mandare al tuo commercialista. Verifica sempre i dati prima del primo invio, specialmente aliquota IVA e regime.</div>'+
+    '<div class="form-grid">'+
+    '<div class="form-group full"><label>Cliente — Ragione sociale o Nome e Cognome</label><input type="text" id="ft-nome" value="'+nomeDefault.replace(/"/g,'&quot;')+'"></div>'+
+    '<div class="form-group"><label>P.IVA cliente (se azienda)</label><input type="text" id="ft-piva-cliente"></div>'+
+    '<div class="form-group"><label>Codice Fiscale cliente</label><input type="text" id="ft-cf-cliente"></div>'+
+    '<div class="form-group full"><label>Indirizzo cliente</label><input type="text" id="ft-indirizzo-cliente" placeholder="Via, numero civico"></div>'+
+    '<div class="form-group"><label>CAP</label><input type="text" id="ft-cap-cliente" maxlength="5"></div>'+
+    '<div class="form-group"><label>Comune</label><input type="text" id="ft-comune-cliente"></div>'+
+    '<div class="form-group"><label>Provincia (2 lettere)</label><input type="text" id="ft-prov-cliente" maxlength="2"></div>'+
+    '<div class="form-group"><label>Nazione</label><input type="text" id="ft-nazione-cliente" value="IT" maxlength="2"></div>'+
+    '<div class="form-group full" style="border-top:1px dashed var(--border2);padding-top:12px"><label>Codice Destinatario SDI (7 caratteri — se non lo conosci, lascia "0000000" e compila la PEC sotto)</label><input type="text" id="ft-sdi-cliente" value="0000000" maxlength="7"></div>'+
+    '<div class="form-group full"><label>PEC cliente (obbligatoria se il Codice Destinatario è 0000000)</label><input type="text" id="ft-pec-cliente"></div>'+
+    '<div class="form-group full" style="border-top:1px dashed var(--border2);padding-top:12px"><label>Descrizione servizio</label><input type="text" id="ft-descrizione" value="'+descrizioneDefault.replace(/"/g,'&quot;')+'"></div>'+
+    '<div class="form-group"><label>Imponibile (€, IVA esclusa)</label><input type="number" step="0.01" id="ft-imponibile" value="'+importoDefault+'"></div>'+
+    '<div class="form-group"><label>Aliquota IVA %'+((s.regimeFiscale||'RF01')==='RF19'?' (ignorata: sei in regime forfettario, N2.2)':' (10% è l\'aliquota agevolata tipica per alloggio)')+'</label><input type="number" step="0.01" id="ft-aliquota" value="10" '+((s.regimeFiscale||'RF01')==='RF19'?'disabled':'')+'></div>'+
+    '</div>',
+    '<button class="btn" onclick="closeModal()">Annulla</button>'+
+    '<button class="btn btn-primary" onclick="fatturaGeneraEScarica(\''+(bookingId||'')+'\')">📥 Genera XML</button>'
+  );
+}
+
+function fatturaGeneraEScarica(bookingId){
+  var s = DB.getObj('settings', {});
+  var nome = (document.getElementById('ft-nome').value||'').trim();
+  if (!nome) { showToast('Inserisci il nome/ragione sociale del cliente'); return; }
+  var pivaCliente = (document.getElementById('ft-piva-cliente').value||'').trim();
+  var cfCliente = (document.getElementById('ft-cf-cliente').value||'').trim();
+  var sdiCliente = (document.getElementById('ft-sdi-cliente').value||'0000000').trim() || '0000000';
+  var pecCliente = (document.getElementById('ft-pec-cliente').value||'').trim();
+  if (sdiCliente==='0000000' && !pecCliente) { showToast('Senza Codice Destinatario serve almeno la PEC del cliente'); return; }
+  var descrizione = (document.getElementById('ft-descrizione').value||'Servizio di alloggio').trim();
+  var imponibile = Math.round((parseFloat(document.getElementById('ft-imponibile').value)||0)*100)/100;
+  if (imponibile<=0) { showToast('Inserisci un importo valido'); return; }
+  var isForfettario = (s.regimeFiscale||'RF01')==='RF19';
+  var aliquota = isForfettario ? 0 : (Math.round((parseFloat(document.getElementById('ft-aliquota').value)||0)*100)/100);
+  var imposta = isForfettario ? 0 : Math.round(imponibile*aliquota)/100;
+  var totale = Math.round((imponibile+imposta)*100)/100;
+
+  var lista = fattureGetLista();
+  var numero = fattureProssimoNumero();
+  var dati = {
+    numero: numero, data: today(),
+    cliente: { nome: nome, piva: pivaCliente, cf: cfCliente, indirizzo: (document.getElementById('ft-indirizzo-cliente').value||'').trim(),
+      cap: (document.getElementById('ft-cap-cliente').value||'').trim(), comune: (document.getElementById('ft-comune-cliente').value||'').trim(),
+      provincia: (document.getElementById('ft-prov-cliente').value||'').trim(), nazione: (document.getElementById('ft-nazione-cliente').value||'IT').trim().toUpperCase(),
+      sdi: sdiCliente, pec: pecCliente },
+    descrizione: descrizione, imponibile: imponibile, aliquota: aliquota, imposta: imposta, totale: totale, isForfettario: isForfettario,
+    bookingId: bookingId || null,
+  };
+
+  var xml = fatturaGeneraXML(s, dati);
+  var blob = new Blob([xml], {type:'application/xml'});
+  var url = URL.createObjectURL(blob);
+  var nomeFile = (s.piva||'IT00000000000') + '_' + numero.replace('/','-') + '.xml';
+  var a = document.createElement('a');
+  a.href = url; a.download = nomeFile;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  lista.unshift(dati);
+  fattureSalvaLista(lista);
+  closeModal();
+  showToast('Fattura '+numero+' generata — carica il file su Fatture e Corrispettivi o mandalo al commercialista');
+  renderFatture();
+}
+
+// Costruisce il file XML nel formato ufficiale FatturaPA (fattura semplice, una sola riga di
+// servizio) — struttura minima ma conforme allo schema ufficiale versione FPR12.
+function fatturaGeneraXML(s, d){
+  function esc(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  var piva = (s.piva||'').replace(/^IT/i,'');
+  var cedenteSede = '<Sede><Indirizzo>'+esc(s.address||'')+'</Indirizzo><CAP>'+esc(s.cap_fiscale||'00000')+'</CAP><Comune>'+esc(s.comuneFiscale||'')+'</Comune><Provincia>'+esc(s.provincia||'')+'</Provincia><Nazione>IT</Nazione></Sede>';
+  var committenteFiscale = d.cliente.piva
+    ? '<IdFiscaleIVA><IdPaese>'+esc(d.cliente.nazione||'IT')+'</IdPaese><IdCodice>'+esc(d.cliente.piva)+'</IdCodice></IdFiscaleIVA>'+(d.cliente.cf?'<CodiceFiscale>'+esc(d.cliente.cf)+'</CodiceFiscale>':'')
+    : (d.cliente.cf ? '<CodiceFiscale>'+esc(d.cliente.cf)+'</CodiceFiscale>' : '');
+  var natura = d.isForfettario ? '<Natura>N2.2</Natura>' : '';
+  var aliquotaTxt = (d.isForfettario ? 0 : d.aliquota).toFixed(2);
+
+  return '<?xml version="1.0" encoding="UTF-8"?>\n'+
+  '<p:FatturaElettronica xmlns:p="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" versione="FPR12">\n'+
+  '<FatturaElettronicaHeader>\n'+
+  '<DatiTrasmissione><IdTrasmittente><IdPaese>IT</IdPaese><IdCodice>'+esc(piva)+'</IdCodice></IdTrasmittente>'+
+  '<ProgressivoInvio>'+esc(d.numero.replace('/','_'))+'</ProgressivoInvio><FormatoTrasmissione>FPR12</FormatoTrasmissione>'+
+  '<CodiceDestinatario>'+esc(d.cliente.sdi||'0000000')+'</CodiceDestinatario>'+
+  (d.cliente.sdi==='0000000' && d.cliente.pec ? '<PECDestinatario>'+esc(d.cliente.pec)+'</PECDestinatario>' : '')+
+  '</DatiTrasmissione>\n'+
+  '<CedentePrestatore><DatiAnagrafici><IdFiscaleIVA><IdPaese>IT</IdPaese><IdCodice>'+esc(piva)+'</IdCodice></IdFiscaleIVA>'+
+  (s.codiceFiscale?'<CodiceFiscale>'+esc(s.codiceFiscale)+'</CodiceFiscale>':'')+
+  '<Anagrafica><Denominazione>'+esc(s.ragioneSociale||s.propertyName||'')+'</Denominazione></Anagrafica>'+
+  '<RegimeFiscale>'+esc(s.regimeFiscale||'RF01')+'</RegimeFiscale></DatiAnagrafici>'+cedenteSede+'</CedentePrestatore>\n'+
+  '<CessionarioCommittente><DatiAnagrafici>'+committenteFiscale+
+  '<Anagrafica><Denominazione>'+esc(d.cliente.nome)+'</Denominazione></Anagrafica></DatiAnagrafici>'+
+  '<Sede><Indirizzo>'+esc(d.cliente.indirizzo||'')+'</Indirizzo><CAP>'+esc(d.cliente.cap||'00000')+'</CAP><Comune>'+esc(d.cliente.comune||'')+'</Comune>'+
+  (d.cliente.provincia?'<Provincia>'+esc(d.cliente.provincia)+'</Provincia>':'')+'<Nazione>'+esc(d.cliente.nazione||'IT')+'</Nazione></Sede></CessionarioCommittente>\n'+
+  '</FatturaElettronicaHeader>\n'+
+  '<FatturaElettronicaBody>\n'+
+  '<DatiGenerali><DatiGeneraliDocumento><TipoDocumento>TD01</TipoDocumento><Divisa>EUR</Divisa><Data>'+esc(d.data)+'</Data>'+
+  '<Numero>'+esc(d.numero.split('/')[0])+'</Numero></DatiGeneraliDocumento></DatiGenerali>\n'+
+  '<DatiBeniServizi><DettaglioLinee><NumeroLinea>1</NumeroLinea><Descrizione>'+esc(d.descrizione)+'</Descrizione>'+
+  '<Quantita>1.00</Quantita><PrezzoUnitario>'+d.imponibile.toFixed(2)+'</PrezzoUnitario><PrezzoTotale>'+d.imponibile.toFixed(2)+'</PrezzoTotale>'+
+  '<AliquotaIVA>'+aliquotaTxt+'</AliquotaIVA>'+natura+'</DettaglioLinee>\n'+
+  '<DatiRiepilogo><AliquotaIVA>'+aliquotaTxt+'</AliquotaIVA>'+natura+'<ImponibileImporto>'+d.imponibile.toFixed(2)+'</ImponibileImporto>'+
+  '<Imposta>'+d.imposta.toFixed(2)+'</Imposta><EsigibilitaIVA>I</EsigibilitaIVA></DatiRiepilogo></DatiBeniServizi>\n'+
+  '<DatiPagamento><CondizioniPagamento>TP02</CondizioniPagamento><DettaglioPagamento><ModalitaPagamento>MP05</ModalitaPagamento>'+
+  '<ImportoPagamento>'+d.totale.toFixed(2)+'</ImportoPagamento></DettaglioPagamento></DatiPagamento>\n'+
+  '</FatturaElettronicaBody>\n'+
+  '</p:FatturaElettronica>';
+}
+
+function renderFatture(){
+  var lista = fattureGetLista();
+  var html = '<div class="page-header"><div><div class="page-title">🧾 Fatture</div>'+
+    '<div class="page-subtitle">Genera il file XML per il portale "Fatture e Corrispettivi" — non invia nulla automaticamente</div></div>'+
+    '<button class="btn btn-primary" onclick="fatturaApriModaleNuova()">+ Nuova fattura</button>'+
+    '</div><div class="page-content">';
+  if (!lista.length) {
+    html += '<div class="empty-state"><p>Nessuna fattura generata ancora. Puoi crearne una da qui, oppure dal pulsante "🧾 Fattura" dentro la scheda di una prenotazione.</p></div>';
+  } else {
+    html += '<div class="card" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px">'+
+      '<thead><tr style="color:var(--text3);text-align:left"><th style="padding:6px">Numero</th><th style="padding:6px">Data</th><th style="padding:6px">Cliente</th><th style="padding:6px;text-align:right">Imponibile</th><th style="padding:6px;text-align:right">Totale</th></tr></thead><tbody>'+
+      lista.map(function(f){
+        return '<tr style="border-top:1px solid var(--border)">'+
+          '<td style="padding:6px;font-weight:700">'+f.numero+'</td>'+
+          '<td style="padding:6px">'+fmtDate(f.data)+'</td>'+
+          '<td style="padding:6px">'+f.cliente.nome.replace(/</g,'&lt;')+'</td>'+
+          '<td style="padding:6px;text-align:right">'+fmtCurrency(f.imponibile)+'</td>'+
+          '<td style="padding:6px;text-align:right;font-weight:700">'+fmtCurrency(f.totale)+'</td>'+
+        '</tr>';
+      }).join('')+
+      '</tbody></table></div>';
+  }
+  html += '</div>';
+  document.getElementById('page-fatture').innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// GESTIONE UTENTI & PERMESSI — richiesto da Gian: un accesso Amministratore
+// con accesso completo a tutto, e account "Reception" con permessi decisi e
+// modificabili SOLO dall'amministratore da questa maschera — non fissi nel
+// codice. Un account NON elencato qui ha sempre accesso completo (è il
+// comportamento di default per chi non è mai stato limitato); solo gli
+// account aggiunti qui sotto vengono davvero ristretti.
+//
+// Per creare un nuovo accesso "Reception": prima crea l'utente (email +
+// password) su Supabase → Authentication → Users — è l'unico modo sicuro,
+// perché farlo da qui richiederebbe esporre nel browser una chiave con
+// troppi poteri. Una volta creato lì, aggiungi la stessa email qui sotto e
+// scegli cosa può fare.
+// ══════════════════════════════════════════════════════════════════════════
+var PAGINE_PERMESSO = {
+  planner:'calendario', calendario:'calendario', arrivi:'calendario', housekeeping:'calendario', biancheria:'calendario', puliziamobile:'calendario',
+  checkin:'calendario', checkout:'calendario', 'arrivi-partenze':'calendario', checkineffettuati:'calendario', checkouteffettuati:'calendario', effettuati:'calendario',
+  prenotazioni:'prenotazioni', mobilecheckin:'prenotazioni', ospiti:'prenotazioni', archivioospiti:'prenotazioni', preventivi:'prenotazioni', wamassivo:'prenotazioni', emailmassiva:'prenotazioni',
+  gruppi:'gruppi',
+  fatture:'fatture',
+  recensioni:'recensioni',
+  report:'report', reportpasti:'report', previsionale:'report', revenue:'report',
+  corrispettivi:'corrispettivi', contidasaldare:'corrispettivi',
+  listino:'listino', livelli:'listino', tipologie:'listino', tassasoggiorno:'listino', camere:'listino',
+  manutenzione:'manutenzione',
+  extra:'gestione', addebitiextra:'gestione', adempimenti:'gestione', blacklist:'gestione', ical:'gestione', condizioni:'gestione', guidaospiti:'gestione', sitoweb:'gestione',
+  impostazioni:'impostazioni', salvataggio:'impostazioni', utenti:'impostazioni',
+};
+var VOCI_PERMESSO = [
+  {k:'calendario', l:'Calendario, Planner, Housekeeping, Check-in/out'},
+  {k:'prenotazioni', l:'Prenotazioni, Preventivi, messaggi massivi'},
+  {k:'corrispettivi', l:'Corrispettivi (conto, incassi)'},
+  {k:'gruppi', l:'Gruppi & Eventi'},
+  {k:'manutenzione', l:'Manutenzione/Guasti'},
+  {k:'listino', l:'Listino prezzi, Livelli, Tipologie'},
+  {k:'report', l:'Report, Revenue, Previsionale'},
+  {k:'fatture', l:'Fatture elettroniche'},
+  {k:'recensioni', l:'Recensioni'},
+  {k:'gestione', l:'Extra/Servizi, Adempimenti, Blacklist, iCal, Sito web'},
+  {k:'impostazioni', l:'Impostazioni e Salvataggio'},
+];
+var AZIONI_PERMESSO = [
+  {k:'modificaPrenotazioni', l:'Modificare prenotazioni esistenti'},
+  {k:'eliminaScontrini', l:'Eliminare scontrini/ricevute dai Corrispettivi'},
+  {k:'eliminaFatture', l:'Eliminare fatture dai Corrispettivi'},
+];
+
+function utentiPermessiGetLista(){ return DB.getObj('utentiPermessi', {}); }
+function utentiPermessiSalvaLista(obj){ DB.setObj('utentiPermessi', obj); }
+
+// Da richiamare subito dopo il login (o il ripristino sessione) — capisce chi si è collegato e
+// applica i permessi giusti, nascondendo dal menu quello che non può usare.
+async function applicaPermessiUtenteCorrente(){
+  window.currentUserPermessi = null;
+  window.currentUserEmail = '';
+  try {
+    if (!supabaseClient) return;
+    const { data } = await supabaseClient.auth.getUser();
+    const email = (data && data.user && data.user.email || '').toLowerCase();
+    window.currentUserEmail = email;
+    const lista = utentiPermessiGetLista();
+    if (email && lista[email]) {
+      window.currentUserPermessi = lista[email].permessi || {};
+    }
+  } catch (err) { console.warn('Permessi utente non applicati:', err); }
+  aggiornaVisibilitaMenuPermessi();
+}
+function aggiornaVisibilitaMenuPermessi(){
+  document.querySelectorAll('.nav-item[data-page]').forEach(function(el){
+    var pagina = el.dataset.page;
+    var permesso = PAGINE_PERMESSO[pagina];
+    if (!permesso) { return; } // dashboard e pagine non mappate restano sempre visibili
+    var consentito = !window.currentUserPermessi || !!window.currentUserPermessi[permesso];
+    el.style.display = consentito ? '' : 'none';
+  });
+  var voceUtenti = document.querySelector('.nav-item[data-page="utenti"]');
+  if (voceUtenti) voceUtenti.style.display = window.currentUserPermessi ? 'none' : '';
+}
+
+function renderGestioneUtenti(){
+  if (window.currentUserPermessi) { showToast('Solo l\'amministratore può accedere a questa pagina'); navigate('dashboard'); return; }
+  var lista = utentiPermessiGetLista();
+  var email_list = Object.keys(lista);
+  var html = '<div class="page-header"><div><div class="page-title">🔐 Utenti & Permessi</div>'+
+    '<div class="page-subtitle">Solo gli account elencati qui sotto sono limitati — chiunque altro ha accesso completo</div></div>'+
+    '<button class="btn btn-primary" onclick="utentiApriModaleNuovo()">+ Aggiungi utente limitato</button>'+
+    '</div><div class="page-content">'+
+    '<div style="font-size:12px;color:var(--text3);background:var(--surface2);padding:10px 12px;border-radius:8px;margin-bottom:16px">Per creare un nuovo accesso, prima crea l\'utente (email+password) su <strong>Supabase → Authentication → Users</strong> — è l\'unico modo sicuro per farlo. Poi aggiungi qui la stessa email e scegli cosa può fare.</div>';
+  if (!email_list.length) {
+    html += '<div class="empty-state"><p>Nessun account limitato — tutti gli accessi hanno pieni poteri.</p></div>';
+  } else {
+    html += '<div style="display:flex;flex-direction:column;gap:10px">'+
+      email_list.map(function(email){
+        var u = lista[email];
+        var vociAttive = VOCI_PERMESSO.filter(function(v){ return u.permessi && u.permessi[v.k]; }).map(function(v){return v.l.split(',')[0];});
+        return '<div class="card" style="padding:12px 16px">'+
+          '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">'+
+          '<div><div style="font-weight:700">'+(u.nome||email).replace(/</g,'&lt;')+'</div><div style="font-size:12px;color:var(--text3)">'+email+'</div>'+
+          '<div style="font-size:11.5px;color:var(--text2);margin-top:4px">Può vedere: '+(vociAttive.length?vociAttive.join(', '):'nessuna area specifica')+'</div></div>'+
+          '<div style="display:flex;gap:6px">'+
+            '<button class="btn btn-sm" onclick="utentiApriModaleModifica(\''+email+'\')">✏️ Modifica</button>'+
+            '<button class="btn btn-sm" style="color:var(--red)" onclick="utentiRimuovi(\''+email+'\')">✕ Rimuovi</button>'+
+          '</div></div></div>';
+      }).join('')+
+    '</div>';
+  }
+  html += '</div>';
+  document.getElementById('page-utenti').innerHTML = html;
+}
+function utentiApriModaleNuovo(){ utentiApriModaleModifica(null); }
+function utentiApriModaleModifica(email){
+  var lista = utentiPermessiGetLista();
+  var permessiDefault = {calendario:true, prenotazioni:true, corrispettivi:true, gruppi:true, manutenzione:true, modificaPrenotazioni:true};
+  var u = email ? lista[email] : {nome:'', permessi: permessiDefault};
+  var p = (u && u.permessi) ? u.permessi : permessiDefault;
+  showModal(email ? 'Modifica permessi — '+email : 'Nuovo utente limitato',
+    '<div class="form-grid">'+
+    (email ? '' : '<div class="form-group full"><label>Email (deve corrispondere esattamente a un utente già creato su Supabase → Authentication)</label><input type="email" id="ut-email" placeholder="reception@struttura.it"></div>')+
+    '<div class="form-group full"><label>Nome da mostrare (facoltativo)</label><input type="text" id="ut-nome" value="'+(u.nome||'').replace(/"/g,'&quot;')+'"></div>'+
+    '<div class="form-group full" style="border-top:1px dashed var(--border2);padding-top:10px"><label style="font-weight:700">Aree visibili nel menu</label></div>'+
+    VOCI_PERMESSO.map(function(v){
+      return '<div class="form-group full" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="ut-perm-'+v.k+'" '+(p[v.k]?'checked':'')+' style="width:auto"><label for="ut-perm-'+v.k+'" style="margin:0;font-weight:400">'+v.l+'</label></div>';
+    }).join('')+
+    '<div class="form-group full" style="border-top:1px dashed var(--border2);padding-top:10px"><label style="font-weight:700">Azioni specifiche</label></div>'+
+    AZIONI_PERMESSO.map(function(a){
+      return '<div class="form-group full" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="ut-perm-'+a.k+'" '+(p[a.k]?'checked':'')+' style="width:auto"><label for="ut-perm-'+a.k+'" style="margin:0;font-weight:400">'+a.l+'</label></div>';
+    }).join('')+
+    '</div>',
+    '<button class="btn" onclick="closeModal()">Annulla</button>'+
+    '<button class="btn btn-primary" onclick="utentiSalva('+(email?"'"+email+"'":'null')+')">Salva</button>'
+  );
+}
+function utentiSalva(emailEsistente){
+  var lista = utentiPermessiGetLista();
+  var email = emailEsistente || (document.getElementById('ut-email').value||'').trim().toLowerCase();
+  if (!email) { showToast('Inserisci l\'email'); return; }
+  var permessi = {};
+  VOCI_PERMESSO.concat(AZIONI_PERMESSO).forEach(function(v){
+    var el = document.getElementById('ut-perm-'+v.k);
+    if (el) permessi[v.k] = el.checked;
+  });
+  lista[email] = { nome: (document.getElementById('ut-nome').value||'').trim(), permessi: permessi };
+  utentiPermessiSalvaLista(lista);
+  closeModal();
+  showToast('Permessi salvati per '+email);
+  renderGestioneUtenti();
+}
+function utentiRimuovi(email){
+  if (!confirm('Rimuovere i limiti per '+email+'? Da quel momento avrà di nuovo accesso completo.')) return;
+  var lista = utentiPermessiGetLista();
+  delete lista[email];
+  utentiPermessiSalvaLista(lista);
+  renderGestioneUtenti();
 }
 
 function renderPrenotazioni() {
@@ -22774,7 +23261,8 @@ function renderReport() {
     ['panoramica','Panoramica'],
     ['produzione','Produzione Giornaliera'],
     ['revenue','Revenue'],
-    ['nazionalita','Report Nazionalità']
+    ['nazionalita','Report Nazionalità'],
+    ['pickup','📈 Pickup']
   ];
   var tabBar = '<div style="display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:16px;flex-wrap:wrap">' +
     tabs.map(function(t){
@@ -22792,6 +23280,67 @@ function renderReport() {
   else if (repTab==='produzione') repRenderProduzione(body);
   else if (repTab==='revenue') repRenderRevenue(body);
   else if (repTab==='nazionalita') repRenderNazionalita(body);
+  else if (repTab==='pickup') repRenderPickup(body);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PICKUP REPORT — richiesto da Gian: per ogni mese futuro, quante
+// prenotazioni sono arrivate negli ultimi 7/14/30 giorni — per capire se il
+// ritmo di prenotazione sta accelerando o rallentando, non solo quanto c'è
+// "sul groupato" in totale in questo momento.
+// ══════════════════════════════════════════════════════════════════════════
+function repRenderPickup(body) {
+  var allBk = DB.get('bookings').filter(function(b){ return b.status!=='cancellata' && !b.escludiConteggi; });
+  var oggi = today();
+  var mesi = [];
+  var d = new Date(oggi+'T00:00:00');
+  for (var i=0; i<12; i++) {
+    var y = d.getFullYear(), m = d.getMonth();
+    var meseStart = y+'-'+String(m+1).padStart(2,'0')+'-01';
+    var ultimoGiorno = new Date(y, m+1, 0).getDate();
+    var meseEnd = y+'-'+String(m+1).padStart(2,'0')+'-'+String(ultimoGiorno).padStart(2,'0');
+    var label = d.toLocaleDateString('it-IT',{month:'long',year:'numeric'});
+    mesi.push({ label: label, start: meseStart, end: meseEnd });
+    d.setMonth(d.getMonth()+1);
+  }
+
+  function finestra(giorniIndietro) {
+    var soglia = addDays(oggi, -giorniIndietro);
+    return allBk.filter(function(b){ return b.createdAt && b.createdAt.slice(0,10) >= soglia; });
+  }
+  var bk7 = finestra(7), bk14 = finestra(14), bk30 = finestra(30);
+
+  function statsPerMese(bks, meseStart, meseEnd) {
+    var filtered = bks.filter(function(b){ return b.checkin >= meseStart && b.checkin <= meseEnd; });
+    var notti = filtered.reduce(function(s,b){ return s + nights(b.checkin,b.checkout); }, 0);
+    var valore = filtered.reduce(function(s,b){ return s + Number(b.totalPrice||0); }, 0);
+    return { count: filtered.length, notti: notti, valore: valore };
+  }
+
+  var righe = mesi.map(function(mo){
+    return {
+      mo: mo,
+      attuale: statsPerMese(allBk, mo.start, mo.end),
+      p7: statsPerMese(bk7, mo.start, mo.end),
+      p14: statsPerMese(bk14, mo.start, mo.end),
+      p30: statsPerMese(bk30, mo.start, mo.end),
+    };
+  });
+
+  body.innerHTML = '<div class="card" style="overflow-x:auto">'+
+    '<div style="font-size:12.5px;color:var(--text3);margin-bottom:14px">Per ogni mese futuro (in base alla data di arrivo), quante prenotazioni sono arrivate negli ultimi 7/14/30 giorni — utile per vedere se il ritmo con cui arrivano prenotazioni sta accelerando o rallentando, non solo quanto c\'è "sul groupato" in questo momento.</div>'+
+    '<table style="width:100%;border-collapse:collapse;font-size:12.5px;white-space:nowrap">'+
+    '<thead><tr style="color:var(--text3);text-align:right"><th style="text-align:left;padding:6px 10px">Mese</th><th style="padding:6px 10px">Sul groupato ora (totale)</th><th style="padding:6px 10px;color:var(--accent)">Pickup ultimi 7gg</th><th style="padding:6px 10px;color:var(--accent)">Pickup ultimi 14gg</th><th style="padding:6px 10px;color:var(--accent)">Pickup ultimi 30gg</th></tr></thead><tbody>'+
+    righe.map(function(r){
+      return '<tr style="border-top:1px solid var(--border)">'+
+        '<td style="padding:6px 10px;text-align:left;font-weight:700;text-transform:capitalize">'+r.mo.label+'</td>'+
+        '<td style="padding:6px 10px;text-align:right;color:var(--text2)">'+r.attuale.count+' pren. · '+r.attuale.notti+' notti · '+fmtCurrency(r.attuale.valore)+'</td>'+
+        '<td style="padding:6px 10px;text-align:right">'+r.p7.count+' pren. · '+r.p7.notti+' notti · '+fmtCurrency(r.p7.valore)+'</td>'+
+        '<td style="padding:6px 10px;text-align:right">'+r.p14.count+' pren. · '+r.p14.notti+' notti · '+fmtCurrency(r.p14.valore)+'</td>'+
+        '<td style="padding:6px 10px;text-align:right">'+r.p30.count+' pren. · '+r.p30.notti+' notti · '+fmtCurrency(r.p30.valore)+'</td>'+
+      '</tr>';
+    }).join('')+
+    '</tbody></table></div>';
 }
 
 function repRenderPanoramicaHTML() {
@@ -27566,6 +28115,28 @@ function renderImpostazioni() {
               <label>Codice SDI</label>
               <input type="text" id="s-sdi" value="${s.sdi||''}" placeholder="Per fattura elettronica">
             </div>
+            <div class="form-group full" style="border-top:1px dashed var(--border2);padding-top:14px;margin-top:4px">
+              <label style="font-weight:700">Per la fatturazione elettronica</label>
+            </div>
+            <div class="form-group">
+              <label>Regime fiscale</label>
+              <select id="s-regimefiscale">
+                <option value="RF01" ${s.regimeFiscale==='RF01'||!s.regimeFiscale?'selected':''}>Ordinario (RF01)</option>
+                <option value="RF19" ${s.regimeFiscale==='RF19'?'selected':''}>Forfettario (RF19)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Codice ATECO</label>
+              <input type="text" id="s-ateco" value="${s.ateco||''}" placeholder="Es. 55.20.51">
+            </div>
+            <div class="form-group">
+              <label>CAP</label>
+              <input type="text" id="s-cap" value="${s.cap_fiscale||''}" placeholder="20100" maxlength="5">
+            </div>
+            <div class="form-group">
+              <label>Comune</label>
+              <input type="text" id="s-comune-fiscale" value="${s.comuneFiscale||''}" placeholder="Milano">
+            </div>
           </div>
       </div></div>
 
@@ -28107,6 +28678,10 @@ function saveImpostazioni() {
   s.email          = document.getElementById('s-email')?.value || '';
   s.pec            = document.getElementById('s-pec')?.value || '';
   s.sdi            = document.getElementById('s-sdi')?.value || '';
+  s.regimeFiscale  = document.getElementById('s-regimefiscale')?.value || 'RF01';
+  s.ateco          = document.getElementById('s-ateco')?.value.trim() || '';
+  s.cap_fiscale    = document.getElementById('s-cap')?.value.trim() || '';
+  s.comuneFiscale  = document.getElementById('s-comune-fiscale')?.value.trim() || '';
   s.supabaseUrl     = document.getElementById('s-supaUrl')?.value.trim() || '';
   s.checkinOnlineUrl = document.getElementById('s-checkinOnlineUrl')?.value.trim() || '';
   s.scegliPreventivoUrl = document.getElementById('s-scegliPreventivoUrl')?.value.trim() || '';
@@ -28383,7 +28958,9 @@ async function doLogin() {
     if (logoutBtn) logoutBtn.style.display = 'flex';
     fixPrezziPrenotazioniEsistenti();
     seedCondizioniDefault();
+    await applicaPermessiUtenteCorrente();
     navigate('dashboard');
+    aggiornaBottoneStopVendite();
   } catch (err) {
     errBox.textContent = err.message === 'Invalid login credentials' ? 'Email o password errati' : ('Errore: '+err.message);
     errBox.style.display = 'block';
@@ -28466,6 +29043,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       if (logoutBtn2) logoutBtn2.style.display = 'flex';
       fixPrezziPrenotazioniEsistenti(); // opera sui dati appena caricati da Supabase
       seedCondizioniDefault();
+      await applicaPermessiUtenteCorrente();
     } catch (err) {
       var bannerErr = document.getElementById('supabase-connecting');
       if (bannerErr) bannerErr.remove();
@@ -28479,6 +29057,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   }
 
   navigate('dashboard');
+  aggiornaBottoneStopVendite();
 });
 
 
@@ -28612,6 +29191,155 @@ function recuperaMessaggiDaBackup(event) {
     event.target.value = '';
   };
   reader.readAsText(file);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// MANUTENZIONE / GUASTI — richiesto da Gian: un registro per tenere traccia
+// dei guasti/interventi (es. "termosifone 106 non funziona, chiamare
+// idraulico") dalla segnalazione fino alla risoluzione, invece di doverlo
+// tenere a mente o su un pezzo di carta separato dal PMS.
+// ══════════════════════════════════════════════════════════════════════════
+var MANUTENZIONE_PRIORITA = [
+  {v:'urgente', l:'🔴 Urgente', colore:'var(--red,#dc2626)'},
+  {v:'alta', l:'🟠 Alta', colore:'var(--amber,#d97706)'},
+  {v:'media', l:'🟡 Media', colore:'#ca8a04'},
+  {v:'bassa', l:'⚪ Bassa', colore:'var(--text3)'},
+];
+var MANUTENZIONE_STATI = [
+  {v:'aperto', l:'Aperto'},
+  {v:'in_corso', l:'In corso'},
+  {v:'risolto', l:'Risolto'},
+];
+var manutenzioneFiltroStato = 'aperto_in_corso'; // vista di default: solo quello ancora da fare
+
+function manutenzioneGetLista(){ return DB.get('manutenzione') || []; }
+function manutenzioneSalvaLista(lista){ DB.set('manutenzione', lista); }
+function manutenzionePrioritaInfo(v){ return MANUTENZIONE_PRIORITA.find(function(p){return p.v===v;}) || MANUTENZIONE_PRIORITA[2]; }
+function manutenzioneStatoLabel(v){ return (MANUTENZIONE_STATI.find(function(s){return s.v===v;})||{}).l || v; }
+
+function manutenzioneApriModaleNuovo(){
+  var rooms = DB.get('rooms') || [];
+  showModal('Nuova segnalazione',
+    '<div class="form-grid">'+
+    '<div class="form-group full"><label>Cosa è successo</label><input type="text" id="man-titolo" placeholder="es. Termosifone non funziona" style="width:100%"></div>'+
+    '<div class="form-group"><label>Camera (opzionale — lascia vuoto se è un\'area comune)</label><select id="man-camera" style="width:100%"><option value="">— Area comune / generale —</option>'+
+      rooms.map(function(r){return '<option value="'+r.id+'">'+r.name+'</option>';}).join('')+
+    '</select></div>'+
+    '<div class="form-group"><label>Priorità</label><select id="man-priorita" style="width:100%">'+
+      MANUTENZIONE_PRIORITA.map(function(p){return '<option value="'+p.v+'"'+(p.v==='media'?' selected':'')+'>'+p.l+'</option>';}).join('')+
+    '</select></div>'+
+    '<div class="form-group full"><label>Dettagli / note (opzionale)</label><textarea id="man-descrizione" rows="3" style="width:100%" placeholder="es. Chiamare l\'idraulico, sentito già ieri"></textarea></div>'+
+    '</div>',
+    '<button class="btn" onclick="closeModal()">Annulla</button>'+
+    '<button class="btn btn-primary" onclick="manutenzioneSalvaNuovo()">Salva segnalazione</button>'
+  );
+}
+function manutenzioneSalvaNuovo(){
+  var titolo = (document.getElementById('man-titolo').value||'').trim();
+  if (!titolo) { showToast('Scrivi almeno cosa è successo'); return; }
+  var rooms = DB.get('rooms') || [];
+  var roomId = document.getElementById('man-camera').value || '';
+  var room = rooms.find(function(r){return r.id===roomId;});
+  var lista = manutenzioneGetLista();
+  lista.unshift({
+    id: 'man_'+Date.now(),
+    camera: roomId,
+    cameraNome: room ? room.name : '',
+    titolo: titolo,
+    descrizione: (document.getElementById('man-descrizione').value||'').trim(),
+    priorita: document.getElementById('man-priorita').value,
+    stato: 'aperto',
+    dataSegnalazione: today(),
+    dataRisoluzione: '',
+    noteRisoluzione: '',
+  });
+  manutenzioneSalvaLista(lista);
+  closeModal();
+  showToast('Segnalazione salvata');
+  renderManutenzione();
+}
+function manutenzioneCambiaStato(id, nuovoStato){
+  var lista = manutenzioneGetLista();
+  var el = lista.find(function(x){return x.id===id;});
+  if (!el) return;
+  if (nuovoStato === 'risolto' && el.stato !== 'risolto') {
+    var note = prompt('Note sulla risoluzione (opzionale):', '');
+    el.noteRisoluzione = note || '';
+    el.dataRisoluzione = today();
+  }
+  if (nuovoStato !== 'risolto') { el.dataRisoluzione = ''; }
+  el.stato = nuovoStato;
+  manutenzioneSalvaLista(lista);
+  renderManutenzione();
+}
+function manutenzioneElimina(id){
+  if (!confirm('Eliminare questa segnalazione? Non si può annullare.')) return;
+  manutenzioneSalvaLista(manutenzioneGetLista().filter(function(x){return x.id!==id;}));
+  renderManutenzione();
+}
+function manutenzioneImpostaFiltro(f){ manutenzioneFiltroStato = f; renderManutenzione(); }
+
+function renderManutenzione(){
+  var lista = manutenzioneGetLista();
+  var visibili = lista.filter(function(x){
+    if (manutenzioneFiltroStato === 'tutti') return true;
+    if (manutenzioneFiltroStato === 'aperto_in_corso') return x.stato === 'aperto' || x.stato === 'in_corso';
+    return x.stato === manutenzioneFiltroStato;
+  });
+  var ordinePriorita = {urgente:0, alta:1, media:2, bassa:3};
+  visibili.sort(function(a,b){
+    var op = (ordinePriorita[a.priorita]||9) - (ordinePriorita[b.priorita]||9);
+    if (op !== 0) return op;
+    return (b.dataSegnalazione||'').localeCompare(a.dataSegnalazione||'');
+  });
+  var aperteCount = lista.filter(function(x){return x.stato==='aperto';}).length;
+  var urgentiCount = lista.filter(function(x){return x.stato!=='risolto' && x.priorita==='urgente';}).length;
+
+  var filtri = [
+    {v:'aperto_in_corso', l:'Da fare'},
+    {v:'aperto', l:'Aperti'},
+    {v:'in_corso', l:'In corso'},
+    {v:'risolto', l:'Risolti'},
+    {v:'tutti', l:'Tutti'},
+  ];
+
+  var html = '<div class="page-header"><div><div class="page-title">🔧 Manutenzione</div>'+
+    '<div class="page-subtitle">'+aperteCount+' aperte'+(urgentiCount?' · <span style="color:var(--red,#dc2626);font-weight:700">'+urgentiCount+' urgenti</span>':'')+'</div></div>'+
+    '<button class="btn btn-primary" onclick="manutenzioneApriModaleNuovo()">+ Nuova segnalazione</button>'+
+    '</div>'+
+    '<div class="page-content">'+
+    '<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">'+
+      filtri.map(function(f){
+        return '<button class="btn btn-sm" style="'+(manutenzioneFiltroStato===f.v?'background:var(--accent);color:#fff;border-color:var(--accent)':'')+'" onclick="manutenzioneImpostaFiltro(\''+f.v+'\')">'+f.l+'</button>';
+      }).join('')+
+    '</div>';
+
+  if (!visibili.length) {
+    html += '<div class="empty-state"><p>Nessuna segnalazione qui.</p></div>';
+  } else {
+    html += '<div style="display:flex;flex-direction:column;gap:10px">' +
+      visibili.map(function(x){
+        var pInfo = manutenzionePrioritaInfo(x.priorita);
+        return '<div class="card" style="padding:12px 16px;border-left:4px solid '+pInfo.colore+'">'+
+          '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">'+
+          '<div>'+
+            '<div style="font-weight:700;font-size:14px">'+x.titolo.replace(/</g,'&lt;')+'</div>'+
+            '<div style="font-size:11.5px;color:var(--text3);margin-top:2px">'+pInfo.l+(x.cameraNome?' · 🚪 '+x.cameraNome:' · area comune')+' · segnalato il '+fmtDate(x.dataSegnalazione)+'</div>'+
+            (x.descrizione ? '<div style="font-size:12.5px;margin-top:6px;color:var(--text2)">'+x.descrizione.replace(/</g,'&lt;')+'</div>' : '')+
+            (x.stato==='risolto' ? '<div style="font-size:11.5px;color:var(--green,#16a34a);margin-top:6px">✅ Risolto il '+fmtDate(x.dataRisoluzione)+(x.noteRisoluzione?' — '+x.noteRisoluzione.replace(/</g,'&lt;'):'')+'</div>' : '')+
+          '</div>'+
+          '<div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end;flex-shrink:0">'+
+            '<select onchange="manutenzioneCambiaStato(\''+x.id+'\', this.value)" style="font-size:11.5px;padding:3px 6px;border-radius:5px;border:.5px solid var(--border2)">'+
+              MANUTENZIONE_STATI.map(function(s){return '<option value="'+s.v+'"'+(s.v===x.stato?' selected':'')+'>'+s.l+'</option>';}).join('')+
+            '</select>'+
+            '<button class="btn btn-sm" style="font-size:10.5px;padding:2px 6px;color:var(--red)" onclick="manutenzioneElimina(\''+x.id+'\')">✕ Elimina</button>'+
+          '</div>'+
+          '</div></div>';
+      }).join('') +
+    '</div>';
+  }
+  html += '</div>';
+  document.getElementById('page-manutenzione').innerHTML = html;
 }
 
 function renderExtra() {
@@ -31495,6 +32223,10 @@ function corrAttachRegistroHandlers(){
   document.querySelectorAll('[data-del]').forEach(b=> b.onclick = async ()=>{
     if(!confirm('Eliminare questo movimento?')) return;
     const daEliminare = corrState.transactions.find(t=>t.id===b.dataset.del);
+    if (window.currentUserPermessi) {
+      var permessoNecessario = (daEliminare && daEliminare.tipo==='F') ? 'eliminaFatture' : 'eliminaScontrini';
+      if (!window.currentUserPermessi[permessoNecessario]) { showToast('⛔ Non hai il permesso di eliminare '+(permessoNecessario==='eliminaFatture'?'fatture':'scontrini')+' — chiedi all\'amministratore'); return; }
+    }
     corrState.transactions = corrState.transactions.filter(t=>t.id!==b.dataset.del);
     if (daEliminare) corrRegistraLog('cancellazione', (daEliminare.tipo==='F'?'Fattura':'Scontrino')+' N.'+daEliminare.numero+' del '+daEliminare.date+' eliminata — importo '+corrEur(corrRowTotal(daEliminare))+(daEliminare.clienteNome?' — '+daEliminare.clienteNome:''));
     await corrPersist('movimento eliminato');
