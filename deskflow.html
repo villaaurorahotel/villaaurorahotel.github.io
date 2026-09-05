@@ -334,13 +334,10 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 05/09/2026 · 05:50</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 05/09/2026 · 10:28</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
-    </button>
-    <button id="btn-stop-vendite" onclick="toggleStopVenditePortali()" title="Chiude/riapre subito la vendita su tutti i portali collegati — resta comunque prenotabile a mano dal PMS" style="width:calc(100% - 24px);margin:0 12px 8px;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
-      <span id="btn-stop-vendite-testo">⛔ Chiudi vendite portali</span>
     </button>
     <button id="btn-logout" onclick="doLogout()" style="display:none;width:calc(100% - 24px);margin:0 12px 12px;background:transparent;color:var(--text3,#888);border:.5px solid var(--border2,#ddd);border-radius:8px;padding:7px 12px;font-size:12px;font-weight:500;cursor:pointer;align-items:center;justify-content:center;gap:6px">
       🚪 Esci
@@ -10784,24 +10781,29 @@ function confermaSpostamentoDrag(bId, targetRoomId) {
   renderCalendario();
 }
 
-// ══════════════════════════════════════════════════════════════════════════
-// STOP VENDITE PORTALI — richiesto da Gian: un interruttore sempre visibile
-// nella barra laterale (qualunque pagina si stia guardando) per chiudere
-// SUBITO la vendita su tutti i portali collegati in caso di emergenza —
-// senza dover chiudere data per data. Riusa lo stesso meccanismo di
-// chiusura già esistente (regoleTipo.chiusure), applicandolo in un colpo
-// solo su tutte le tipologie e i prossimi 12 mesi. Prima di sovrascrivere,
-// salva lo stato di chiusura di partenza, così alla riattivazione si torna
-// ESATTAMENTE a come era prima (senza perdere chiusure specifiche che
-// magari avevi già impostato tu). Resta comunque possibile creare
-// prenotazioni a mano dal PMS: questo interruttore chiude solo la vendita
-// verso i portali esterni.
-// ══════════════════════════════════════════════════════════════════════════
-async function toggleStopVenditePortali(){
+function apriPannelloStopVendite(){
+  var r = getRegoleTipo();
+  var canali = otaCanaliGetLista();
+  var nomiUnici = Array.from(new Set(canali.map(function(c){ return c.nome; }).filter(Boolean)));
+  var attivoGenerale = !!r.stopVenditePortali;
+  showModal('Chiudi vendite ai portali',
+    '<div style="font-size:12.5px;color:var(--text3);margin-bottom:14px">Chiude subito la vendita esterna — resta comunque possibile creare prenotazioni a mano dal PMS. Puoi riattivare in qualsiasi momento con lo stesso pulsante.</div>'+
+    '<button class="btn" style="width:100%;padding:10px;font-weight:700;margin-bottom:14px;background:'+(attivoGenerale?'var(--green)':'var(--red-bg,#fee2e2)')+';color:'+(attivoGenerale?'#fff':'var(--red,#dc2626)')+';border:'+(attivoGenerale?'none':'1.5px solid var(--red,#dc2626)')+'" onclick="toggleStopVenditeGenerale()">'+(attivoGenerale?'✅ Riattiva TUTTI i portali':'⛔ Chiudi TUTTI i portali')+'</button>'+
+    (nomiUnici.length ? '<div style="font-size:11px;color:var(--text3);text-transform:uppercase;font-weight:700;margin:10px 0 6px">Oppure un portale alla volta</div>'+
+      nomiUnici.map(function(nome){
+        var attivo = !!(r.chiusurePerCanale && r.chiusurePerCanale[nome] && r.chiusurePerCanale[nome].__attivo);
+        return '<button class="btn btn-sm" style="width:100%;padding:8px;margin-bottom:6px;font-weight:600;background:'+(attivo?'var(--green)':'var(--surface2)')+';color:'+(attivo?'#fff':'var(--text1)')+'" onclick="toggleStopVenditeCanale(\''+nome.replace(/'/g,"\\'")+'\')">'+(attivo?'✅ Riattiva '+nome:'⛔ Chiudi solo '+nome)+'</button>';
+      }).join('')
+    : '<div style="font-size:11.5px;color:var(--text3)">Nessun canale configurato — aggiungili in Impostazioni → Canali OTA per avere qui un pulsante per ciascuno.</div>')+
+    '',
+    '<button class="btn" onclick="closeModal()">Chiudi</button>'
+  );
+}
+async function toggleStopVenditeGenerale(){
   var r = getRegoleTipo();
   var attivo = !!r.stopVenditePortali;
   if (!attivo) {
-    if (!confirm('Chiudere SUBITO la vendita su tutti i portali collegati per i prossimi 12 mesi?\n\nResta comunque possibile creare prenotazioni a mano dal PMS. Potrai riattivare la vendita in qualsiasi momento con lo stesso pulsante.')) return;
+    if (!confirm('Chiudere SUBITO la vendita su TUTTI i portali collegati per i prossimi 12 mesi?')) return;
     var rooms = DB.get('rooms') || [];
     var tipi = Array.from(new Set(rooms.map(function(rm){ return normCatType(rm.type); })));
     var oggi = today();
@@ -10821,24 +10823,52 @@ async function toggleStopVenditePortali(){
   }
   await saveRegoleTipo(r);
   if (typeof avvisaHostexSubito === 'function') avvisaHostexSubito();
-  if (typeof registraModificaListino === 'function') registraModificaListino('Tutte le tipologie — ' + (!attivo ? '⛔ vendita ai portali CHIUSA (prossimi 12 mesi)' : '✅ vendita ai portali RIAPERTA'));
+  if (typeof avvisaHostexRestrizioniSubito === 'function') avvisaHostexRestrizioniSubito();
+  if (typeof registraModificaListino === 'function') registraModificaListino('Tutti i portali — ' + (!attivo ? '⛔ vendita CHIUSA (prossimi 12 mesi)' : '✅ vendita RIAPERTA'));
   aggiornaBottoneStopVendite();
-  showToast(!attivo ? '⛔ Vendita ai portali chiusa — ricordati di riattivarla quando serve' : '✅ Vendita ai portali riaperta');
+  showToast(!attivo ? '⛔ Vendita a tutti i portali chiusa' : '✅ Vendita a tutti i portali riaperta');
+  closeModal();
+}
+async function toggleStopVenditeCanale(nomePortale){
+  var r = getRegoleTipo();
+  if (!r.chiusurePerCanale) r.chiusurePerCanale = {};
+  if (!r.chiusurePerCanale[nomePortale]) r.chiusurePerCanale[nomePortale] = {};
+  var attivo = !!r.chiusurePerCanale[nomePortale].__attivo;
+  if (!attivo) {
+    if (!confirm('Chiudere SUBITO la vendita solo su "'+nomePortale+'" per i prossimi 12 mesi, lasciando aperti gli altri portali?')) return;
+    var oggi = today(), al = addDays(oggi, 365);
+    var d = oggi, guard = 0;
+    while (d <= al && guard < 400) { r.chiusurePerCanale[nomePortale][d] = true; d = addDays(d,1); guard++; }
+    r.chiusurePerCanale[nomePortale].__attivo = true;
+  } else {
+    if (!confirm('Riaprire la vendita su "'+nomePortale+'"?')) return;
+    r.chiusurePerCanale[nomePortale] = {};
+  }
+  await saveRegoleTipo(r);
+  if (typeof avvisaHostexRestrizioniSubito === 'function') avvisaHostexRestrizioniSubito();
+  if (typeof registraModificaListino === 'function') registraModificaListino(nomePortale+' — ' + (!attivo ? '⛔ vendita CHIUSA (prossimi 12 mesi)' : '✅ vendita RIAPERTA'));
+  aggiornaBottoneStopVendite();
+  showToast(!attivo ? '⛔ Vendita chiusa solo su '+nomePortale : '✅ Vendita riaperta su '+nomePortale);
+  closeModal();
+  apriPannelloStopVendite(); // riapre subito il pannello aggiornato, per chiudere velocemente anche gli altri se serve
 }
 function aggiornaBottoneStopVendite(){
   var btn = document.getElementById('btn-stop-vendite');
   var testo = document.getElementById('btn-stop-vendite-testo');
   if (!btn || !testo) return;
-  var attivo = !!(getRegoleTipo().stopVenditePortali);
+  var r = getRegoleTipo();
+  var attivoGenerale = !!r.stopVenditePortali;
+  var canaliChiusi = r.chiusurePerCanale ? Object.keys(r.chiusurePerCanale).filter(function(n){ return r.chiusurePerCanale[n].__attivo; }) : [];
+  var attivo = attivoGenerale || canaliChiusi.length>0;
   if (attivo) {
-    btn.style.background = 'var(--green)';
+    btn.style.background = attivoGenerale ? 'var(--red,#dc2626)' : 'var(--amber,#d97706)';
     btn.style.color = '#fff';
     btn.style.border = 'none';
-    testo.textContent = '✅ Riattiva vendita portali';
+    testo.textContent = attivoGenerale ? '⛔ Vendita CHIUSA (tutti)' : ('⚠ Chiuso: '+canaliChiusi.join(', '));
   } else {
-    btn.style.background = 'var(--red-bg,#fee2e2)';
-    btn.style.color = 'var(--red,#dc2626)';
-    btn.style.border = '1.5px solid var(--red,#dc2626)';
+    btn.style.background = 'var(--surface2)';
+    btn.style.color = 'var(--text1)';
+    btn.style.border = '1.5px solid var(--border2)';
     testo.textContent = '⛔ Chiudi vendite portali';
   }
 }
@@ -25510,7 +25540,12 @@ if(lstSelFrom&&lstSelTo){
     : '';
   document.getElementById('page-listino').innerHTML=
     '<div style="padding:24px 28px 12px">'+
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">'+
     '<div class="page-title">Listino prezzi</div>'+
+    '<button id="btn-stop-vendite" onclick="apriPannelloStopVendite()" title="Chiude/riapre subito la vendita ai portali (tutti insieme o uno per volta) — resta comunque prenotabile a mano dal PMS" style="border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">'+
+      '<span id="btn-stop-vendite-testo">⛔ Chiudi vendite portali</span>'+
+    '</button>'+
+    '</div>'+
     '<div class="page-subtitle" style="margin-bottom:6px">'+rangeLabel+' · Tariffa: <strong>'+getTariffaNome(lstTariffaId)+'</strong>'+(lstIsDerivata?' <span style="color:#7c3aed;font-weight:700">— calcolata automaticamente: Standard '+(lstTarObj.valore>=0?'+':'')+lstTarObj.valore+(lstTarObj.modalita==='percento'?'%':(cfg.currency||'€'))+'</span>':'')+'</div>'+
     avvisoNoStandard+
     (lstMarkupOTA ? '<div style="background:var(--accent-light);color:var(--accent);padding:8px 14px;border-radius:8px;font-size:12.5px;margin-bottom:10px">💡 Margine OTA attivo: <strong>+'+lstMarkupOTA+'%</strong> — passa il mouse su un prezzo per vedere quanto mettere su Booking.com/Airbnb</div>' : '')+
@@ -25596,6 +25631,7 @@ if(lstSelFrom&&lstSelTo){
     '<div style="margin-top:8px">'+renderRegistroListinoHTML()+'</div>'+
     '</details>'+
     '</div>';
+  aggiornaBottoneStopVendite();
 }
 var lstSelFrom='',lstSelTo='',listinoYear=new Date().getFullYear(),lstTariffaId='standard';
 
