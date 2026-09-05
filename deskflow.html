@@ -334,11 +334,14 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 05/09/2026 · 10:28</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 05/09/2026 · 15:38</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
     </button>
+    <a id="btn-torna-hub" href="#" onclick="return apriHub()" title="Torna alla pagina Hub per passare a un'altra struttura (solo Amministratore)" style="display:none;width:calc(100% - 24px);margin:0 12px 8px;text-align:center;background:transparent;color:var(--accent);border:1px solid var(--accent);border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none">
+      🔀 Torna all'Hub
+    </a>
     <button id="btn-logout" onclick="doLogout()" style="display:none;width:calc(100% - 24px);margin:0 12px 12px;background:transparent;color:var(--text3,#888);border:.5px solid var(--border2,#ddd);border-radius:8px;padding:7px 12px;font-size:12px;font-weight:500;cursor:pointer;align-items:center;justify-content:center;gap:6px">
       🚪 Esci
     </button>
@@ -15094,6 +15097,16 @@ function aggiornaVisibilitaMenuPermessi(){
   });
   var voceUtenti = document.querySelector('.nav-item[data-page="utenti"]');
   if (voceUtenti) voceUtenti.style.display = window.currentUserPermessi ? 'none' : '';
+  var btnHub = document.getElementById('btn-torna-hub');
+  if (btnHub) btnHub.style.display = window.currentUserPermessi ? 'none' : 'block';
+}
+// Torna alla pagina Hub Amministratore (indirizzo impostato in Impostazioni → Struttura) — l'unico
+// posto da cui adesso si passa da una struttura all'altra, su richiesta di Gian.
+function apriHub(){
+  var s = DB.getObj('settings', {});
+  if (!s.hubUrl) { showToast('Imposta prima l\'indirizzo della pagina Hub in Impostazioni → Struttura'); return false; }
+  window.location.href = s.hubUrl;
+  return false;
 }
 
 function renderGestioneUtenti(){
@@ -28044,6 +28057,10 @@ function renderImpostazioni() {
               <input type="text" id="s-name" value="${s.propertyName||''}" placeholder="Il tuo hotel">
             </div>
             <div class="form-group full">
+              <label>Indirizzo pagina Hub Amministratore (per "🔀 Torna all'Hub" in barra laterale)</label>
+              <input type="text" id="s-hub-url" value="${s.hubUrl||''}" placeholder="https://.../hub-amministratore.html">
+            </div>
+            <div class="form-group full">
               <label>Email di invio (preventivi/conferme/ricevute)</label>
               <input type="email" id="s-email-mittente" value="${s.emailMittente||''}" placeholder="nome@tuastruttura.it">
               <div style="font-size:11px;color:var(--text3);margin-top:3px">L'indirizzo che appare nei pulsanti "Invia da..." e nei messaggi di conferma — l'invio vero passa comunque dalla funzione Supabase configurata con le credenziali di questo indirizzo.</div>
@@ -28695,6 +28712,7 @@ function rimuoviLogoStruttura() {
 function saveImpostazioni() {
   const s = DB.getObj('settings', {}); // partiamo da TUTTO quello che c'è già, non lo ricostruiamo da zero
   s.propertyName  = document.getElementById('s-name').value;
+  s.hubUrl        = document.getElementById('s-hub-url')?.value.trim() || '';
   s.emailMittente = document.getElementById('s-email-mittente')?.value.trim() || '';
   s.currency      = document.getElementById('s-currency').value;
   // s.logo non va toccato qui: resta quello già salvato, si cambia solo con Carica/Rimuovi logo
