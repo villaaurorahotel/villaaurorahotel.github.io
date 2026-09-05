@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 05/09/2026 · 15:38</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 05/09/2026 · 16:44</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -14810,6 +14810,8 @@ function gruppiSalvaReferente(groupId){
 }
 
 function renderGruppiEventi(){
+  if (!window._gruppiFiltro) window._gruppiFiltro = { dal:'', al:'', soloEventi:true };
+  var f = window._gruppiFiltro;
   var bookings = DB.get('bookings').filter(function(b){ return b.groupId && b.status !== 'cancellata'; });
   var info = gruppiInfoGet();
   var perGruppo = {};
@@ -14824,15 +14826,28 @@ function renderGruppiEventi(){
     var checkoutMax = bks.reduce(function(m,b){ return (!m||b.checkout>m)?b.checkout:m; }, null);
     var totale = bks.reduce(function(s,b){ return s + Number(b.totalPrice||0); }, 0);
     var ospiti = bks.reduce(function(s,b){ return s + (Number(b.adults)||0) + (Number(b.children)||0); }, 0);
-    return { id: gid, info: g, camere: bks.length, checkinMin: checkinMin, checkoutMax: checkoutMax, totale: totale, ospiti: ospiti, colore: (getGroupColors()[gid]||'#9333ea') };
+    return { id: gid, info: g, camere: bks.length, checkinMin: checkinMin, checkoutMax: checkoutMax, totale: totale, ospiti: ospiti, colore: (getGroupColors()[gid]||'#9333ea'), isEvento: ospiti>=15 };
+  }).filter(function(g){
+    if (f.soloEventi && !g.isEvento) return false;
+    if (f.dal && (!g.checkoutMax || g.checkoutMax < f.dal)) return false;
+    if (f.al && (!g.checkinMin || g.checkinMin > f.al)) return false;
+    return true;
   }).sort(function(a,b){ return (a.checkinMin||'').localeCompare(b.checkinMin||''); });
 
+  var totaleGruppiEsistenti = Object.keys(perGruppo).length;
+
   var html = '<div class="page-header"><div><div class="page-title">👥 Gruppi & Eventi</div>'+
-    '<div class="page-subtitle">'+gruppi.length+' gruppi attivi (camere collegate tra loro)</div></div></div>'+
-    '<div class="page-content">';
+    '<div class="page-subtitle">'+gruppi.length+' mostrati su '+totaleGruppiEsistenti+' totali · "Evento" = 15 o più ospiti in un gruppo</div></div></div>'+
+    '<div class="page-content">'+
+    '<div class="card" style="padding:12px 16px;margin-bottom:14px;display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">'+
+      '<div><label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Dal</label><input type="date" value="'+f.dal+'" onchange="window._gruppiFiltro.dal=this.value;renderGruppiEventi();"></div>'+
+      '<div><label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Al</label><input type="date" value="'+f.al+'" onchange="window._gruppiFiltro.al=this.value;renderGruppiEventi();"></div>'+
+      '<button class="btn btn-sm" onclick="window._gruppiFiltro.dal=\'\';window._gruppiFiltro.al=\'\';renderGruppiEventi();">✕ Azzera date</button>'+
+      '<label style="display:flex;align-items:center;gap:6px;font-size:12.5px;margin-left:8px"><input type="checkbox" '+(f.soloEventi?'checked':'')+' onchange="window._gruppiFiltro.soloEventi=this.checked;renderGruppiEventi();" style="width:auto"> Solo eventi (15+ ospiti)</label>'+
+    '</div>';
 
   if (!gruppi.length) {
-    html += '<div class="empty-state"><p>Nessun gruppo attivo al momento — un gruppo si crea collegando due o più prenotazioni con lo stesso "ID gruppo" nella scheda di modifica prenotazione.</p></div>';
+    html += '<div class="empty-state"><p>Nessun gruppo trovato con questi filtri.</p></div>';
   } else {
     html += '<div style="display:flex;flex-direction:column;gap:12px">' +
       gruppi.map(function(g){
@@ -14840,7 +14855,7 @@ function renderGruppiEventi(){
         return '<div class="card" style="padding:14px 18px;border-left:4px solid '+g.colore+'">'+
           '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap">'+
           '<div>'+
-            '<div style="font-weight:700;font-size:15px">'+titolo.replace(/</g,'&lt;')+(g.info.nomeEvento?' <span style="font-weight:400;color:var(--text3);font-size:12px">('+g.id+')</span>':'')+'</div>'+
+            '<div style="font-weight:700;font-size:15px">'+titolo.replace(/</g,'&lt;')+(g.info.nomeEvento?' <span style="font-weight:400;color:var(--text3);font-size:12px">('+g.id+')</span>':'')+(g.isEvento?' <span style="background:#7c3aed;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;vertical-align:middle">🎉 EVENTO</span>':'')+'</div>'+
             '<div style="font-size:12px;color:var(--text3);margin-top:3px">🚪 '+g.camere+' camere · 👤 '+g.ospiti+' ospiti · '+fmtDate(g.checkinMin)+' → '+fmtDate(g.checkoutMax)+' · 💰 '+fmtCurrency(g.totale)+'</div>'+
             (g.info.referenteNome ? '<div style="font-size:12.5px;color:var(--text2);margin-top:8px">📇 Referente: <strong>'+g.info.referenteNome.replace(/</g,'&lt;')+'</strong>'+(g.info.referenteTelefono?' · 📞 '+g.info.referenteTelefono.replace(/</g,'&lt;'):'')+(g.info.referenteEmail?' · ✉ '+g.info.referenteEmail.replace(/</g,'&lt;'):'')+'</div>' : '<div style="font-size:12px;color:var(--amber,#d97706);margin-top:8px">⚠ Nessun referente impostato</div>')+
             (g.info.note ? '<div style="font-size:12px;color:var(--text3);margin-top:4px">📝 '+g.info.note.replace(/</g,'&lt;')+'</div>' : '')+
@@ -14850,6 +14865,7 @@ function renderGruppiEventi(){
             '<button class="btn btn-sm" onclick="apriGruppoCollegato(\''+g.id.replace(/'/g,"\\'")+'\')">🔗 Vedi/Modifica camere</button>'+
             '<button class="btn btn-sm" onclick="apriContoGruppo(\''+g.id.replace(/'/g,"\\'")+'\')">💰 Conto unico</button>'+
             '<button class="btn btn-sm" onclick="stampaSchedaGruppo(\''+g.id.replace(/'/g,"\\'")+'\')">🖨 Stampa scheda</button>'+
+            '<button class="btn btn-sm" style="background:#7c3aed;color:#fff;border-color:#7c3aed" onclick="stampaRoomingList(\''+g.id.replace(/'/g,"\\'")+'\')">📋 Rooming list (da inviare)</button>'+
           '</div>'+
           '</div></div>';
       }).join('') +
@@ -15035,31 +15051,55 @@ function renderFatture(){
 // scegli cosa può fare.
 // ══════════════════════════════════════════════════════════════════════════
 var PAGINE_PERMESSO = {
-  planner:'calendario', calendario:'calendario', arrivi:'calendario', housekeeping:'calendario', biancheria:'calendario', puliziamobile:'calendario',
-  checkin:'calendario', checkout:'calendario', 'arrivi-partenze':'calendario', checkineffettuati:'calendario', checkouteffettuati:'calendario', effettuati:'calendario',
-  prenotazioni:'prenotazioni', mobilecheckin:'prenotazioni', ospiti:'prenotazioni', archivioospiti:'prenotazioni', preventivi:'prenotazioni', wamassivo:'prenotazioni', emailmassiva:'prenotazioni',
-  gruppi:'gruppi',
-  fatture:'fatture',
-  recensioni:'recensioni',
-  report:'report', reportpasti:'report', previsionale:'report', revenue:'report',
-  corrispettivi:'corrispettivi', contidasaldare:'corrispettivi',
-  listino:'listino', livelli:'listino', tipologie:'listino', tassasoggiorno:'listino', camere:'listino',
+  planner:'planner', calendario:'calendario', arrivi:'arrivi', 'arrivi-partenze':'arrivi-partenze', housekeeping:'housekeeping', biancheria:'biancheria', puliziamobile:'puliziamobile',
+  mobilecheckin:'mobilecheckin', prenotazioni:'prenotazioni', ospiti:'ospiti', archivioospiti:'archivioospiti', preventivi:'preventivi', wamassivo:'wamassivo', emailmassiva:'emailmassiva',
+  gruppi:'gruppi', fatture:'fatture', recensioni:'recensioni',
+  report:'report', reportpasti:'reportpasti', previsionale:'previsionale', revenue:'revenue',
+  corrispettivi:'corrispettivi', contidasaldare:'contidasaldare',
+  listino:'listino', livelli:'livelli', tipologie:'tipologie', tassasoggiorno:'tassasoggiorno', camere:'camere',
   manutenzione:'manutenzione',
-  extra:'gestione', addebitiextra:'gestione', adempimenti:'gestione', blacklist:'gestione', ical:'gestione', condizioni:'gestione', guidaospiti:'gestione', sitoweb:'gestione',
-  impostazioni:'impostazioni', salvataggio:'impostazioni', utenti:'impostazioni',
+  extra:'extra', addebitiextra:'addebitiextra', adempimenti:'adempimenti', blacklist:'blacklist', ical:'ical', condizioni:'condizioni', guidaospiti:'guidaospiti', sitoweb:'sitoweb',
+  impostazioni:'impostazioni', salvataggio:'salvataggio', utenti:'impostazioni',
 };
 var VOCI_PERMESSO = [
-  {k:'calendario', l:'Calendario, Planner, Housekeeping, Check-in/out'},
-  {k:'prenotazioni', l:'Prenotazioni, Preventivi, messaggi massivi'},
-  {k:'corrispettivi', l:'Corrispettivi (conto, incassi)'},
-  {k:'gruppi', l:'Gruppi & Eventi'},
-  {k:'manutenzione', l:'Manutenzione/Guasti'},
-  {k:'listino', l:'Listino prezzi, Livelli, Tipologie'},
-  {k:'report', l:'Report, Revenue, Previsionale'},
-  {k:'fatture', l:'Fatture elettroniche'},
-  {k:'recensioni', l:'Recensioni'},
-  {k:'gestione', l:'Extra/Servizi, Adempimenti, Blacklist, iCal, Sito web'},
-  {k:'impostazioni', l:'Impostazioni e Salvataggio'},
+  {k:'planner', l:'📅 Planner'},
+  {k:'calendario', l:'📅 Calendario'},
+  {k:'arrivi-partenze', l:'🗂 Check-in/out'},
+  {k:'mobilecheckin', l:'📱 Check-in mobile'},
+  {k:'housekeeping', l:'🧹 Housekeeping'},
+  {k:'biancheria', l:'🧺 Biancheria'},
+  {k:'puliziamobile', l:'🧹📱 Pulizie mobile'},
+  {k:'prenotazioni', l:'📋 Prenotazioni'},
+  {k:'preventivi', l:'📝 Preventivi'},
+  {k:'wamassivo', l:'📨 WhatsApp massivo'},
+  {k:'emailmassiva', l:'📧 Email massiva'},
+  {k:'ospiti', l:'👥 Ospiti'},
+  {k:'archivioospiti', l:'🗂 Archivio ospiti'},
+  {k:'guidaospiti', l:'🗺️ Guida ospiti'},
+  {k:'gruppi', l:'👥 Gruppi & Eventi'},
+  {k:'corrispettivi', l:'💶 Corrispettivi'},
+  {k:'contidasaldare', l:'💰 Conti da saldare'},
+  {k:'fatture', l:'🧾 Fatture'},
+  {k:'listino', l:'💰 Listino prezzi'},
+  {k:'livelli', l:'🎚 Livelli tariffari'},
+  {k:'tipologie', l:'🏷 Tipologie'},
+  {k:'camere', l:'🛏 Camere'},
+  {k:'tassasoggiorno', l:'🏛 Tassa di soggiorno'},
+  {k:'revenue', l:'🎯 Prezzo consigliato'},
+  {k:'report', l:'📊 Report'},
+  {k:'reportpasti', l:'🍽 Report Pasti'},
+  {k:'previsionale', l:'📈 Previsionale'},
+  {k:'manutenzione', l:'🔧 Manutenzione'},
+  {k:'recensioni', l:'⭐ Recensioni'},
+  {k:'extra', l:'🛎 Extra/Servizi'},
+  {k:'addebitiextra', l:'🛎 Addebiti extra'},
+  {k:'adempimenti', l:'📋 Adempimenti'},
+  {k:'blacklist', l:'🚫 Blacklist'},
+  {k:'ical', l:'🔗 iCal/Portali'},
+  {k:'condizioni', l:'📜 Condizioni'},
+  {k:'sitoweb', l:'🌐 Sito web'},
+  {k:'impostazioni', l:'⚙ Impostazioni'},
+  {k:'salvataggio', l:'💾 Salvataggio'},
 ];
 var AZIONI_PERMESSO = [
   {k:'modificaPrenotazioni', l:'Modificare prenotazioni esistenti'},
@@ -15142,7 +15182,7 @@ function renderGestioneUtenti(){
 function utentiApriModaleNuovo(){ utentiApriModaleModifica(null); }
 function utentiApriModaleModifica(email){
   var lista = utentiPermessiGetLista();
-  var permessiDefault = {calendario:true, prenotazioni:true, corrispettivi:true, gruppi:true, manutenzione:true, modificaPrenotazioni:true};
+  var permessiDefault = {planner:true, calendario:true, 'arrivi-partenze':true, mobilecheckin:true, housekeeping:true, prenotazioni:true, ospiti:true, gruppi:true, corrispettivi:true, manutenzione:true, modificaPrenotazioni:true};
   var u = email ? lista[email] : {nome:'', permessi: permessiDefault};
   var p = (u && u.permessi) ? u.permessi : permessiDefault;
   showModal(email ? 'Modifica permessi — '+email : 'Nuovo utente limitato',
@@ -29886,6 +29926,62 @@ function schedaGruppoHTML(bookings, cfg) {
     righeCamere +
     '<div class="row total" style="margin-top:12px"><span>Totale complessivo gruppo</span><span>'+fmtCurrency(totaleGenerale)+'</span></div>' +
     '</div>';
+}
+
+// ROOMING LIST STAMPABILE — richiesto da Gian: per i gruppi/eventi, un modulo da stampare
+// (anche vuoto, senza dati degli ospiti) da mandare al referente del gruppo, che lo compila a
+// mano con i dati di ogni persona prima dell'arrivo. Mostra le camere/date già note dal PMS, e
+// lascia righe vuote da riempire per ogni ospite atteso in ciascuna camera.
+function stampaRoomingList(groupId) {
+  var bookings = DB.get('bookings').filter(function(b){ return b.groupId === groupId && b.status !== 'cancellata'; })
+    .sort(function(a,b){ return (a.roomName||'').localeCompare(b.roomName||'', 'it', {numeric:true}); });
+  if (!bookings.length) { showToast('Nessuna prenotazione trovata per questo gruppo'); return; }
+  var cfg = DB.getObj('settings', {propertyName:'La mia struttura'});
+  var info = gruppiInfoGet()[groupId] || {};
+  var titolo = info.nomeEvento || groupId;
+  var checkinMin = bookings.reduce(function(m,b){ return (!m||b.checkin<m)?b.checkin:m; }, null);
+  var checkoutMax = bookings.reduce(function(m,b){ return (!m||b.checkout>m)?b.checkout:m; }, null);
+
+  var righeCamere = bookings.map(function(b){
+    var nOspiti = Math.max(1, (Number(b.adults)||0) + (Number(b.children)||0));
+    var righeOspiti = '';
+    for (var i=0; i<nOspiti; i++) {
+      righeOspiti += '<tr>'+
+        (i===0 ? '<td rowspan="'+nOspiti+'" style="font-weight:700;vertical-align:top;border-right:1px solid #999">'+ (b.roomName||'').replace(/</g,'&lt;') +'</td>' : '')+
+        '<td style="border-bottom:1px solid #ccc;height:26px"></td>'+
+        '<td style="border-bottom:1px solid #ccc"></td>'+
+        '<td style="border-bottom:1px solid #ccc"></td>'+
+        '<td style="border-bottom:1px solid #ccc"></td>'+
+        '<td style="border-bottom:1px solid #ccc"></td>'+
+      '</tr>';
+    }
+    return righeOspiti;
+  }).join('');
+
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Rooming list — '+titolo+'</title>'+
+    '<style>'+
+    'body{font-family:Arial,sans-serif;padding:24px;color:#111}'+
+    'h1{font-size:18px;margin:0 0 4px}'+
+    '.sub{color:#666;font-size:12.5px;margin-bottom:18px}'+
+    'table{width:100%;border-collapse:collapse;font-size:12px}'+
+    'th{background:#f0f0f0;text-align:left;padding:6px 8px;border-bottom:2px solid #999}'+
+    'td{padding:6px 8px}'+
+    '.istruzioni{font-size:11.5px;color:#555;background:#f7f7f7;padding:10px 12px;border-radius:6px;margin-bottom:16px;line-height:1.5}'+
+    '@media print{ .no-print{display:none} }'+
+    '</style></head><body>'+
+    '<h1>Rooming list — '+titolo.replace(/</g,'&lt;')+'</h1>'+
+    '<div class="sub">'+(cfg.propertyName||'')+' · Soggiorno: '+fmtDate(checkinMin)+' → '+fmtDate(checkoutMax)+' · '+bookings.length+' camere</div>'+
+    '<div class="istruzioni">Gentile ospite, la preghiamo di compilare questa scheda con i dati di ogni persona del gruppo, camera per camera, e di rispedircela prima dell\'arrivo — ci serve per preparare correttamente il soggiorno e le comunicazioni obbligatorie alle autorità.</div>'+
+    '<table><thead><tr><th>Camera</th><th>Nome</th><th>Cognome</th><th>Data di nascita</th><th>Nazionalità</th><th>Documento n°</th></tr></thead><tbody>'+
+    righeCamere+
+    '</tbody></table>'+
+    '<button class="no-print" onclick="window.print()" style="margin-top:20px;padding:10px 18px;font-size:14px;cursor:pointer">🖨 Stampa</button>'+
+    '</body></html>';
+
+  var win = window.open('', '_blank', 'width=800,height=1000');
+  win.document.write(html);
+  win.document.close();
+  setTimeout(function(){ win.print(); }, 500);
 }
 
 function stampaSchedaGruppo(groupId) {
