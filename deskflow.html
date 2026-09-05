@@ -335,7 +335,7 @@ tr:hover td{background:var(--surface2)}
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
       <button id="btn-cambia-struttura" onclick="apriSelettoreStrutture()" title="Passa a un'altra struttura collegata (solo Amministratore)" style="display:none;width:100%;margin-top:6px;background:transparent;color:var(--accent);border:1px solid var(--accent);border-radius:6px;padding:4px 8px;font-size:11px;font-weight:600;cursor:pointer">🔀 Cambia struttura</button>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 04/09/2026 · 18:04</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 05/09/2026 · 05:16</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -15109,12 +15109,12 @@ function apriSelettoreStrutture(){
 function apriAggiungiStruttura(){
   showModal('Aggiungi struttura',
     '<div class="form-grid">'+
+    '<div style="font-size:11.5px;color:var(--amber,#d97706);background:var(--amber-bg,#fef3c7);padding:8px 10px;border-radius:6px;margin-bottom:12px">⚠ Attenzione: qui sotto vanno i dati della struttura A CUI VUOI PASSARE — NON quelli della struttura in cui ti trovi ora. Li trovi aprendo quella struttura in un\'altra scheda → Impostazioni → Supabase URL/Chiave.</div>'+
     '<div class="form-group full"><label>Nome struttura</label><input type="text" id="str-nome" placeholder="es. Hotel Villa Aurora"></div>'+
-    '<div class="form-group full"><label>Supabase URL</label><input type="text" id="str-url" placeholder="https://xxxxx.supabase.co"></div>'+
-    '<div class="form-group full"><label>Supabase Anon Key</label><input type="text" id="str-key" placeholder="eyJ..."></div>'+
+    '<div class="form-group full"><label>Supabase URL (della struttura di destinazione)</label><input type="text" id="str-url" placeholder="https://xxxxx.supabase.co"></div>'+
+    '<div class="form-group full"><label>Supabase Anon Key (della struttura di destinazione)</label><input type="text" id="str-key" placeholder="eyJ..."></div>'+
     '<div class="form-group full" style="border-top:1px dashed var(--border2);padding-top:10px"><label>La tua email di accesso per QUELLA struttura</label><input type="email" id="str-email" placeholder="tuaemail@..."></div>'+
     '<div class="form-group full"><label>La tua password per QUELLA struttura (salvata su questo dispositivo, per entrare senza doverla riscrivere ogni volta)</label><input type="password" id="str-password" placeholder="••••••••"></div>'+
-    '<div class="form-group full"><button type="button" class="btn btn-sm" onclick="var s=DB.getObj(\'settings\',{});document.getElementById(\'str-nome\').value=s.propertyName||\'Questa struttura\';document.getElementById(\'str-url\').value=s.supabaseUrl||\'\';document.getElementById(\'str-key\').value=s.supabaseKey||\'\';document.getElementById(\'str-email\').value=window.currentUserEmail||\'\';">↺ Usa URL/Chiave/Email di QUESTA struttura (la password va comunque scritta a mano — per sicurezza non resta mai salvata da nessuna parte dopo il login)</button></div>'+
     '</div>',
     '<button class="btn" onclick="apriSelettoreStrutture()">Annulla</button>'+
     '<button class="btn btn-primary" onclick="salvaNuovaStruttura()">Salva</button>'
