@@ -334,8 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <button id="btn-cambia-struttura" onclick="apriSelettoreStrutture()" title="Passa a un'altra struttura collegata (solo Amministratore)" style="display:none;width:100%;margin-top:6px;background:transparent;color:var(--accent);border:1px solid var(--accent);border-radius:6px;padding:4px 8px;font-size:11px;font-weight:600;cursor:pointer">🔀 Cambia struttura</button>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 05/09/2026 · 05:16</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 05/09/2026 · 05:50</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -15065,100 +15064,6 @@ function aggiornaVisibilitaMenuPermessi(){
   });
   var voceUtenti = document.querySelector('.nav-item[data-page="utenti"]');
   if (voceUtenti) voceUtenti.style.display = window.currentUserPermessi ? 'none' : '';
-  var btnCambiaStruttura = document.getElementById('btn-cambia-struttura');
-  if (btnCambiaStruttura) btnCambiaStruttura.style.display = window.currentUserPermessi ? 'none' : 'block';
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// CAMBIA STRUTTURA — richiesto da Gian: passare da Villa Aurora a Greta's
-// House (e alle prossime strutture) senza uscire e rientrare da capo. Ogni
-// struttura è un file PMS separato collegato a un progetto Supabase
-// separato — "cambiare struttura" significa collegarsi a un altro progetto
-// Supabase, quindi la pagina si ricarica sempre (serve anche perché ogni
-// struttura ha i suoi utenti/permessi propri, potrebbe chiedere il login).
-// L'elenco delle strutture resta salvato SOLO su questo browser/dispositivo
-// (non su Supabase) — va quindi registrato una volta su ogni dispositivo
-// che usi per amministrare più strutture.
-// ══════════════════════════════════════════════════════════════════════════
-function struttureCollegateGetLista(){
-  try { return JSON.parse(localStorage.getItem('pms_struttureCollegate')) || []; } catch(e) { return []; }
-}
-function struttureCollegateSalvaLista(lista){
-  localStorage.setItem('pms_struttureCollegate', JSON.stringify(lista));
-}
-function apriSelettoreStrutture(){
-  if (window.currentUserPermessi) { showToast('Solo l\'amministratore può cambiare struttura'); return; }
-  var lista = struttureCollegateGetLista();
-  var s = DB.getObj('settings', {});
-  var urlAttuale = s.supabaseUrl || '';
-  showModal('Cambia struttura',
-    '<div style="font-size:12px;color:var(--text3);margin-bottom:12px">Passa a un\'altra struttura collegata su questo dispositivo — se non hai già effettuato l\'accesso lì, ti verrà chiesto il login.</div>'+
-    (lista.length ? lista.map(function(st, i){
-      var attiva = st.url === urlAttuale;
-      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border:1px solid var(--border2);border-radius:8px;margin-bottom:6px'+(attiva?';background:var(--accent-light)':'')+'">'+
-        '<div><strong>'+st.nome.replace(/</g,'&lt;')+'</strong>'+(attiva?' <span style="font-size:11px;color:var(--accent)">· struttura attuale</span>':'')+'</div>'+
-        '<div style="display:flex;gap:6px">'+
-          (attiva?'':'<button class="btn btn-sm" onclick="vaiAStruttura('+i+')">Vai →</button>')+
-          '<button class="btn btn-sm" style="color:var(--red)" onclick="rimuoviStruttura('+i+')">✕</button>'+
-        '</div></div>';
-    }).join('') : '<div style="font-size:12px;color:var(--text3);margin-bottom:12px">Nessuna struttura salvata ancora su questo dispositivo.</div>')+
-    '<button class="btn btn-sm" style="margin-top:8px" onclick="apriAggiungiStruttura()">+ Aggiungi struttura</button>',
-    '<button class="btn" onclick="closeModal()">Chiudi</button>'
-  );
-}
-function apriAggiungiStruttura(){
-  showModal('Aggiungi struttura',
-    '<div class="form-grid">'+
-    '<div style="font-size:11.5px;color:var(--amber,#d97706);background:var(--amber-bg,#fef3c7);padding:8px 10px;border-radius:6px;margin-bottom:12px">⚠ Attenzione: qui sotto vanno i dati della struttura A CUI VUOI PASSARE — NON quelli della struttura in cui ti trovi ora. Li trovi aprendo quella struttura in un\'altra scheda → Impostazioni → Supabase URL/Chiave.</div>'+
-    '<div class="form-group full"><label>Nome struttura</label><input type="text" id="str-nome" placeholder="es. Hotel Villa Aurora"></div>'+
-    '<div class="form-group full"><label>Supabase URL (della struttura di destinazione)</label><input type="text" id="str-url" placeholder="https://xxxxx.supabase.co"></div>'+
-    '<div class="form-group full"><label>Supabase Anon Key (della struttura di destinazione)</label><input type="text" id="str-key" placeholder="eyJ..."></div>'+
-    '<div class="form-group full" style="border-top:1px dashed var(--border2);padding-top:10px"><label>La tua email di accesso per QUELLA struttura</label><input type="email" id="str-email" placeholder="tuaemail@..."></div>'+
-    '<div class="form-group full"><label>La tua password per QUELLA struttura (salvata su questo dispositivo, per entrare senza doverla riscrivere ogni volta)</label><input type="password" id="str-password" placeholder="••••••••"></div>'+
-    '</div>',
-    '<button class="btn" onclick="apriSelettoreStrutture()">Annulla</button>'+
-    '<button class="btn btn-primary" onclick="salvaNuovaStruttura()">Salva</button>'
-  );
-}
-function salvaNuovaStruttura(){
-  var nome = (document.getElementById('str-nome').value||'').trim();
-  var url = (document.getElementById('str-url').value||'').trim();
-  var key = (document.getElementById('str-key').value||'').trim();
-  var email = (document.getElementById('str-email').value||'').trim();
-  var password = document.getElementById('str-password').value||'';
-  if (!nome || !url || !key) { showToast('Compila almeno nome, URL e Chiave'); return; }
-  var lista = struttureCollegateGetLista();
-  lista.push({nome:nome, url:url, key:key, email:email, password:password});
-  struttureCollegateSalvaLista(lista);
-  showToast('Struttura aggiunta'+(email&&password?' — accesso automatico attivo':''));
-  apriSelettoreStrutture();
-}
-function rimuoviStruttura(i){
-  if (!confirm('Rimuovere questa struttura dall\'elenco? (non cancella nulla dei suoi dati, solo il collegamento rapido salvato su questo dispositivo)')) return;
-  var lista = struttureCollegateGetLista();
-  lista.splice(i,1);
-  struttureCollegateSalvaLista(lista);
-  apriSelettoreStrutture();
-}
-// Passa a un'altra struttura — se per quella struttura sono state salvate email+password (vedi
-// apriAggiungiStruttura), le passa tramite un "biglietto" temporaneo in localStorage che la pagina
-// legge SUBITO dopo il ricaricamento per fare il login da sola, senza chiedertelo di nuovo. Il
-// biglietto si autodistrugge dopo la prima lettura (o dopo 30 secondi), per sicurezza.
-function vaiAStruttura(i){
-  var lista = struttureCollegateGetLista();
-  var st = lista[i];
-  if (!st) return;
-  if (!confirm('Passare a "'+st.nome+'"? La pagina si ricaricherà.')) return;
-  var s = DB.getObj('settings', {});
-  s.supabaseUrl = st.url;
-  s.supabaseKey = st.key;
-  // Scritto direttamente su localStorage (non tramite DB.setObj, che proverebbe a sincronizzare
-  // sulla struttura che stiamo per lasciare) — la pagina si ricarica subito dopo comunque.
-  localStorage.setItem('pms_settings', JSON.stringify(s));
-  if (st.email && st.password) {
-    localStorage.setItem('pms_autologin_pending', JSON.stringify({email:st.email, password:st.password, ts:Date.now()}));
-  }
-  location.reload();
 }
 
 function renderGestioneUtenti(){
@@ -29119,14 +29024,21 @@ document.addEventListener('DOMContentLoaded', async function() {
       supabaseClient = supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey);
       const { data: { session } } = await supabaseClient.auth.getSession();
       if (!session) {
-        // Prova prima un accesso automatico, se si arriva qui da un "Cambia struttura" con
-        // email/password salvate — evita di dover rifare il login ogni volta che si passa da una
-        // struttura all'altra. Il "biglietto" si legge una volta sola e si autodistrugge subito
-        // dopo, valido solo per pochi secondi, per sicurezza.
+        // Prova prima un accesso automatico — o da un "Cambia struttura" fatto da dentro questo
+        // stesso PMS (biglietto su localStorage), o da un link ricevuto dall'Hub Amministratore
+        // esterno (email/password nell'indirizzo). Il biglietto si legge una volta sola e si
+        // autodistrugge subito dopo, valido solo per pochi secondi, per sicurezza.
         var autologinRiuscito = false;
         try {
           var autologin = JSON.parse(localStorage.getItem('pms_autologin_pending') || 'null');
           localStorage.removeItem('pms_autologin_pending');
+          var paramsUrl = new URLSearchParams(location.search);
+          if (!autologin && paramsUrl.get('autologin_email') && paramsUrl.get('autologin_password')) {
+            autologin = { email: paramsUrl.get('autologin_email'), password: paramsUrl.get('autologin_password'), ts: Date.now() };
+            // Toglie subito email/password dalla barra degli indirizzi, prima ancora di provare il
+            // login — non deve restare visibile né nella cronologia del browser.
+            history.replaceState(null, '', location.pathname + location.hash);
+          }
           if (autologin && autologin.email && autologin.password && (Date.now() - autologin.ts) < 30000) {
             const { error: errAuto } = await supabaseClient.auth.signInWithPassword({ email: autologin.email, password: autologin.password });
             if (!errAuto) autologinRiuscito = true;
