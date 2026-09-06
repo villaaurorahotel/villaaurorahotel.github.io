@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 06/09/2026 · 14:39</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 06/09/2026 · 14:50</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -19467,10 +19467,13 @@ function openDettaglioPrenotazione(id) {
                 '<tbody>' +
                 b.componenti.map(function(comp){
                   const eta = calcolaEtaAllaData(comp.dataNascita, b.checkin);
+                  var luogoResidenza = comp.residenza
+                    ? comp.residenza + (comp.provResidenza ? ' ('+comp.provResidenza+')' : '')
+                    : ((comp.statoResidenza && comp.statoResidenza!=='Italia') ? comp.statoResidenza : '—');
                   return '<tr style="border-top:1px solid var(--border)">' +
                     '<td style="padding:6px 8px 6px 0"><strong>'+(comp.nome||'')+' '+(comp.cognome||'')+'</strong></td>' +
                     '<td style="padding:6px 8px;color:var(--text2)">'+(eta!==null ? eta+' anni' : '—')+'</td>' +
-                    '<td style="padding:6px 0;color:var(--text2)">'+(comp.residenza||'—')+'</td>' +
+                    '<td style="padding:6px 0;color:var(--text2)">'+luogoResidenza+'</td>' +
                   '</tr>';
                 }).join('') +
                 '</tbody>' +
@@ -21484,25 +21487,26 @@ function openCheckinForm(bookingId) {
       '<span id="ci-foto-anteprima-'+i+'" style="display:inline-block;vertical-align:middle;margin-left:6px">'+(prevC.fotoOspite?'<img src="'+prevC.fotoOspite+'" style="width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid var(--border2)">':'')+'</span>'+
       '</div>'+
       '<div class="form-grid">'+
-        '<div class="form-group"><label>Cognome *</label><input type="text" id="ci-cogn-'+i+'" value="'+cogn+'" placeholder="Rossi"></div>'+
-        '<div class="form-group"><label>Nome *</label><input type="text" id="ci-nome-'+i+'" value="'+nom+'" placeholder="Mario"></div>'+
+        '<div class="form-group"><label>Cognome *</label><input type="text" id="ci-cogn-'+i+'" value="'+cogn+'" placeholder="Rossi" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></div>'+
+        '<div class="form-group"><label>Nome *</label><input type="text" id="ci-nome-'+i+'" value="'+nom+'" placeholder="Mario" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></div>'+
         '<div class="form-group"><label>Sesso'+req+'</label><select id="ci-sesso-'+i+'">'+
           '<option value="M"'+(prevC.sesso==='M'||!prevC.sesso?' selected':'')+'>M — Maschio</option>'+
           '<option value="F"'+(prevC.sesso==='F'?' selected':'')+'>F — Femmina</option>'+
         '</select></div>'+
         '<div class="form-group"><label>Data di nascita'+req+'</label><input type="date" id="ci-nasc-'+i+'" value="'+(prevC.dataNascita||'')+'" onchange="checkCompleannoLive('+i+')"></div>'+
         '<div class="form-group"><label>Cittadinanza'+req+'</label><input type="text" id="ci-naz-'+i+'" list="nazioni-list" autocomplete="off" value="'+(prevC.cittadinanza||'Italia')+'" onchange="onCittadinanzaChange('+i+')"></div>'+
-        '<div class="form-group"><label>Comune di nascita</label><input type="text" id="ci-luogo-nasc-'+i+'" value="'+(prevC.luogoNascita||'')+'" placeholder="Roma" autocomplete="off" '+((prevC.cittadinanza||'Italia')==='Italia'?'list="comuni-it-list"':'')+' oninput="onComuneNascitaInput('+i+')"></div>'+
+        '<div class="form-group"><label>Comune di nascita</label><input type="text" id="ci-luogo-nasc-'+i+'" value="'+(prevC.luogoNascita||'')+'" placeholder="Roma" autocomplete="off" style="text-transform:uppercase" '+((prevC.cittadinanza||'Italia')==='Italia'?'list="comuni-it-list"':'')+' oninput="this.value=this.value.toUpperCase(); onComuneNascitaInput('+i+')"></div>'+
         '<div class="form-group"><label>Prov. nascita</label><input type="text" id="ci-prov-'+i+'" value="'+(prevC.provNascita||'')+'" placeholder="RM" maxlength="2" style="text-transform:uppercase"></div>'+
         '<div class="form-group"><label>Stato di residenza</label><input type="text" id="ci-stato-res-'+i+'" list="nazioni-list" autocomplete="off" value="'+(prevC.statoResidenza||prevC.cittadinanza||'Italia')+'"></div>'+
-        '<div class="form-group"><label>Comune residenza</label><input type="text" id="ci-res-'+i+'" value="'+(prevC.residenza||'')+'" placeholder="Milano" autocomplete="off" list="'+((prevC.cittadinanza||'Italia')==='Italia'?'comuni-it-list':'nazioni-list')+'" oninput="onComuneResidenzaInput('+i+')"></div>'+
+        '<div class="form-group"><label>Comune residenza</label><input type="text" id="ci-res-'+i+'" value="'+(prevC.residenza||'')+'" placeholder="Milano" autocomplete="off" style="text-transform:uppercase" list="'+((prevC.cittadinanza||'Italia')==='Italia'?'comuni-it-list':'nazioni-list')+'" oninput="this.value=this.value.toUpperCase(); onComuneResidenzaInput('+i+')"></div>'+
+        '<div class="form-group"><label>Prov. residenza</label><input type="text" id="ci-provres-'+i+'" value="'+(prevC.provResidenza||'')+'" placeholder="MI" maxlength="2" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></div>'+
         '<div class="form-group"><label>Tipo documento'+req+'</label><select id="ci-tdoc-'+i+'">'+
           '<option value="">'+(isMain?'— Seleziona —':'— Nessuno —')+'</option>'+
           tipiDoc.map(d=>'<option value="'+d[0]+'"'+(d[0]===(prevC.tipoDoc||(isMain?'IDELE':''))?' selected':'')+'>'+d[0]+' — '+d[1]+'</option>').join('')+
         '</select></div>'+
         '<div class="form-group"><label>N° documento'+req+'</label><input type="text" id="ci-ndoc-'+i+'" value="'+(prevC.numDoc||'')+'" placeholder="AA1234567"></div>'+
         '<div class="form-group"><label>Autorità rilascio</label><input type="text" id="ci-ente-'+i+'" value="'+(prevC.enteDoc||'')+'" placeholder="Comune di Roma"></div>'+
-        '<div class="form-group"><label>Luogo rilascio</label><input type="text" id="ci-ldoc-'+i+'" value="'+(prevC.luogoDoc||prevC.residenza||'')+'" placeholder="Roma" oninput="this.dataset.manual=\'1\'"></div>'+
+        '<div class="form-group"><label>Luogo rilascio</label><input type="text" id="ci-ldoc-'+i+'" value="'+(prevC.luogoDoc||prevC.residenza||'')+'" placeholder="Roma" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase(); this.dataset.manual=\'1\'"></div>'+
       '</div></div>';
   }
 
@@ -21619,6 +21623,7 @@ function catturaComponentiInDraft() {
       provNascita:  document.getElementById('ci-prov-'+gi)?.value||'',
       cittadinanza: document.getElementById('ci-naz-'+gi)?.value||'Italia',
       residenza:    document.getElementById('ci-res-'+gi)?.value||'',
+      provResidenza: document.getElementById('ci-provres-'+gi)?.value||'',
       statoResidenza: document.getElementById('ci-stato-res-'+gi)?.value||'',
       tipoDoc:      document.getElementById('ci-tdoc-'+gi)?.value || (slot.localIndex===0 ? 'IDELE' : ''),
       numDoc:       document.getElementById('ci-ndoc-'+gi)?.value||'',
@@ -21706,6 +21711,7 @@ async function saveCheckinDataGruppo() {
       provNascita:  document.getElementById('ci-prov-'+gi)?.value||'',
       cittadinanza: document.getElementById('ci-naz-'+gi)?.value||'Italia',
       residenza:    document.getElementById('ci-res-'+gi)?.value||'',
+      provResidenza: document.getElementById('ci-provres-'+gi)?.value||'',
       statoResidenza: document.getElementById('ci-stato-res-'+gi)?.value||'',
       indirizzo:    document.getElementById('ci-ind-'+gi)?.value||'',
       cap:          document.getElementById('ci-cap-'+gi)?.value||'',
@@ -21837,6 +21843,7 @@ async function saveCheckinData(bookingId, nAdults) {
       provNascita:  document.getElementById('ci-prov-'+i)?.value||'',
       cittadinanza: document.getElementById('ci-naz-'+i)?.value||'Italia',
       residenza:    document.getElementById('ci-res-'+i)?.value||'',
+      provResidenza: document.getElementById('ci-provres-'+i)?.value||'',
       statoResidenza: document.getElementById('ci-stato-res-'+i)?.value||'',
       indirizzo:    document.getElementById('ci-ind-'+i)?.value||'',
       cap:          document.getElementById('ci-cap-'+i)?.value||'',
