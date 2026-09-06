@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 06/09/2026 · 14:09</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 06/09/2026 · 14:39</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -21790,11 +21790,29 @@ async function saveCheckinDataGruppo() {
   });
   DB.set('guests', guests); invalidateGuestDatalistCache();
 
-  closeModal();
+  // Su richiesta di Gian: invece di chiudere subito la finestra, si passa direttamente alla
+  // schermata di invio Alloggiati Web/Questura — così i dati appena inseriti si possono spedire
+  // senza dover prima chiudere e poi ricercare la prenotazione da un'altra pagina. Il pulsante
+  // "Annulla" di quella schermata chiude comunque tutto, se per ora non serve inviare subito.
   showToast(totMancanti>0
     ? 'Check-in completato ('+bookingIds.length+' camer'+(bookingIds.length===1?'a':'e')+') — ⚠ dati mancanti per '+totMancanti+' ospit'+(totMancanti===1?'e':'i')+', potrai completarli più tardi'
     : 'Check-in completato — '+bookingIds.length+' camer'+(bookingIds.length===1?'a':'e')+', '+totComponenti+' component'+(totComponenti===1?'e':'i'));
   renderPage(currentPage);
+  if (bookingIds.length === 1) {
+    alloggiatiActionMenu(bookingIds[0]);
+  } else {
+    showModal('Check-in completato — invia ad Alloggiati Web',
+      '<div style="font-size:13px;color:var(--text2);margin-bottom:10px">Scegli per quale camera inviare subito i dati, oppure chiudi per farlo più tardi.</div>'+
+      bookingIds.map(function(bid){
+        var bb = bks.find(function(x){ return x.id===bid; });
+        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-top:1px solid var(--border)">'+
+          '<span style="font-size:13px">'+(bb?bb.roomName+' · '+bb.guestName:bid)+'</span>'+
+          '<button class="btn btn-sm" onclick="alloggiatiActionMenu(\''+bid+'\')">📡 Invia</button>'+
+        '</div>';
+      }).join(''),
+      '<button class="btn btn-primary" onclick="closeModal()">Chiudi</button>'
+    );
+  }
   } catch (err) {
     console.error('Errore imprevisto nel salvataggio check-in:', err);
     alert('⚠ Si è verificato un errore imprevisto e il check-in NON è stato salvato:\n\n'+(err && err.message ? err.message : err)+'\n\nRicarica la pagina e riprova. Se il problema persiste, segnalamelo con questo messaggio.');
@@ -21860,6 +21878,7 @@ async function saveCheckinData(bookingId, nAdults) {
     ? 'Check-in completato — ⚠ dati mancanti per '+mancanti+' ospit'+(mancanti===1?'e':'i')+', potrai completarli più tardi'
     : 'Check-in completato — '+componenti.length+' component'+(componenti.length===1?'e':'i'));
   renderPage(currentPage);
+  alloggiatiActionMenu(bookingId);
 }
 
 // Un check-in è "incompleto" se manca cognome o nome di almeno un ospite registrato
