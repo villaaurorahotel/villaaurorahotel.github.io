@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 05/09/2026 · 16:44</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 06/09/2026 · 06:58</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -501,6 +501,7 @@ const DB = {
     if (k==='tassaSoggiornoLog' && supabaseReady && _blobsReady['tassaSoggiornoLog']) return _blobsCache['tassaSoggiornoLog'] || [];
     if (k==='listinoLivelli' && supabaseReady && _blobsReady['listinoLivelli']) return _blobsCache['listinoLivelli'] || [];
     if (k==='listinoRegistro' && supabaseReady && _blobsReady['listinoRegistro']) return _blobsCache['listinoRegistro'] || [];
+    if (k==='otaCanali' && supabaseReady && _blobsReady['otaCanali']) return _blobsCache['otaCanali'] || [];
     if (k==='manutenzione' && supabaseReady && _blobsReady['manutenzione']) return _blobsCache['manutenzione'] || [];
     try{return JSON.parse(localStorage.getItem('pms_'+k))||[];}catch{return[];}
   },
@@ -526,6 +527,7 @@ const DB = {
     if (k==='tassaSoggiornoLog' && supabaseReady && _blobsReady['tassaSoggiornoLog']) { _blobsCache['tassaSoggiornoLog'] = v; setTimeout(()=>syncBlobToSupabase('tassaSoggiornoLog', v),0); return; }
     if (k==='listinoLivelli' && supabaseReady && _blobsReady['listinoLivelli']) { _blobsCache['listinoLivelli'] = v; setTimeout(()=>syncBlobToSupabase('listinoLivelli', v),0); return; }
     if (k==='listinoRegistro' && supabaseReady && _blobsReady['listinoRegistro']) { _blobsCache['listinoRegistro'] = v; setTimeout(()=>syncBlobToSupabase('listinoRegistro', v),0); return; }
+    if (k==='otaCanali' && supabaseReady && _blobsReady['otaCanali']) { _blobsCache['otaCanali'] = v; setTimeout(()=>syncBlobToSupabase('otaCanali', v),0); return; }
     if (k==='manutenzione' && supabaseReady && _blobsReady['manutenzione']) { _blobsCache['manutenzione'] = v; setTimeout(()=>syncBlobToSupabase('manutenzione', v),0); return; }
     localStorage.setItem('pms_'+k,JSON.stringify(v));
   },
@@ -935,14 +937,14 @@ async function initSupabase() {
 
     // Impostazioni e Corrispettivi: tabella facoltativa "app_blobs" (un blocco unico di dati per chiave)
     try {
-      const {data:blobs, error:err8} = await supabaseClient.from('app_blobs').select('*').in('key', ['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro','manutenzione','gruppiInfo','fatture','utentiPermessi']);
+      const {data:blobs, error:err8} = await supabaseClient.from('app_blobs').select('*').in('key', ['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro','manutenzione','gruppiInfo','fatture','utentiPermessi','otaCanali']);
       if (err8) throw err8;
       (blobs||[]).forEach(row => { _blobsCache[row.key] = row.data; _blobsReady[row.key] = true; });
       // Se una delle chiavi non esiste ancora su Supabase, la creiamo copiando quella locale attuale
       // (per storicoOspiti/messageTemplates/listinoAggiustamenti/listinoScostamenti/competitorStrutture/
       // competitorPrices: JSON.parse restituisce [] di default, non null, quindi il controllo "local"
       // richiede che l'array abbia almeno un elemento — altrimenti non c'è nulla da migrare)
-      for (const key of ['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro','manutenzione','gruppiInfo','fatture','utentiPermessi']) {
+      for (const key of ['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro','manutenzione','gruppiInfo','fatture','utentiPermessi','otaCanali']) {
         if (!_blobsReady[key]) {
           const raw = localStorage.getItem('pms_'+key);
           const isArrayKey = (key==='storicoOspiti'||key==='messageTemplates'||key==='listinoAggiustamenti'||key==='listinoScostamenti'||key==='competitorStrutture'||key==='competitorPrices'||key==='blacklist'||key==='extras'||key==='movimenti'||key==='tassaSoggiornoLog'||key==='categoryOrder'||key==='ical_portals');
@@ -955,7 +957,7 @@ async function initSupabase() {
       }
     } catch (err8) {
       console.warn('Tabella app_blobs non disponibile — Impostazioni, Corrispettivi, Archivio storico ospiti, variazioni prezzo, scostamenti, Prezzo consigliato, Prezzi concorrenti e portali iCal restano locali su questo PC. Esegui lo script SQL aggiuntivo per attivarlo.', err8);
-      ['settings','corrispettivi','storicoOspiti','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro','manutenzione','gruppiInfo','fatture','utentiPermessi'].forEach(function(k){ _blobsReady[k] = false; });
+      ['settings','corrispettivi','storicoOspiti','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro','manutenzione','gruppiInfo','fatture','utentiPermessi','otaCanali'].forEach(function(k){ _blobsReady[k] = false; });
     }
 
     // Tempo reale su tutte le tabelle — riattivato dopo l'upgrade a compute Micro (più risorse
@@ -1104,7 +1106,7 @@ function handleQuoteRealtimeChange(payload) {
 }
 function handleBlobRealtimeChange(payload) {
   const key = payload.eventType === 'DELETE' ? payload.old.key : payload.new.key;
-  if (['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro','manutenzione','gruppiInfo','fatture','utentiPermessi'].indexOf(key) < 0) return;
+  if (['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro','manutenzione','gruppiInfo','fatture','utentiPermessi','otaCanali'].indexOf(key) < 0) return;
   if (payload.eventType === 'DELETE') { delete _blobsCache[key]; }
   else { _blobsCache[key] = payload.new.data; }
   if (key === 'settings') {
@@ -1959,7 +1961,7 @@ async function refreshDatiCorrenti() {
         r.forEach(b => { _roomBlocksCache[b.room_id+'|'+b.block_date] = true; });
       }));
       if (_blobsReady['settings'] || _blobsReady['corrispettivi'] || _blobsReady['storicoOspiti'] || _blobsReady['messageTemplates'] || _blobsReady['listinoAggiustamenti'] || _blobsReady['listinoScostamenti'] || _blobsReady['revenueConfig'] || _blobsReady['competitorStrutture'] || _blobsReady['competitorPrices'] || _blobsReady['blacklist'] || _blobsReady['extras'] || _blobsReady['movimenti'] || _blobsReady['tassaSoggiornoLog'] || _blobsReady['categoryOrder'] || _blobsReady['groupColors'] || _blobsReady['hkData'] || _blobsReady['regoleTipo'] || _blobsReady['tassaSoggiornoDettaglio'] || _blobsReady['ical_portals']) {
-        jobs.push(supabaseClient.from('app_blobs').select('*').in('key', ['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro','manutenzione','gruppiInfo','fatture','utentiPermessi']).then(r => {
+        jobs.push(supabaseClient.from('app_blobs').select('*').in('key', ['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro','manutenzione','gruppiInfo','fatture','utentiPermessi','otaCanali']).then(r => {
           (r.data||[]).forEach(row => { _blobsCache[row.key] = row.data; });
         }));
       }
@@ -28083,11 +28085,54 @@ function hasCondizioni(lang) {
   return !!(condStrip(s['condOrari'+sfx]) || condStrip(s['condCancellazione'+sfx]) || condStrip(s['condPagamento'+sfx]) || condStrip(s['condRegole'+sfx]) || condStrip(s['condAltro'+sfx]));
 }
 
+var OTA_CHANNEL_TYPES = [
+  {v:'booking.com', l:'Booking.com'},
+  {v:'airbnb', l:'Airbnb'},
+  {v:'agoda', l:'Agoda'},
+  {v:'expedia', l:'Expedia'},
+  {v:'vrbo', l:'Vrbo'},
+  {v:'trip.com', l:'Trip.com'},
+  {v:'booking_site', l:'Sito di prenotazione (booking_site)'},
+  {v:'tujia_intl', l:'Tujia'},
+  {v:'houfy', l:'Houfy'},
+];
+function otaCanaliGetLista(){ return DB.get('otaCanali') || []; }
+function otaCanaliSalvaLista(lista){ DB.set('otaCanali', lista); }
+
+function renderCanaliOTAHTML(){
+  var lista = otaCanaliGetLista();
+  var tariffe = getTariffe();
+  return '<div class="card" style="max-width:700px;flex:1 1 640px">'+
+    '<div class="card-header"><span class="card-title">🔌 Canali OTA collegati</span></div>'+
+    '<div class="modal-body">'+
+    '<p style="font-size:12px;color:var(--text3);margin-bottom:12px">Aggiungi qui ogni annuncio collegato su Hostex (uno per ogni combinazione portale + tariffa, come li vedi su Hostex → Account Collegati). Servono per generare i pulsanti "Chiudi vendite" per singolo portale, nella barra laterale — non serve più modificare il codice per aggiungerne uno nuovo.</p>'+
+    (lista.length ? '<table style="width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:12px">'+
+      '<thead><tr style="color:var(--text3);text-align:left"><th style="padding:5px">Nome portale</th><th style="padding:5px">Tipo canale</th><th style="padding:5px">Listing ID</th><th style="padding:5px">Tariffa collegata</th><th></th></tr></thead><tbody>'+
+      lista.map(function(c,i){
+        return '<tr style="border-top:1px solid var(--border)">'+
+          '<td style="padding:5px"><input type="text" value="'+(c.nome||'').replace(/"/g,'&quot;')+'" placeholder="es. Booking.com" onchange="var l=otaCanaliGetLista();l['+i+'].nome=this.value;otaCanaliSalvaLista(l);aggiornaBottoneStopVendite();" style="width:120px;padding:4px 6px;border:.5px solid var(--border2);border-radius:5px"></td>'+
+          '<td style="padding:5px"><select onchange="var l=otaCanaliGetLista();l['+i+'].channelType=this.value;otaCanaliSalvaLista(l);" style="padding:4px 6px;border:.5px solid var(--border2);border-radius:5px">'+
+            OTA_CHANNEL_TYPES.map(function(t){return '<option value="'+t.v+'"'+(t.v===c.channelType?' selected':'')+'>'+t.l+'</option>';}).join('')+
+          '</select></td>'+
+          '<td style="padding:5px"><input type="text" value="'+(c.listingId||'').replace(/"/g,'&quot;')+'" placeholder="es. 1452184301-56388117" onchange="var l=otaCanaliGetLista();l['+i+'].listingId=this.value;otaCanaliSalvaLista(l);" style="width:170px;padding:4px 6px;border:.5px solid var(--border2);border-radius:5px;font-family:monospace;font-size:11.5px"></td>'+
+          '<td style="padding:5px"><select onchange="var l=otaCanaliGetLista();l['+i+'].tariffaId=this.value;otaCanaliSalvaLista(l);" style="padding:4px 6px;border:.5px solid var(--border2);border-radius:5px">'+
+            tariffe.map(function(t){return '<option value="'+t.id+'"'+(t.id===c.tariffaId?' selected':'')+'>'+t.nome+'</option>';}).join('')+
+          '</select></td>'+
+          '<td style="padding:5px"><button class="btn btn-sm" style="color:var(--red)" onclick="var l=otaCanaliGetLista();l.splice('+i+',1);otaCanaliSalvaLista(l);renderImpostazioni();aggiornaBottoneStopVendite();" title="Rimuovi">✕</button></td>'+
+        '</tr>';
+      }).join('')+
+      '</tbody></table>'
+    : '<div style="font-size:12px;color:var(--text3);margin-bottom:12px">Nessun canale ancora aggiunto.</div>')+
+    '<button class="btn btn-sm" onclick="var l=otaCanaliGetLista();l.push({id:\'canale_\'+Date.now(),nome:\'Nuovo canale\',channelType:\'booking.com\',listingId:\'\',tariffaId:\'standard\'});otaCanaliSalvaLista(l);renderImpostazioni();">+ Aggiungi canale</button>'+
+    '</div></div>';
+}
+
 function renderImpostazioni() {
   const s = DB.getObj('settings', { propertyName: '', cityTax: 0, cityTaxChildAge: 0, cityTaxChildRate: 0, currency: '€' });
   document.getElementById('page-impostazioni').innerHTML = `
     <div class="page-header"><div><div class="page-title">Impostazioni</div></div></div>
     <div class="page-content" style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">
+      ${renderCanaliOTAHTML()}
       <div class="card" style="max-width:500px;flex:1 1 460px">
         <div class="card-header"><span class="card-title">Struttura</span></div>
         <div class="modal-body">
