@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 06/09/2026 · 09:19</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 06/09/2026 · 10:49</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -10892,6 +10892,11 @@ function avvisaHostexSubito(){
     fetch(s.supabaseUrl.replace(/\/$/,'') + '/functions/v1/sync-disponibilita-hostex').then(function(res){
       if (!res.ok) console.warn('Avviso istantaneo a Hostex (disponibilità) rifiutato con stato '+res.status+' (interverrà comunque il Cron entro pochi minuti)');
     }).catch(function(err){ console.warn('Avviso istantaneo a Hostex (disponibilità) non riuscito (interverrà comunque il Cron entro pochi minuti):', err); });
+    // Avvisa anche l'inventario delle tipologie multi-unità (es. Superior) — stesso avviso
+    // istantaneo, ma per il conteggio "quante ne restano libere" invece del semplice aperto/chiuso.
+    fetch(s.supabaseUrl.replace(/\/$/,'') + '/functions/v1/sync-inventario-hostex').then(function(res){
+      if (!res.ok) console.warn('Avviso istantaneo a Hostex (inventario) rifiutato con stato '+res.status+' (interverrà comunque il Cron entro pochi minuti)');
+    }).catch(function(err){ console.warn('Avviso istantaneo a Hostex (inventario) non riuscito (interverrà comunque il Cron entro pochi minuti):', err); });
   } catch (err) { console.warn('Avviso istantaneo a Hostex non riuscito:', err); }
 }
 // Come sopra, ma per soggiorno minimo/chiusure per tariffa o per canale.
