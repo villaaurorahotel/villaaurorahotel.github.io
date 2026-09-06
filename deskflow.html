@@ -334,7 +334,8 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 06/09/2026 · 15:06</span>
+      <span id="utente-corrente-badge" style="display:none;font-size:10.5px;font-weight:700;color:var(--accent);margin-top:2px"></span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 06/09/2026 · 16:18</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -15211,6 +15212,26 @@ function aggiornaVisibilitaMenuPermessi(){
   if (voceUtenti) voceUtenti.style.display = window.currentUserPermessi ? 'none' : '';
   var btnHub = document.getElementById('btn-torna-hub');
   if (btnHub) btnHub.style.display = window.currentUserPermessi ? 'none' : 'block';
+  // Etichetta con chi è collegato in questo momento, sotto il nome della struttura — utile per
+  // sapere a colpo d'occhio se si è dentro con l'accesso amministratore o con uno limitato.
+  var badge = document.getElementById('utente-corrente-badge');
+  if (badge && window.currentUserEmail) {
+    if (window.currentUserPermessi) {
+      var lista = (typeof utentiPermessiGetLista === 'function') ? utentiPermessiGetLista() : {};
+      var nomeUtente = (lista[window.currentUserEmail] && lista[window.currentUserEmail].nome) || window.currentUserEmail;
+      badge.textContent = '👤 ' + nomeUtente;
+      badge.style.display = 'block';
+    } else {
+      var sBadge = DB.getObj('settings', {});
+      var emailGenerale = (sBadge.emailAdminGenerale || '').trim().toLowerCase();
+      if (emailGenerale && emailGenerale === window.currentUserEmail) {
+        badge.textContent = '👑 Amministratore Generale';
+      } else {
+        badge.textContent = '🏠 Amministratore di struttura';
+      }
+      badge.style.display = 'block';
+    }
+  }
 }
 // Torna alla pagina Hub Amministratore (indirizzo impostato in Impostazioni → Struttura) — l'unico
 // posto da cui adesso si passa da una struttura all'altra, su richiesta di Gian.
@@ -28262,6 +28283,11 @@ function renderImpostazioni() {
               <input type="text" id="s-hub-url" value="${s.hubUrl||''}" placeholder="https://.../hub-amministratore.html">
             </div>
             <div class="form-group full">
+              <label>Email Amministratore Generale (solo per l'etichetta mostrata — non limita nessun potere)</label>
+              <input type="email" id="s-email-admin-generale" value="${s.emailAdminGenerale||''}" placeholder="tuaemail@...">
+              <div style="font-size:11px;color:var(--text3);margin-top:3px">Chi accede con questa email vede scritto "Amministratore Generale"; chiunque altro non limitato in Utenti & Permessi vede "Amministratore di struttura" — entrambi hanno comunque pieni poteri su questa struttura, è solo un'etichetta per riconoscere a colpo d'occhio chi ha una visione su tutte le strutture.</div>
+            </div>
+            <div class="form-group full">
               <label>Email di invio (preventivi/conferme/ricevute)</label>
               <input type="email" id="s-email-mittente" value="${s.emailMittente||''}" placeholder="nome@tuastruttura.it">
               <div style="font-size:11px;color:var(--text3);margin-top:3px">L'indirizzo che appare nei pulsanti "Invia da..." e nei messaggi di conferma — l'invio vero passa comunque dalla funzione Supabase configurata con le credenziali di questo indirizzo.</div>
@@ -28915,6 +28941,7 @@ function saveImpostazioni() {
   const s = DB.getObj('settings', {}); // partiamo da TUTTO quello che c'è già, non lo ricostruiamo da zero
   s.propertyName  = document.getElementById('s-name').value;
   s.hubUrl        = document.getElementById('s-hub-url')?.value.trim() || '';
+  s.emailAdminGenerale = document.getElementById('s-email-admin-generale')?.value.trim().toLowerCase() || '';
   s.emailMittente = document.getElementById('s-email-mittente')?.value.trim() || '';
   s.currency      = document.getElementById('s-currency').value;
   // s.logo non va toccato qui: resta quello già salvato, si cambia solo con Carica/Rimuovi logo
