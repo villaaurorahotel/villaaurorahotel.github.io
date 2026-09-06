@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 06/09/2026 · 13:53</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 06/09/2026 · 14:09</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -11244,20 +11244,23 @@ function calcolaOccupazionePerTipologia(ds, tipo){
 // + chiusura generale della tipologia dal Listino), così quello che vedi qui nel PMS corrisponde a
 // quello che viene davvero mandato ai portali. Richiesto da Gian per decidere il prezzo guardando
 // la disponibilità reale, non solo la percentuale di occupazione.
+// FIX (06/09/2026): leggeva i blocchi della singola camera dal posto sbagliato (DB.getObj diretto,
+// che resta vuoto quando si è collegati a Supabase) invece che da getRoomBlocks()/isRoomDayBlocked
+// — le camere bloccate risultavano quindi contate per errore come libere.
 function calcolaCamereLibere(ds, tipo){
   var rooms = getRooms().filter(function(r){ return r.status==='disponibile' && (r.type||'Senza tipologia')===tipo; });
   var totale = rooms.length;
-  if (!totale) return {libere:0, totale:0};
-  if (isTipoClosed(tipo, ds)) return {libere:0, totale:totale};
+  if (!totale) return {libere:0, occupate:0, bloccate:0, totale:0};
+  if (isTipoClosed(tipo, ds)) return {libere:0, occupate:0, bloccate:totale, totale:totale};
   var bookings = DB.get('bookings').filter(function(b){ return b.status!=='cancellata' && b.checkin<=ds && b.checkout>ds; });
   var occupiedIds = new Set(bookings.map(function(b){ return b.roomId; }));
-  var rb = DB.getObj('roomBlocks', {});
-  var libere = rooms.filter(function(r){
-    if (occupiedIds.has(r.id)) return false;
-    if (rb[r.id+'|'+ds]) return false;
-    return true;
-  }).length;
-  return {libere: libere, totale: totale};
+  var occupate=0, bloccate=0, libere=0;
+  rooms.forEach(function(r){
+    if (occupiedIds.has(r.id)) { occupate++; return; }
+    if (isRoomDayBlocked(r.id, ds)) { bloccate++; return; }
+    libere++;
+  });
+  return {libere: libere, occupate: occupate, bloccate: bloccate, totale: totale};
 }
 
 // Prezzo effettivo: se la tariffa è derivata (modalità+valore), lo calcola automaticamente
@@ -25533,7 +25536,7 @@ function renderListino() {
         var ds=fmt(d);
         var lc=calcolaCamereLibere(ds,cat);
         var colore = lc.totale<=1 ? 'var(--text3)' : (lc.libere===0?'var(--red)':lc.libere<=Math.ceil(lc.totale*0.2)?'var(--amber)':'#166534');
-        return '<td style="padding:2px 1px;border-left:.5px solid var(--border);border-bottom:1px solid var(--border2);background:var(--surface2);text-align:center" title="'+lc.libere+' libere su '+lc.totale+' camere '+cat+' il '+fmtDate(ds)+'">'+
+        return '<td style="padding:2px 1px;border-left:.5px solid var(--border);border-bottom:1px solid var(--border2);background:var(--surface2);text-align:center" title="'+lc.libere+' libere · '+lc.occupate+' occupate · '+lc.bloccate+' bloccate — su '+lc.totale+' camere '+cat+' il '+fmtDate(ds)+'">'+
           '<span style="font-size:11px;font-weight:700;color:'+colore+'">'+lc.libere+'/'+lc.totale+'</span>'+
           '</td>';
       }).join('');
