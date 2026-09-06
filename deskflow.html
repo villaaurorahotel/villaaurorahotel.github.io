@@ -334,7 +334,7 @@ tr:hover td{background:var(--surface2)}
     <div class="sidebar-logo">
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 06/09/2026 · 06:58</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 06/09/2026 · 08:44</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -10692,6 +10692,7 @@ function updateMinNottiGiorno(catTypeEnc, ds, value, fromPage){
   if(!r.minNotti[catType]) r.minNotti[catType]={};
   r.minNotti[catType][ds]=v;
   saveRegoleTipo(r);
+  if (typeof avvisaHostexRestrizioniSubito === 'function') avvisaHostexRestrizioniSubito();
   if (typeof registraModificaListino === 'function') registraModificaListino(fmtDate(ds)+': <strong>'+catType+'</strong> — soggiorno minimo → '+v+' nott'+(v===1?'e':'i'));
   // Non ricarichiamo l'intera pagina per evitare di perdere il focus, ma aggiorniamo il dato nel DB
   console.log('Min. notti tipologia '+catType+' per '+ds+' impostato a '+v);
@@ -10878,14 +10879,53 @@ function aggiornaBottoneStopVendite(){
   }
 }
 
+// Avvisa SUBITO Hostex (invece di aspettare il prossimo giro del Cron, fino a 3 minuti) ogni volta
+// che qualcosa nel PMS cambia la disponibilità di una camera: nuova prenotazione, cancellazione,
+// blocco/chiusura manuale. "Fire and forget": non blocca né rallenta l'interfaccia, e se fallisce
+// (es. connessione assente in quel momento) il Cron programmato copre comunque l'aggiornamento
+// entro pochi minuti, quindi non si perde mai nulla.
+function avvisaHostexSubito(){
+  if (!supabaseReady) return;
+  try {
+    var s = DB.getObj('settings', {});
+    if (!s.supabaseUrl) return;
+    fetch(s.supabaseUrl.replace(/\/$/,'') + '/functions/v1/sync-disponibilita-hostex').then(function(res){
+      if (!res.ok) console.warn('Avviso istantaneo a Hostex (disponibilità) rifiutato con stato '+res.status+' (interverrà comunque il Cron entro pochi minuti)');
+    }).catch(function(err){ console.warn('Avviso istantaneo a Hostex (disponibilità) non riuscito (interverrà comunque il Cron entro pochi minuti):', err); });
+  } catch (err) { console.warn('Avviso istantaneo a Hostex non riuscito:', err); }
+}
+// Come sopra, ma per soggiorno minimo/chiusure per tariffa o per canale.
+function avvisaHostexRestrizioniSubito(){
+  if (!supabaseReady) return;
+  try {
+    var s = DB.getObj('settings', {});
+    if (!s.supabaseUrl) return;
+    fetch(s.supabaseUrl.replace(/\/$/,'') + '/functions/v1/sync-restrizioni-hostex').then(function(res){
+      if (!res.ok) console.warn('Avviso istantaneo a Hostex (restrizioni) rifiutato con stato '+res.status+' (interverrà comunque il Cron entro pochi minuti)');
+    }).catch(function(err){ console.warn('Avviso istantaneo a Hostex (restrizioni) non riuscito (interverrà comunque il Cron entro pochi minuti):', err); });
+  } catch (err) { console.warn('Avviso istantaneo a Hostex non riuscito:', err); }
+}
+// Come sopra, ma per i prezzi.
+function avvisaHostexPrezziSubito(){
+  if (!supabaseReady) return;
+  try {
+    var s = DB.getObj('settings', {});
+    if (!s.supabaseUrl) return;
+    fetch(s.supabaseUrl.replace(/\/$/,'') + '/functions/v1/sync-prezzi-hostex').then(function(res){
+      if (!res.ok) console.warn('Avviso istantaneo a Hostex (prezzi) rifiutato con stato '+res.status+' (interverrà comunque il Cron entro il giorno)');
+    }).catch(function(err){ console.warn('Avviso istantaneo a Hostex (prezzi) non riuscito (interverrà comunque il Cron entro il giorno):', err); });
+  } catch (err) { console.warn('Avviso istantaneo a Hostex non riuscito:', err); }
+}
+
 // Chiude/riapre alla vendita un singolo giorno per l'intera tipologia
-function toggleChiusuraCategoria(catTypeEnc, ds, fromPage){
+async function toggleChiusuraCategoria(catTypeEnc, ds, fromPage){
   var catType = normCatType(decodeURIComponent(catTypeEnc));
   var r = getRegoleTipo();
   if(!r.chiusure[catType]) r.chiusure[catType]={};
   var wasClosed = !!r.chiusure[catType][ds];
   if(wasClosed) delete r.chiusure[catType][ds]; else r.chiusure[catType][ds]=true;
-  saveRegoleTipo(r);
+  await saveRegoleTipo(r);
+  avvisaHostexSubito();
   if (typeof registraModificaListino === 'function') registraModificaListino(fmtDate(ds)+': <strong>'+catType+'</strong> — '+(!wasClosed?'chiusa alla vendita':'riaperta alla vendita'));
   showToast(!wasClosed ? ('Tipologia "'+catType+'" chiusa alla vendita il '+fmtDate(ds)) : ('Tipologia "'+catType+'" riaperta alla vendita il '+fmtDate(ds)));
   if(fromPage==='listino') renderListino(); else renderCalendario();
@@ -10901,6 +10941,7 @@ function toggleChiusuraCategoriaPeriodo(catTypeEnc, dal, al, fromPage){
   var anyOpen = days.some(function(ds){ return !r.chiusure[catType][ds]; });
   days.forEach(function(ds){ if(anyOpen) r.chiusure[catType][ds]=true; else delete r.chiusure[catType][ds]; });
   saveRegoleTipo(r);
+  avvisaHostexSubito();
   showToast(anyOpen ? ('Tipologia "'+catType+'" chiusa dal '+fmtDate(dal)+' al '+fmtDate(al)) : ('Tipologia "'+catType+'" riaperta dal '+fmtDate(dal)+' al '+fmtDate(al)));
   if(fromPage==='listino') renderListino(); else renderCalendario();
 }
@@ -16538,6 +16579,7 @@ function confermaCancellazioneEmail(idsCsv) {
   });
   DB.set('bookings', bookings);
   ids.forEach(function(id){ registraModificaPrenotazione(id, 'cancellazione', 'Prenotazione cancellata automaticamente da email del portale'); });
+  if (typeof avvisaHostexSubito === 'function') avvisaHostexSubito();
   closeModal();
   showToast(n===1 ? 'Prenotazione cancellata — resta visibile nell\'archivio (filtro Stato → Cancellata)' : n+' prenotazioni cancellate — restano visibili nell\'archivio (filtro Stato → Cancellata)');
   renderPage(currentPage);
@@ -17981,6 +18023,7 @@ function savePrenotazione(editId) {
     try { registraModificaPrenotazione(editId, 'modifica', righeModificaEdit); } catch(errRegistro) { console.error('Registro Modifiche non aggiornato:', errRegistro); }
   }
   if (groupId && useColor && groupColor) setGroupColor(groupId, groupColor);
+  if (typeof avvisaHostexSubito === 'function') avvisaHostexSubito();
   renderPage(currentPage);
   if (editId) {
     closeModal();
@@ -18020,6 +18063,7 @@ function eseguiCancellazionePrenotazione(id, avvisaCliente) {
   bookings[idx].cancelledAt = new Date().toISOString();
   DB.set('bookings', bookings);
   registraModificaPrenotazione(id, 'cancellazione', 'Prenotazione cancellata'+(avvisaCliente?' (cliente avvisato)':' (senza avviso al cliente)'));
+  if (typeof avvisaHostexSubito === 'function') avvisaHostexSubito();
   renderPage(currentPage);
   if (avvisaCliente) {
     apriInvioCancellazione(id);
@@ -25935,12 +25979,13 @@ function lstCellSave(el){
   DB.set('listino',lst);
   lstSincronizzaTipologia(rId);
   var propagato = lstPropagaDaStandard(rId, pk, v, ctx);
+  if (typeof avvisaHostexPrezziSubito === 'function') avvisaHostexPrezziSubito();
   lstOnInput(el);
   if(propagato) setTimeout(renderListino, 0); // rimandato: evita errore DOM se scatta da un blur
 }
-function lstPeriodSave(el){var rId=el.dataset.room,pk=el.dataset.trat||'PAX1',dal=el.dataset.dal,al=el.dataset.al;if(!rId||!dal||!al)return;var v=Math.round(parseFloat(el.value)||0);el.value=v||'';var lst=DB.get('listino')||[];var e=lst.find(function(l){return l.roomId===rId && (l.tariffaId||'standard')===lstTariffaId;});if(!e){e={roomId:rId,tariffaId:lstTariffaId,prezzi:{},periodi:[]};lst.push(e);}if(!e.periodi)e.periodi=[];var p=e.periodi.find(function(p){return p.dal===dal&&p.al===al;});if(!p){p={dal:dal,al:al,prezzi:{}};e.periodi.push(p);}if(v>0)p.prezzi[pk]=v;else delete p.prezzi[pk];DB.set('listino',lst);lstSincronizzaTipologia(rId);var propagato=lstPropagaDaStandard(rId,pk,v,{dal:dal,al:al});if(propagato)setTimeout(renderListino,0);}
+function lstPeriodSave(el){var rId=el.dataset.room,pk=el.dataset.trat||'PAX1',dal=el.dataset.dal,al=el.dataset.al;if(!rId||!dal||!al)return;var v=Math.round(parseFloat(el.value)||0);el.value=v||'';var lst=DB.get('listino')||[];var e=lst.find(function(l){return l.roomId===rId && (l.tariffaId||'standard')===lstTariffaId;});if(!e){e={roomId:rId,tariffaId:lstTariffaId,prezzi:{},periodi:[]};lst.push(e);}if(!e.periodi)e.periodi=[];var p=e.periodi.find(function(p){return p.dal===dal&&p.al===al;});if(!p){p={dal:dal,al:al,prezzi:{}};e.periodi.push(p);}if(v>0)p.prezzi[pk]=v;else delete p.prezzi[pk];DB.set('listino',lst);lstSincronizzaTipologia(rId);var propagato=lstPropagaDaStandard(rId,pk,v,{dal:dal,al:al});if(typeof avvisaHostexPrezziSubito==='function')avvisaHostexPrezziSubito();if(propagato)setTimeout(renderListino,0);}
 
-function lstBaseSave(el){var rId=el.dataset.room,pk=el.dataset.trat||'PAX1';if(!rId)return;var v=Math.round(parseFloat(el.value)||0);el.value=v||'';var lst=DB.get('listino')||[];var e=lst.find(function(l){return l.roomId===rId && (l.tariffaId||'standard')===lstTariffaId;});if(!e){e={roomId:rId,tariffaId:lstTariffaId,prezzi:{},periodi:[]};lst.push(e);}if(!e.periodi)e.periodi=[];if(v>0)e.prezzi[pk]=v;else delete e.prezzi[pk];DB.set('listino',lst);lstSincronizzaTipologia(rId);lstPropagaDaStandard(rId,pk,v,{});setTimeout(renderListino,0);}
+function lstBaseSave(el){var rId=el.dataset.room,pk=el.dataset.trat||'PAX1';if(!rId)return;var v=Math.round(parseFloat(el.value)||0);el.value=v||'';var lst=DB.get('listino')||[];var e=lst.find(function(l){return l.roomId===rId && (l.tariffaId||'standard')===lstTariffaId;});if(!e){e={roomId:rId,tariffaId:lstTariffaId,prezzi:{},periodi:[]};lst.push(e);}if(!e.periodi)e.periodi=[];if(v>0)e.prezzi[pk]=v;else delete e.prezzi[pk];DB.set('listino',lst);lstSincronizzaTipologia(rId);lstPropagaDaStandard(rId,pk,v,{});if(typeof avvisaHostexPrezziSubito==='function')avvisaHostexPrezziSubito();setTimeout(renderListino,0);}
 
 // lstSaveMin/lstSaveMinEvt rimosse: il soggiorno minimo non è più
 // modificabile per singola camera (vedi applyMinNottiCategoria, per tipologia+data).
