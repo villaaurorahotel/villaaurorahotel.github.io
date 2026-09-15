@@ -17,7 +17,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="DeskFlow">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='38' fill='%231a73e8'/%3E%3Ctext x='90' y='125' font-size='95' text-anchor='middle'%3E%F0%9F%8F%A8%3C/text%3E%3C/svg%3E">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DeskFlow</title>
 <style>
@@ -58,6 +58,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
   #main{padding-top:52px}
   .page-header{flex-wrap:wrap;gap:10px}
   .metrics-grid{grid-template-columns:repeat(auto-fit,minmax(110px,1fr))}
+  /* Evita lo zoom automatico fastidioso di iPhone/iPad quando si tocca un campo con testo troppo
+     piccolo (Safari ingrandisce da solo se il carattere è sotto i 16px) — non cambia nulla
+     sull'aspetto su computer, solo su schermi piccoli. */
+  input, select, textarea { font-size:16px !important; }
   table{font-size:12.5px}
 }
 .page{display:none;flex-direction:column;flex:1;overflow-y:auto}
@@ -335,7 +339,7 @@ tr:hover td{background:var(--surface2)}
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
       <span id="utente-corrente-badge" style="display:none;font-size:10.5px;font-weight:700;color:var(--accent);margin-top:2px"></span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 06/09/2026 · 16:18</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 15/09/2026 · 08:19</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -383,6 +387,7 @@ tr:hover td{background:var(--surface2)}
   <div class="nav-section">Impostazioni</div>
   <div class="nav-item" onclick="navigate('extra')" data-page="extra">🛎 Extra/Servizi</div>
   <div class="nav-item" onclick="navigate('manutenzione')" data-page="manutenzione">🔧 Manutenzione</div>
+  <div class="nav-item" onclick="navigate('guidaospiti')" data-page="guidaospiti">🗺️ Guida ospiti</div>
   <div class="nav-item" onclick="navigate('adempimenti')" data-page="adempimenti">📋 Adempimenti</div>
   <div class="nav-item" onclick="navigate('blacklist')" data-page="blacklist" style="color:var(--danger)">🚫 Blacklist</div>
   <div class="nav-item" onclick="navigate('ical')" data-page="ical">🔗 iCal/Portali</div>
@@ -453,6 +458,7 @@ tr:hover td{background:var(--surface2)}
   <div id="page-reportpasti" class="page"></div>
   <div id="page-extra" class="page"></div>
   <div id="page-manutenzione" class="page"></div>
+  <div id="page-guidaospiti" class="page"></div>
   <div id="page-adempimenti" class="page"></div>
   <div id="page-blacklist" class="page"></div>
   <div id="page-ical" class="page"></div>
@@ -533,11 +539,11 @@ const DB = {
     localStorage.setItem('pms_'+k,JSON.stringify(v));
   },
   getObj(k,def){
-    if ((k==='settings'||k==='corrispettivi'||k==='revenueConfig'||k==='categoryOrder'||k==='groupColors'||k==='hkData'||k==='regoleTipo'||k==='tassaSoggiornoDettaglio'||k==='ical_portals'||k==='livelliTariffari'||k==='gruppiInfo'||k==='fatture'||k==='utentiPermessi') && supabaseReady && _blobsReady[k]) return _blobsCache[k] || def;
+    if ((k==='settings'||k==='corrispettivi'||k==='revenueConfig'||k==='categoryOrder'||k==='groupColors'||k==='hkData'||k==='regoleTipo'||k==='tassaSoggiornoDettaglio'||k==='ical_portals'||k==='livelliTariffari'||k==='gruppiInfo'||k==='fatture'||k==='utentiPermessi'||k==='guidaOspiti') && supabaseReady && _blobsReady[k]) return _blobsCache[k] || def;
     try{return JSON.parse(localStorage.getItem('pms_'+k))||def;}catch{return def;}
   },
   setObj(k,v){
-    if ((k==='settings'||k==='corrispettivi'||k==='revenueConfig'||k==='categoryOrder'||k==='groupColors'||k==='hkData'||k==='regoleTipo'||k==='tassaSoggiornoDettaglio'||k==='ical_portals'||k==='livelliTariffari'||k==='gruppiInfo'||k==='fatture'||k==='utentiPermessi') && supabaseReady && _blobsReady[k]) { _blobsCache[k] = v; setTimeout(()=>syncBlobToSupabase(k, v),0); return; }
+    if ((k==='settings'||k==='corrispettivi'||k==='revenueConfig'||k==='categoryOrder'||k==='groupColors'||k==='hkData'||k==='regoleTipo'||k==='tassaSoggiornoDettaglio'||k==='ical_portals'||k==='livelliTariffari'||k==='gruppiInfo'||k==='fatture'||k==='utentiPermessi'||k==='guidaOspiti') && supabaseReady && _blobsReady[k]) { _blobsCache[k] = v; setTimeout(()=>syncBlobToSupabase(k, v),0); return; }
     localStorage.setItem('pms_'+k,JSON.stringify(v));
   }
 };
@@ -938,14 +944,14 @@ async function initSupabase() {
 
     // Impostazioni e Corrispettivi: tabella facoltativa "app_blobs" (un blocco unico di dati per chiave)
     try {
-      const {data:blobs, error:err8} = await supabaseClient.from('app_blobs').select('*').in('key', ['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro','manutenzione','gruppiInfo','fatture','utentiPermessi','otaCanali']);
+      const {data:blobs, error:err8} = await supabaseClient.from('app_blobs').select('*').in('key', ['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro','manutenzione','gruppiInfo','fatture','utentiPermessi','otaCanali','guidaOspiti']);
       if (err8) throw err8;
       (blobs||[]).forEach(row => { _blobsCache[row.key] = row.data; _blobsReady[row.key] = true; });
       // Se una delle chiavi non esiste ancora su Supabase, la creiamo copiando quella locale attuale
       // (per storicoOspiti/messageTemplates/listinoAggiustamenti/listinoScostamenti/competitorStrutture/
       // competitorPrices: JSON.parse restituisce [] di default, non null, quindi il controllo "local"
       // richiede che l'array abbia almeno un elemento — altrimenti non c'è nulla da migrare)
-      for (const key of ['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro','manutenzione','gruppiInfo','fatture','utentiPermessi','otaCanali']) {
+      for (const key of ['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro','manutenzione','gruppiInfo','fatture','utentiPermessi','otaCanali','guidaOspiti']) {
         if (!_blobsReady[key]) {
           const raw = localStorage.getItem('pms_'+key);
           const isArrayKey = (key==='storicoOspiti'||key==='messageTemplates'||key==='listinoAggiustamenti'||key==='listinoScostamenti'||key==='competitorStrutture'||key==='competitorPrices'||key==='blacklist'||key==='extras'||key==='movimenti'||key==='tassaSoggiornoLog'||key==='categoryOrder'||key==='ical_portals');
@@ -958,7 +964,7 @@ async function initSupabase() {
       }
     } catch (err8) {
       console.warn('Tabella app_blobs non disponibile — Impostazioni, Corrispettivi, Archivio storico ospiti, variazioni prezzo, scostamenti, Prezzo consigliato, Prezzi concorrenti e portali iCal restano locali su questo PC. Esegui lo script SQL aggiuntivo per attivarlo.', err8);
-      ['settings','corrispettivi','storicoOspiti','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro','manutenzione','gruppiInfo','fatture','utentiPermessi','otaCanali'].forEach(function(k){ _blobsReady[k] = false; });
+      ['settings','corrispettivi','storicoOspiti','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro','manutenzione','gruppiInfo','fatture','utentiPermessi','otaCanali','guidaOspiti'].forEach(function(k){ _blobsReady[k] = false; });
     }
 
     // Tempo reale su tutte le tabelle — riattivato dopo l'upgrade a compute Micro (più risorse
@@ -1107,7 +1113,7 @@ function handleQuoteRealtimeChange(payload) {
 }
 function handleBlobRealtimeChange(payload) {
   const key = payload.eventType === 'DELETE' ? payload.old.key : payload.new.key;
-  if (['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro','manutenzione','gruppiInfo','fatture','utentiPermessi','otaCanali'].indexOf(key) < 0) return;
+  if (['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro','manutenzione','gruppiInfo','fatture','utentiPermessi','otaCanali','guidaOspiti'].indexOf(key) < 0) return;
   if (payload.eventType === 'DELETE') { delete _blobsCache[key]; }
   else { _blobsCache[key] = payload.new.data; }
   if (key === 'settings') {
@@ -1962,7 +1968,7 @@ async function refreshDatiCorrenti() {
         r.forEach(b => { _roomBlocksCache[b.room_id+'|'+b.block_date] = true; });
       }));
       if (_blobsReady['settings'] || _blobsReady['corrispettivi'] || _blobsReady['storicoOspiti'] || _blobsReady['messageTemplates'] || _blobsReady['listinoAggiustamenti'] || _blobsReady['listinoScostamenti'] || _blobsReady['revenueConfig'] || _blobsReady['competitorStrutture'] || _blobsReady['competitorPrices'] || _blobsReady['blacklist'] || _blobsReady['extras'] || _blobsReady['movimenti'] || _blobsReady['tassaSoggiornoLog'] || _blobsReady['categoryOrder'] || _blobsReady['groupColors'] || _blobsReady['hkData'] || _blobsReady['regoleTipo'] || _blobsReady['tassaSoggiornoDettaglio'] || _blobsReady['ical_portals']) {
-        jobs.push(supabaseClient.from('app_blobs').select('*').in('key', ['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro','manutenzione','gruppiInfo','fatture','utentiPermessi','otaCanali']).then(r => {
+        jobs.push(supabaseClient.from('app_blobs').select('*').in('key', ['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','livelliTariffari','listinoLivelli','listinoRegistro','manutenzione','gruppiInfo','fatture','utentiPermessi','otaCanali','guidaOspiti']).then(r => {
           (r.data||[]).forEach(row => { _blobsCache[row.key] = row.data; });
         }));
       }
@@ -11095,7 +11101,7 @@ function navigate(page){
     checkin:renderCheckin,checkout:renderCheckout,'arrivi-partenze':renderArriviPartenze,checkineffettuati:renderCheckinEffettuati,checkouteffettuati:renderCheckoutEffettuati,effettuati:renderEffettuati,planner:renderPlanner,contidasaldare:renderContiDaSaldare,corrispettivi:renderCorrispettiviPage,condizioni:renderCondizioni,revenue:renderRevenue,camere:renderCamere,ospiti:renderOspiti,archivioospiti:renderArchivioOspiti,
     listino:renderListino,livelli:renderLivelliTariffari,tipologie:renderTipologie,tassasoggiorno:renderTassaSoggiorno,preventivi:renderPreventivi,addebitiextra:renderAddebitiExtra,
     housekeeping:renderHousekeeping,previsionale:renderPrevisionale,report:renderReport,biancheria:renderBiancheria,
-    extra:renderExtra,manutenzione:renderManutenzione,adempimenti:renderAdempimenti,reportpasti:renderReportPasti,
+    extra:renderExtra,manutenzione:renderManutenzione,guidaospiti:renderGuidaOspiti,adempimenti:renderAdempimenti,reportpasti:renderReportPasti,
     blacklist:renderBlacklist,ical:renderIcal,impostazioni:renderImpostazioni,
     salvataggio:renderSalvataggio,sitoweb:renderSitoWeb,utenti:renderGestioneUtenti
   };
@@ -21214,6 +21220,667 @@ function archivioOspitiExportXLSX() {
   XL.writeFile(wb, 'archivio-ospiti-'+today()+'.xlsx');
 }
 
+// Testo di default del messaggio inviato al cliente (personalizzabile dall'apposito campo in
+// Guida Ospiti) — {nome}/{checkin}/{checkout}/{link} vengono sostituiti al momento dell'invio.
+const GG_MESSAGGIO_INVIO_DEFAULT = "Ciao {nome}! 🌊\n\nEcco la guida per il tuo soggiorno a Hotel Villa Aurora (dal {checkin} al {checkout}): orari, Wi-Fi, contatti utili, spiagge e ristoranti consigliati.\n\n👉 {link}\n\nA presto!";
+
+const GG_DEFAULT_DATA = {
+  welcome: "Benvenuti a Hotel Villa Aurora! Siamo felici di avervi con noi. Questa guida è pensata per aiutarvi a vivere al meglio il vostro soggiorno in questa meravigliosa terra del Salento. Non esitate a contattarci per qualsiasi necessità — siamo qui per rendere la vostra vacanza indimenticabile. 🌊",
+  address: "Indirizzo: Via [inserire indirizzo], Uggiano la Chiesa (LE) — a 8 km da Otranto.",
+  info: [
+    {label:"Check-in", value:"Dalle ore 15:00"},
+    {label:"Check-out", value:"Entro le ore 11:00"},
+    {label:"Nome Wi-Fi", value:"GretasHouse_2024"},
+    {label:"Password Wi-Fi", value:"salento2024!"},
+    {label:"Parcheggio", value:"Privato, incluso"},
+    {label:"Aria condizionata", value:"Disponibile in ogni stanza"},
+    {label:"Animali", value:"Non ammessi"}
+  ],
+  contacts: [
+    {icon:"👤", label:"Host / Greta", main:"+39 340 000 0000", sub:""},
+    {icon:"🚑", label:"Emergenza", main:"118", sub:""},
+    {icon:"🚒", label:"Vigili del Fuoco", main:"115", sub:""},
+    {icon:"🚕", label:"Taxi locale", main:"+39 0836 000000", sub:""},
+    {icon:"🏥", label:"Farmacia Uggiano", main:"+39 0836 000000", sub:""},
+    {icon:"🛒", label:"Supermercato", main:"Aperto 8:00 – 21:00", sub:""}
+  ],
+  rest: [
+    {emoji:"🦞", name:"Il Faro di Otranto", desc:"Pesce fresco e specialità salentine con vista sul porto. Ottimi i crudi di mare e le orecchiette al ragù di polpo.", dist:"📍 Otranto · ~8 km · ☎ +39 0836 000000"},
+    {emoji:"🍕", name:"Trattoria da Rocco", desc:"Cucina casalinga salentina, l'ideale per gustare pasticciotto, pittule e piatti tipici della tradizione locale.", dist:"📍 Uggiano la Chiesa · 1 km · ☎ +39 0836 000000"},
+    {emoji:"🌿", name:"Masseria Spirito Santo", desc:"Cena romantica in masseria con prodotti biologici a km0. Consigliata la prenotazione d'estate.", dist:"📍 Strada per Poggiardo · ~5 km · ☎ +39 0836 000000"},
+    {emoji:"🍦", name:"Bar Gelateria Porta d'Oriente", desc:"Il miglior gelato artigianale della zona. Da provare i gusti al fico d'india e alla mandorla di Fasano.", dist:"📍 Otranto centro · ~8 km"}
+  ],
+  beach: [
+    {emoji:"💙", name:"Baia dei Turchi", desc:"Mare cristallino incorniciato da dune e pini. Accesso a piedi dal parcheggio (15 min). Da non perdere!", dist:"📍 ~10 km · Ingresso libero"},
+    {emoji:"🌊", name:"Spiaggia di Alimini", desc:"Lunga spiaggia con stabilimenti e zona libera. Ideale per famiglie con bambini. Vicino ai laghi Alimini.", dist:"📍 ~7 km · Zona libera + stabilimenti"},
+    {emoji:"⛵", name:"Porto Badisco", desc:"Piccola insenatura selvaggia, acque trasparenti e fondali ricchi. Perfetta per lo snorkeling.", dist:"📍 ~12 km · Ingresso libero"},
+    {emoji:"🏛️", name:"Spiaggia di Otranto", desc:"A pochi passi dal centro storico, ideale per abbinare mare e visita alla città.", dist:"📍 ~8 km · Stabilimenti e zona libera"}
+  ],
+  visit: [
+    {emoji:"⛪", name:"Otranto — centro storico e cattedrale", desc:"La cattedrale normanna con il celebre mosaico pavimentale del XII sec. Passeggiata nelle viuzze del borgo murato.", dist:"📍 ~8 km · Ingresso cattedrale gratuito"},
+    {emoji:"🦋", name:"Grotte della Poesia", desc:"Grotte preistoriche con iscrizioni rupestri. Sito unico al mondo. Visita guidata disponibile (1h circa).", dist:"📍 Roca Vecchia · ~15 km"},
+    {emoji:"🌿", name:"Laghi Alimini", desc:"Oasi naturale con laghi d'acqua dolce e pineta. Percorsi ciclabili, birdwatching e natura incontaminata.", dist:"📍 ~7 km · Accesso libero"},
+    {emoji:"🏘️", name:"Lecce — la Firenze del Barocco", desc:"A soli 40 km, Lecce stupisce con chiese e palazzi in pietra leccese. Ideale per una gita di giornata.", dist:"📍 ~40 km · Gita di giornata consigliata"},
+    {emoji:"🌅", name:"Punta Palascìa — il confine tra due mari", desc:"Il punto più orientale d'Italia, dove Adriatico e Ionio si incontrano. Tramonto mozzafiato.", dist:"📍 ~12 km · Accesso libero"}
+  ],
+  act: [
+    {emoji:"🚲", name:"Noleggio bici e cicloturismo", desc:"Percorsi cicloturistici lungo la costa e nell'entroterra. Noleggio disponibile a Otranto e Alimini.", dist:"📍 Otranto · da ~15€/giorno"},
+    {emoji:"🤿", name:"Snorkeling e diving", desc:"Fondali ricchissimi di fauna marina. Centri diving certificati ad Otranto per tutti i livelli.", dist:"📍 Otranto · da ~35€/immersione"},
+    {emoji:"🎵", name:"Notte della Taranta", desc:"Festival della pizzica salentina ad agosto. Concerti serali nei borghi e festival principale a Melpignano.", dist:"📍 Vari borghi del Salento · Agosto"},
+    {emoji:"🛶", name:"Tour in barca lungo la costa", desc:"Escursioni in barca o gommone per scoprire grotte marine e calette inaccessibili via terra.", dist:"📍 Porto di Otranto · da ~40€/persona"}
+  ],
+  rules: [
+    {icon:"🔇", text:"Silenzio dopo le 23:00 per rispetto dei vicini."},
+    {icon:"♻️", text:"Raccolta differenziata obbligatoria: sacchi forniti nella cucina."},
+    {icon:"💧", text:"L'acqua è un bene prezioso in Salento — usatela con attenzione."},
+    {icon:"🚭", text:"Vietato fumare all'interno della struttura."},
+    {icon:"🔑", text:"In caso di smarrimento delle chiavi, contattare subito l'host."}
+  ],
+  appliances: [
+    {name:"Lavatrice", instructions:"Apri lo sportello, inserisci il bucato senza superare metà cestello, aggiungi il detersivo nella vaschetta a sinistra. Gira la manopola sul programma \"Cotone 40°\" e premi Start. Ciclo completo: circa 1h30.", photos:[]},
+    {name:"Macchina del caffè", instructions:"Riempi il serbatoio d'acqua sul retro. Inserisci la capsula nell'apposito vano, chiudi la leva. Premi il pulsante grande per un caffè lungo, quello piccolo per un espresso.", photos:[]}
+  ],
+  footer: "Hotel Villa Aurora · Uggiano la Chiesa · Per qualsiasi necessità siamo sempre a disposizione 🌊"
+};
+
+function ggEsc(s) { return (s==null?'':String(s)).replace(/"/g,'&quot;'); }
+
+function ggFieldHTML(f) {
+  return '<div class="field"><label>'+ggEsc(f.label)+'</label><input class="val-input" value="'+ggEsc(f.value)+'"><button class="field-del" onclick="this.closest(\'.field\').remove()" title="Elimina">✕</button></div>';
+}
+function ggContactHTML(c) {
+  return '<div class="contact-chip"><div class="ci-wrap"><span class="ci" onclick="ggOpenEmojiPicker(this)" title="Cambia icona">'+ggEsc(c.icon||'📞')+'</span><span class="ci-hint">✏️</span></div><div class="cc"><input class="cc-label" value="'+ggEsc(c.label)+'"><input class="cc-main" value="'+ggEsc(c.main)+'"><hr class="cc-divider"><input class="cc-sub" placeholder="Note, orari, link…" value="'+ggEsc(c.sub)+'"></div><button class="del-btn" onclick="this.closest(\'.contact-chip\').remove()">✕</button></div>';
+}
+function ggItemHTML(it) {
+  return '<div class="item-row"><div class="item-dot">'+ggEsc(it.emoji||'📍')+'</div><div class="item-fields"><input class="item-name" value="'+ggEsc(it.name)+'"><textarea class="item-desc" rows="2">'+ggEsc(it.desc)+'</textarea><input class="item-dist" value="'+ggEsc(it.dist)+'"></div><button class="del-btn" onclick="this.closest(\'.item-row\').remove()">✕</button></div>';
+}
+function ggRuleHTML(r) {
+  return '<div class="tip-field"><span>'+ggEsc(r.icon||'📝')+'</span><textarea rows="1">'+ggEsc(r.text)+'</textarea></div>';
+}
+
+// ── ELETTRODOMESTICI E COMFORT — nome, istruzioni d'uso, foto (richiesto da Gian: es. "Lavatrice"
+// con indicazioni e foto di come si usa, "Macchina del caffè" idem). Le foto vengono ridotte
+// automaticamente prima di salvarle, per non appesantire troppo il salvataggio (max 900px di lato
+// più lungo, qualità 0.72) — restano comunque ben leggibili su schermo.
+function ggRidimensionaFoto(file){
+  return new Promise(function(resolve, reject){
+    var reader = new FileReader();
+    reader.onload = function(e){
+      var img = new Image();
+      img.onload = function(){
+        var maxLato = 900;
+        var w = img.width, h = img.height;
+        if (w > maxLato || h > maxLato) {
+          if (w > h) { h = Math.round(h * maxLato / w); w = maxLato; }
+          else { w = Math.round(w * maxLato / h); h = maxLato; }
+        }
+        var canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.72));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+function ggApplianceHTML(a, idx) {
+  var fotoHTML = (a.photos||[]).map(function(src, pi){
+    return '<div style="position:relative;display:inline-block;margin:4px"><img src="'+src+'" style="width:70px;height:70px;object-fit:cover;border-radius:8px;border:1px solid var(--sky2)">'+
+      '<button onclick="ggRimuoviFotoAppliance('+idx+','+pi+')" style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:10px;cursor:pointer;line-height:1">✕</button></div>';
+  }).join('');
+  return '<div class="appliance-card" style="background:var(--sky);border-radius:12px;padding:.8rem 1rem;margin-bottom:.7rem">'+
+    '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">'+
+      '<input class="appliance-name" value="'+ggEsc(a.name)+'" placeholder="Nome (es. Lavatrice)" style="flex:1;font-weight:600;font-size:.92rem;background:#fff;border:1px solid var(--sky2);border-radius:6px;padding:.35rem .6rem">'+
+      '<button class="del-btn" onclick="this.closest(\'.appliance-card\').remove()" title="Elimina">✕</button>'+
+    '</div>'+
+    '<textarea class="appliance-instr" rows="3" placeholder="Indicazioni d\'uso passo per passo…" style="width:100%;background:#fff;border:1px solid var(--sky2);border-radius:6px;padding:.5rem .7rem;font-family:\'DM Sans\',sans-serif;font-size:.85rem;resize:vertical">'+ggEsc(a.instructions)+'</textarea>'+
+    '<div class="appliance-photos" style="margin-top:8px">'+fotoHTML+'</div>'+
+    '<label class="add-btn" style="display:inline-flex;margin-top:6px;cursor:pointer">📷 Aggiungi foto<input type="file" accept="image/*" multiple style="display:none" onchange="ggCaricaFotoAppliance(this,'+idx+')"></label>'+
+  '</div>';
+}
+async function ggCaricaFotoAppliance(input, idx){
+  var d = DB.getObj('guidaOspiti', null) || GG_DEFAULT_DATA;
+  if (!d.appliances) d.appliances = [];
+  if (!d.appliances[idx]) return;
+  if (!d.appliances[idx].photos) d.appliances[idx].photos = [];
+  showToast('Caricamento foto…');
+  for (var i=0; i<input.files.length; i++) {
+    try {
+      var dataUrl = await ggRidimensionaFoto(input.files[i]);
+      d.appliances[idx].photos.push(dataUrl);
+    } catch (err) { console.error('Errore caricamento foto:', err); }
+  }
+  DB.setObj('guidaOspiti', d);
+  renderGuidaOspiti();
+  showToast('Foto aggiunta — ricordati di premere "Salva modifiche"');
+}
+function ggRimuoviFotoAppliance(idx, photoIdx){
+  var d = DB.getObj('guidaOspiti', null) || GG_DEFAULT_DATA;
+  if (d.appliances && d.appliances[idx] && d.appliances[idx].photos) {
+    d.appliances[idx].photos.splice(photoIdx, 1);
+    DB.setObj('guidaOspiti', d);
+    renderGuidaOspiti();
+  }
+}
+function ggAddAppliance(){
+  var d = DB.getObj('guidaOspiti', null) || GG_DEFAULT_DATA;
+  if (!d.appliances) d.appliances = [];
+  d.appliances.push({name:'', instructions:'', photos:[]});
+  DB.setObj('guidaOspiti', d);
+  renderGuidaOspiti();
+}
+
+function renderGuidaOspiti() {
+  const saved = DB.getObj('guidaOspiti', null);
+  const d = saved || GG_DEFAULT_DATA;
+  const el = document.getElementById('page-guidaospiti');
+  el.innerHTML = `
+<style>
+#page-guidaospiti{--sky:#e8f4fd;--sky2:#c8e6f7;--sky3:#a0d0ef;--sky4:#5ba8d4;--sky5:#2d7fb8;--deep:#1a4f72;--white:#fff;--sand:#f7f3ee;--gtext:#1e3a4f;--muted:#5a7a8a;--wave:#e0f2fe}
+#page-guidaospiti .gg-savebar{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--white);border:.5px solid var(--sky3);border-radius:10px;padding:10px 14px;margin-bottom:14px}
+#page-guidaospiti .gg-savebar .gg-status{font-size:12px;color:var(--muted)}
+#page-guidaospiti .wrap{max-width:760px;margin:0 auto;padding:0 0 3rem;font-family:'DM Sans',sans-serif;color:var(--gtext)}
+#page-guidaospiti .hero{background:linear-gradient(160deg,var(--sky) 0%,var(--sky2) 50%,var(--sky3) 100%);border-radius:20px;padding:2.5rem 2rem 2rem;text-align:center;margin-bottom:1.5rem}
+#page-guidaospiti .hero h1{font-family:'Cormorant Garamond',serif;font-size:2.2rem;font-weight:400;color:var(--deep);margin:.5rem 0 .3rem}
+#page-guidaospiti .hero .sub{font-size:.82rem;color:var(--sky5);letter-spacing:.12em;text-transform:uppercase;font-weight:500}
+#page-guidaospiti .hero-icon{font-size:2rem;display:block}
+#page-guidaospiti .toolbar{background:var(--white);border:1px solid var(--sky2);border-radius:14px;padding:.8rem 1.1rem;margin-bottom:1.2rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.6rem}
+#page-guidaospiti .btn{display:inline-flex;align-items:center;gap:.35rem;padding:.42rem .9rem;border-radius:20px;font-size:.8rem;font-weight:500;cursor:pointer;border:1px solid;font-family:'DM Sans',sans-serif;transition:all .18s;background:var(--sky);border-color:var(--sky3);color:var(--deep)}
+#page-guidaospiti .btn:hover{background:var(--sky2)}
+#page-guidaospiti .btn-wa{background:#e8f5e9;border-color:#81c784;color:#2e7d32}#page-guidaospiti .btn-wa:hover{background:#c8e6c9}
+#page-guidaospiti .btn-mail{background:var(--sky);border-color:var(--sky3);color:var(--deep)}
+#page-guidaospiti .btn-copy{background:var(--sand);border-color:#ddd;color:#7a6a52}#page-guidaospiti .btn-copy:hover{background:#ece6de}
+#page-guidaospiti .btn-save{background:var(--sky5);border-color:var(--sky5);color:#fff}#page-guidaospiti .btn-save:hover{background:var(--deep)}
+#page-guidaospiti .share-group{display:flex;gap:.4rem;flex-wrap:wrap}
+#page-guidaospiti .card{background:var(--white);border:1px solid var(--sky2);border-radius:16px;margin-bottom:1.1rem;overflow:hidden}
+#page-guidaospiti .card-head{background:linear-gradient(90deg,var(--sky),var(--wave));padding:.85rem 1.2rem;display:flex;align-items:center;gap:.6rem;cursor:pointer;user-select:none}
+#page-guidaospiti .card-icon{font-size:1.1rem}
+#page-guidaospiti .card-title{font-family:'Cormorant Garamond',serif;font-size:1.2rem;font-weight:500;color:var(--deep);flex:1}
+#page-guidaospiti .chevron{font-size:1.3rem;color:var(--sky5);font-weight:700;transition:transform .22s}
+#page-guidaospiti .card.closed .chevron{transform:rotate(-90deg)}
+#page-guidaospiti .card-body{padding:1.1rem 1.2rem}
+#page-guidaospiti .card.closed .card-body{display:none}
+#page-guidaospiti .field-group{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:.8rem}
+@media(max-width:500px){#page-guidaospiti .field-group{grid-template-columns:1fr}}
+#page-guidaospiti .field{background:var(--sky);border-radius:10px;padding:.6rem .9rem .6rem .9rem;position:relative;display:flex;flex-direction:column;gap:.25rem}
+#page-guidaospiti .field label{font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:var(--sky5);font-weight:500;padding-right:18px}
+#page-guidaospiti .field input.val-input{width:100%;background:transparent;border:none;font-family:'DM Sans',sans-serif;font-size:.88rem;color:var(--deep);outline:none;border-bottom:1px solid transparent}
+#page-guidaospiti .field input.val-input:focus{border-bottom:1px solid var(--sky4)}
+#page-guidaospiti .field-del{position:absolute;top:6px;right:7px;background:none;border:none;cursor:pointer;color:#bbb;font-size:.72rem;line-height:1;padding:2px 4px;border-radius:4px;transition:color .15s}
+#page-guidaospiti .field-del:hover{color:#c0392b}
+#page-guidaospiti .new-field-row{display:flex;gap:.5rem;align-items:center;margin-bottom:.6rem;padding:.6rem .9rem;background:var(--wave);border-radius:10px;border:1px dashed var(--sky3)}
+#page-guidaospiti .new-field-row input{background:transparent;border:none;font-family:'DM Sans',sans-serif;font-size:.85rem;color:var(--deep);outline:none;flex:1;border-bottom:1px solid transparent}
+#page-guidaospiti .new-field-row input:focus{border-bottom:1px solid var(--sky4)}
+#page-guidaospiti .new-field-row input::placeholder{color:var(--sky4)}
+#page-guidaospiti .new-field-row .sep{color:var(--sky3);font-size:.9rem}
+#page-guidaospiti .confirm-btn{background:var(--sky5);color:#fff;border:none;border-radius:8px;padding:.35rem .7rem;font-size:.78rem;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap}
+#page-guidaospiti .confirm-btn:hover{background:var(--deep)}
+#page-guidaospiti .cancel-btn{background:none;border:1px solid var(--sky3);color:var(--muted);border-radius:8px;padding:.35rem .6rem;font-size:.78rem;cursor:pointer;font-family:'DM Sans',sans-serif}
+#page-guidaospiti .add-btn{display:flex;align-items:center;justify-content:center;gap:.4rem;width:100%;background:none;border:1px dashed var(--sky3);color:var(--sky5);border-radius:8px;padding:.45rem;font-size:.8rem;cursor:pointer;margin-top:.4rem;font-family:'DM Sans',sans-serif;transition:all .18s}
+#page-guidaospiti .add-btn:hover{background:var(--sky);border-style:solid}
+#page-guidaospiti .tip-field{background:linear-gradient(135deg,var(--sky),#f0faff);border-left:3px solid var(--sky4);border-radius:0 10px 10px 0;padding:.75rem 1rem;margin:.5rem 0;display:flex;align-items:flex-start;gap:.5rem}
+#page-guidaospiti .tip-field textarea{flex:1;background:transparent;border:none;font-family:'DM Sans',sans-serif;font-size:.86rem;color:var(--deep);outline:none;resize:none;line-height:1.55;border-bottom:1px solid transparent}
+#page-guidaospiti .tip-field textarea:focus{border-bottom:1px solid var(--sky4)}
+#page-guidaospiti .item-row{display:flex;gap:.75rem;align-items:flex-start;padding:.75rem 0;border-bottom:1px solid var(--sky)}
+#page-guidaospiti .item-row:last-of-type{border-bottom:none}
+#page-guidaospiti .item-dot{width:34px;height:34px;min-width:34px;background:var(--sky2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.95rem}
+#page-guidaospiti .item-fields{flex:1;display:flex;flex-direction:column;gap:.2rem}
+#page-guidaospiti .item-name{font-weight:500;font-size:.9rem;color:var(--deep);width:100%;background:transparent;border:none;font-family:'DM Sans',sans-serif;outline:none;border-bottom:1px solid transparent}
+#page-guidaospiti .item-name:focus{border-bottom:1px solid var(--sky4)}
+#page-guidaospiti .item-desc{font-size:.81rem;color:var(--muted);width:100%;background:transparent;border:none;font-family:'DM Sans',sans-serif;outline:none;resize:none;line-height:1.5;border-bottom:1px solid transparent}
+#page-guidaospiti .item-desc:focus{border-bottom:1px solid var(--sky4)}
+#page-guidaospiti .item-dist{font-size:.73rem;color:var(--sky4);font-weight:500;width:100%;background:transparent;border:none;font-family:'DM Sans',sans-serif;outline:none;border-bottom:1px solid transparent}
+#page-guidaospiti .item-dist:focus{border-bottom:1px solid var(--sky4)}
+#page-guidaospiti .del-btn{background:none;border:none;cursor:pointer;color:#c0a0a0;font-size:.8rem;padding:2px 4px;line-height:1}
+#page-guidaospiti .del-btn:hover{color:#c0392b}
+#page-guidaospiti .contacts-grid{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+@media(max-width:480px){#page-guidaospiti .contacts-grid{grid-template-columns:1fr}}
+#page-guidaospiti .contact-chip{background:var(--sky);border:1px solid var(--sky2);border-radius:10px;padding:.6rem .8rem;display:flex;align-items:flex-start;gap:.45rem;position:relative}
+#page-guidaospiti .contact-chip .ci-wrap{display:flex;flex-direction:column;align-items:center;gap:.1rem}
+#page-guidaospiti .contact-chip .ci{font-size:1.1rem;line-height:1.4;cursor:pointer;border-radius:6px;padding:1px 3px;transition:background .15s;display:block;text-align:center}
+#page-guidaospiti .contact-chip .ci:hover{background:var(--sky2)}
+#page-guidaospiti .contact-chip .ci-hint{font-size:.5rem;color:var(--sky4);text-align:center;letter-spacing:.02em;line-height:1}
+#page-guidaospiti .contact-chip .cc{flex:1}
+#page-guidaospiti .contact-chip .cc input.cc-label{width:100%;background:transparent;border:none;font-family:'DM Sans',sans-serif;font-size:.66rem;font-weight:500;color:var(--sky5);text-transform:uppercase;letter-spacing:.07em;outline:none;border-bottom:1px solid transparent;display:block}
+#page-guidaospiti .contact-chip .cc input.cc-label:focus{border-bottom:1px solid var(--sky3)}
+#page-guidaospiti .contact-chip .cc input.cc-main{width:100%;background:transparent;border:none;font-family:'DM Sans',sans-serif;font-size:.85rem;color:var(--deep);outline:none;border-bottom:1px solid transparent}
+#page-guidaospiti .contact-chip .cc input.cc-main:focus{border-bottom:1px solid var(--sky4)}
+#page-guidaospiti .contact-chip .cc-divider{border:none;border-top:1px solid var(--sky2);border-bottom:1px solid var(--sky3);height:3px;margin:.45rem 0 .3rem;background:transparent}
+#page-guidaospiti .contact-chip .cc input.cc-sub{width:100%;background:transparent;border:none;font-family:'DM Sans',sans-serif;font-size:.76rem;color:var(--muted);outline:none;border-bottom:1px solid transparent;font-style:italic}
+#page-guidaospiti .contact-chip .cc input.cc-sub:focus{border-bottom:1px solid var(--sky3)}
+#page-guidaospiti .contact-chip .cc input.cc-sub::placeholder{color:var(--sky3);font-style:italic}
+#page-guidaospiti .emoji-picker-popup{position:absolute;z-index:999;background:#fff;border:1px solid var(--sky2);border-radius:12px;padding:.5rem;display:grid;grid-template-columns:repeat(6,1fr);gap:.15rem;box-shadow:0 4px 20px rgba(0,0,0,.1);top:2.5rem;left:.4rem;width:210px}
+#page-guidaospiti .emoji-picker-popup span{font-size:1.1rem;cursor:pointer;border-radius:6px;padding:3px;text-align:center;transition:background .12s}
+#page-guidaospiti .emoji-picker-popup span:hover{background:var(--sky2)}
+#page-guidaospiti .emoji-picker-popup .ep-custom{grid-column:1/-1;margin-top:.3rem;padding-top:.3rem;border-top:1px solid var(--sky2)}
+#page-guidaospiti .emoji-picker-popup .ep-custom input{width:100%;border:1px solid var(--sky3);border-radius:6px;padding:.25rem .5rem;font-size:.95rem;text-align:center;font-family:'DM Sans',sans-serif;outline:none}
+#page-guidaospiti .wave{text-align:center;color:var(--sky3);letter-spacing:.3em;padding:.4rem 0}
+#page-guidaospiti .footer-field{text-align:center;font-size:.76rem;font-style:italic;color:var(--muted);margin-top:.5rem}
+#page-guidaospiti .footer-field input{background:transparent;border:none;border-bottom:1px solid transparent;font-family:'DM Sans',sans-serif;font-size:.76rem;color:var(--muted);text-align:center;width:100%;outline:none;font-style:italic}
+#page-guidaospiti .footer-field input:focus{border-bottom:1px solid var(--sky3)}
+</style>
+
+<div class="page-header">
+  <div>
+    <div class="page-title">🗺️ Guida ospiti</div>
+    <div class="page-subtitle">Tutti i campi sono modificabili — ricordati di premere "Salva modifiche" per non perdere le tue modifiche</div>
+  </div>
+</div>
+
+<div class="gg-savebar">
+  <span class="gg-status">${saved ? '✓ Ultima versione salvata' : '⚠ Stai vedendo i contenuti di esempio — non ancora salvata'}</span>
+  <button class="btn btn-save" style="border-radius:6px" onclick="ggSave()">💾 Salva modifiche</button>
+</div>
+
+<div class="wrap" id="guide">
+
+<div class="hero">
+  <span class="hero-icon">🏡</span>
+  <h1>Benvenuti a Hotel Villa Aurora</h1>
+  <p class="sub">San Martino di Castrozza · Trentino</p>
+</div>
+
+<div class="tip-field" style="margin-bottom:1.2rem"><span>📍</span>
+  <textarea rows="2" id="gg-address" style="width:100%" placeholder="Indirizzo completo, distanze utili…">${ggEsc(d.address)}</textarea>
+</div>
+
+<div class="card" id="s-msg-invio">
+  <div class="card-head">
+    <span class="card-icon">✉️</span><span class="card-title">Testo del messaggio inviato al cliente</span>
+  </div>
+  <div class="card-body">
+    <div style="font-size:.78rem;color:var(--muted);margin-bottom:.5rem">Usa <code>{nome}</code>, <code>{checkin}</code>, <code>{checkout}</code> e <code>{link}</code> — vengono sostituiti automaticamente con i dati della prenotazione scelta al momento dell'invio.</div>
+    <textarea rows="6" id="gg-msg-invio" style="width:100%;font-family:'DM Sans',sans-serif" placeholder="Ciao {nome}! 🌊${'\n\n'}Ecco la guida per il tuo soggiorno...">${ggEsc(d.messaggioInvio || GG_MESSAGGIO_INVIO_DEFAULT)}</textarea>
+  </div>
+</div>
+
+<div class="toolbar">
+  <span style="font-size:.75rem;color:var(--muted);font-weight:500;letter-spacing:.05em;text-transform:uppercase">Anteprima per gli ospiti</span>
+  <div class="share-group">
+    <button class="btn btn-wa" onclick="ggApriInvioCliente()">📤 Invia a un cliente</button>
+    <button class="btn btn-wa" onclick="ggShareWA()">💬 WhatsApp (generico)</button>
+    <button class="btn btn-mail" onclick="ggShareMail()">✉️ Email (generico)</button>
+    <button class="btn btn-copy" onclick="ggCopyText(this)">🔗 Copia testo</button>
+  </div>
+</div>
+
+<div class="card" id="s-welcome">
+  <div class="card-head">
+    <span class="card-icon">🌊</span><span class="card-title">Messaggio di benvenuto</span>
+  </div>
+  <div class="card-body">
+    <div class="tip-field"><span>💬</span>
+      <textarea rows="4" id="welcome-msg">${ggEsc(d.welcome)}</textarea>
+    </div>
+  </div>
+</div>
+
+<div class="card" id="s-info">
+  <div class="card-head" onclick="ggToggle('s-info')">
+    <span class="card-icon">🏠</span><span class="card-title">La struttura</span><span class="chevron">▼</span>
+  </div>
+  <div class="card-body">
+    <div class="field-group" id="info-fields">${(d.info||[]).map(ggFieldHTML).join('')}</div>
+    <div class="new-field-row" id="new-field-row" style="display:none">
+      <input id="new-label" placeholder="Nome campo (es. Asciugamani)" maxlength="40">
+      <span class="sep">→</span>
+      <input id="new-value" placeholder="Valore (es. Inclusi)" maxlength="80">
+      <button class="confirm-btn" onclick="ggConfirmNewField()">+ Aggiungi</button>
+      <button class="cancel-btn" onclick="ggCancelNewField()">✕</button>
+    </div>
+    <button class="add-btn" id="add-field-btn" onclick="ggShowNewFieldRow()">+ Aggiungi voce personalizzata</button>
+  </div>
+</div>
+
+<div class="card" id="s-appliances">
+  <div class="card-head" onclick="ggToggle('s-appliances')">
+    <span class="card-icon">🔌</span><span class="card-title">Elettrodomestici e comfort</span><span class="chevron">▼</span>
+  </div>
+  <div class="card-body" id="appliances-list">
+    ${(d.appliances||[]).map(ggApplianceHTML).join('')}
+    <button class="add-btn" onclick="ggAddAppliance()">+ Aggiungi elettrodomestico</button>
+  </div>
+</div>
+
+<div class="card" id="s-contacts">
+  <div class="card-head" onclick="ggToggle('s-contacts')">
+    <span class="card-icon">📞</span><span class="card-title">Contatti utili</span><span class="chevron">▼</span>
+  </div>
+  <div class="card-body">
+    <div class="contacts-grid" id="contacts-grid">${(d.contacts||[]).map(ggContactHTML).join('')}</div>
+    <button class="add-btn" onclick="ggAddContact()">+ Aggiungi contatto</button>
+  </div>
+</div>
+
+<div class="card" id="s-rest">
+  <div class="card-head" onclick="ggToggle('s-rest')">
+    <span class="card-icon">🍽️</span><span class="card-title">Ristoranti consigliati</span><span class="chevron">▼</span>
+  </div>
+  <div class="card-body">
+    <div id="rest-list">${(d.rest||[]).map(ggItemHTML).join('')}</div>
+    <button class="add-btn" onclick="ggAddItem('rest-list','🍽️')">+ Aggiungi ristorante</button>
+  </div>
+</div>
+
+<div class="card" id="s-beaches">
+  <div class="card-head" onclick="ggToggle('s-beaches')">
+    <span class="card-icon">🏖️</span><span class="card-title">Spiagge e mare</span><span class="chevron">▼</span>
+  </div>
+  <div class="card-body">
+    <div id="beach-list">${(d.beach||[]).map(ggItemHTML).join('')}</div>
+    <button class="add-btn" onclick="ggAddItem('beach-list','🏖️')">+ Aggiungi spiaggia</button>
+  </div>
+</div>
+
+<div class="card" id="s-visit">
+  <div class="card-head" onclick="ggToggle('s-visit')">
+    <span class="card-icon">🗺️</span><span class="card-title">Luoghi da visitare</span><span class="chevron">▼</span>
+  </div>
+  <div class="card-body">
+    <div id="visit-list">${(d.visit||[]).map(ggItemHTML).join('')}</div>
+    <button class="add-btn" onclick="ggAddItem('visit-list','📍')">+ Aggiungi luogo</button>
+  </div>
+</div>
+
+<div class="card" id="s-act">
+  <div class="card-head" onclick="ggToggle('s-act')">
+    <span class="card-icon">🌞</span><span class="card-title">Esperienze e attività</span><span class="chevron">▼</span>
+  </div>
+  <div class="card-body">
+    <div id="act-list">${(d.act||[]).map(ggItemHTML).join('')}</div>
+    <button class="add-btn" onclick="ggAddItem('act-list','🎯')">+ Aggiungi attività</button>
+  </div>
+</div>
+
+<div class="card" id="s-rules">
+  <div class="card-head" onclick="ggToggle('s-rules')">
+    <span class="card-icon">📋</span><span class="card-title">Note e regole della casa</span><span class="chevron">▼</span>
+  </div>
+  <div class="card-body" id="rules-body">
+    ${(d.rules||[]).map(ggRuleHTML).join('')}
+    <button class="add-btn" onclick="ggAddRule()">+ Aggiungi nota</button>
+  </div>
+</div>
+
+<div class="wave">〜 〜 〜</div>
+<div class="footer-field"><input id="footer-txt" value="${ggEsc(d.footer)}"></div>
+</div>`;
+}
+
+function ggToggle(id){document.getElementById(id).classList.toggle('closed')}
+
+function ggShowNewFieldRow(){
+  document.getElementById('new-field-row').style.display='flex';
+  document.getElementById('add-field-btn').style.display='none';
+  document.getElementById('new-label').focus();
+}
+function ggCancelNewField(){
+  document.getElementById('new-field-row').style.display='none';
+  document.getElementById('add-field-btn').style.display='flex';
+  document.getElementById('new-label').value='';
+  document.getElementById('new-value').value='';
+}
+function ggConfirmNewField(){
+  const lbl=document.getElementById('new-label').value.trim();
+  const val=document.getElementById('new-value').value.trim();
+  if(!lbl){document.getElementById('new-label').focus();return;}
+  const grid=document.getElementById('info-fields');
+  const div=document.createElement('div');
+  div.className='field';
+  div.innerHTML=ggFieldHTML({label:lbl,value:val});
+  grid.appendChild(div);
+  ggCancelNewField();
+}
+
+function ggAddItem(listId,emoji){
+  const list=document.getElementById(listId);
+  const row=document.createElement('div');
+  row.innerHTML=ggItemHTML({emoji:emoji,name:'Nuovo elemento',desc:'Descrizione...',dist:'📍 Distanza · Dettagli'});
+  list.appendChild(row.firstElementChild);
+}
+
+function ggAddContact(){
+  const grid=document.getElementById('contacts-grid');
+  const wrap=document.createElement('div');
+  wrap.innerHTML=ggContactHTML({icon:'📞',label:'',main:'',sub:''});
+  const chip=wrap.firstElementChild;
+  grid.appendChild(chip);
+  chip.querySelector('.cc-label').focus();
+}
+
+function ggAddRule(){
+  const body=document.getElementById('rules-body');
+  const addBtn=body.querySelector('.add-btn');
+  const wrap=document.createElement('div');
+  wrap.innerHTML=ggRuleHTML({icon:'📝',text:''});
+  const tip=wrap.firstElementChild;
+  body.insertBefore(tip,addBtn);
+  tip.querySelector('textarea').focus();
+}
+
+const GG_CONTACT_EMOJIS=['👤','📞','📱','💬','✉️','🚑','🏥','💊','🚒','🚓','🚕','🚗','🛒','🏪','🍕','☕','🏋️','🔧','🔑','💡','📍','🌐','💳','🏦','👨‍🍳','🌊','🏖️','🤿','🎵','🎨'];
+let _ggPickerTarget=null;
+function ggOpenEmojiPicker(el){
+  ggCloseEmojiPicker();
+  _ggPickerTarget=el;
+  const popup=document.createElement('div');
+  popup.className='emoji-picker-popup';
+  popup.id='active-emoji-picker';
+  GG_CONTACT_EMOJIS.forEach(em=>{
+    const s=document.createElement('span');
+    s.textContent=em;
+    s.onclick=(e)=>{e.stopPropagation();el.textContent=em;ggCloseEmojiPicker();};
+    popup.appendChild(s);
+  });
+  const custom=document.createElement('div');
+  custom.className='ep-custom';
+  const inp=document.createElement('input');
+  inp.placeholder='Altro emoji…';
+  inp.maxLength=4;
+  inp.oninput=()=>{if([...inp.value].length>=1){el.textContent=[...inp.value][0];ggCloseEmojiPicker();}};
+  custom.appendChild(inp);
+  popup.appendChild(custom);
+  el.closest('.ci-wrap').style.position='relative';
+  el.closest('.ci-wrap').appendChild(popup);
+  setTimeout(()=>document.addEventListener('click',ggCloseEmojiPicker,{once:true}),0);
+}
+function ggCloseEmojiPicker(){
+  const p=document.getElementById('active-emoji-picker');
+  if(p)p.remove();
+  _ggPickerTarget=null;
+}
+
+// Legge tutti i campi a schermo e li trasforma nella struttura dati da salvare
+function ggCollectData(){
+  const info=[];
+  document.querySelectorAll('#info-fields .field').forEach(f=>{
+    const l=f.querySelector('label')?.textContent.trim()||'';
+    const v=f.querySelector('.val-input')?.value||'';
+    if(l) info.push({label:l,value:v});
+  });
+  const contacts=[];
+  document.querySelectorAll('#contacts-grid .contact-chip').forEach(c=>{
+    contacts.push({
+      icon:c.querySelector('.ci')?.textContent||'📞',
+      label:c.querySelector('.cc-label')?.value||'',
+      main:c.querySelector('.cc-main')?.value||'',
+      sub:c.querySelector('.cc-sub')?.value||''
+    });
+  });
+  function collectItems(listId){
+    const arr=[];
+    document.querySelectorAll('#'+listId+' .item-row').forEach(r=>{
+      arr.push({
+        emoji:r.querySelector('.item-dot')?.textContent||'📍',
+        name:r.querySelector('.item-name')?.value||'',
+        desc:r.querySelector('.item-desc')?.value||'',
+        dist:r.querySelector('.item-dist')?.value||''
+      });
+    });
+    return arr;
+  }
+  const rules=[];
+  document.querySelectorAll('#rules-body .tip-field').forEach(t=>{
+    rules.push({icon:t.querySelector('span')?.textContent||'📝', text:t.querySelector('textarea')?.value||''});
+  });
+  // Le foto sono già salvate al momento del caricamento (vedi ggCaricaFotoAppliance) — qui
+  // leggiamo solo nome/istruzioni dai campi a schermo e le riuniamo alle foto già presenti,
+  // per indice, così non si perdono foto già caricate ma non ancora "Salvate" col resto.
+  const applianceSalvate = (DB.getObj('guidaOspiti', null) || GG_DEFAULT_DATA).appliances || [];
+  const appliances=[];
+  document.querySelectorAll('#appliances-list .appliance-card').forEach((c,i)=>{
+    appliances.push({
+      name: c.querySelector('.appliance-name')?.value||'',
+      instructions: c.querySelector('.appliance-instr')?.value||'',
+      photos: (applianceSalvate[i] && applianceSalvate[i].photos) || []
+    });
+  });
+  return {
+    welcome: document.getElementById('welcome-msg')?.value||'',
+    address: document.getElementById('gg-address')?.value||'',
+    info: info,
+    contacts: contacts,
+    rest: collectItems('rest-list'),
+    beach: collectItems('beach-list'),
+    visit: collectItems('visit-list'),
+    act: collectItems('act-list'),
+    rules: rules,
+    appliances: appliances,
+    messaggioInvio: document.getElementById('gg-msg-invio')?.value||'',
+    footer: document.getElementById('footer-txt')?.value||''
+  };
+}
+
+function ggSave(){
+  const data = ggCollectData();
+  DB.setObj('guidaOspiti', data);
+  showToast('💾 Guida ospiti salvata');
+  renderGuidaOspiti();
+}
+
+function ggBuildText(){
+  const d = ggCollectData();
+  const lines=[];
+  lines.push("🏡 GRETA'S HOUSE — Guida per gli ospiti");
+  lines.push("📍 San Martino di Castrozza · Trentino\n");
+  if(d.welcome) lines.push(d.welcome.trim()+"\n");
+  lines.push("🏠 STRUTTURA");
+  d.info.forEach(f=>{ if(f.label&&f.value) lines.push("• "+f.label+": "+f.value); });
+  if(d.address) lines.push(d.address.trim());
+  lines.push("");
+  lines.push("📞 CONTATTI UTILI");
+  d.contacts.forEach(c=>{ if(c.label&&c.main) lines.push(c.icon+" "+c.label+": "+c.main+(c.sub?" — "+c.sub:"")); });
+  lines.push("");
+  [{arr:d.rest,t:"🍽️ RISTORANTI"},{arr:d.beach,t:"🏖️ SPIAGGE"},{arr:d.visit,t:"🗺️ DA VISITARE"},{arr:d.act,t:"🌞 ATTIVITÀ"}].forEach(s=>{
+    lines.push(s.t);
+    s.arr.forEach(it=>{
+      if(it.name) lines.push("• "+it.name+(it.dist?" — "+it.dist:""));
+      if(it.desc) lines.push("  "+it.desc);
+    });
+    lines.push("");
+  });
+  lines.push("📋 NOTE E REGOLE");
+  d.rules.forEach(r=>{ if(r.text&&r.text.trim()) lines.push("• "+r.text.trim()); });
+  lines.push("");
+  if(d.footer) lines.push("— "+d.footer);
+  return lines.join("\n");
+}
+
+function ggShareWA(){window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(ggBuildText()),"_blank")}
+
+// ══════════════════════════════════════════════════════════════════════════
+// INVIA A UN CLIENTE — richiesto da Gian: invece del solo testo generico,
+// scegliere una prenotazione precisa e mandare il LINK della pagina pubblica
+// (bella, con card e immagini) direttamente al telefono/email di quell'ospite.
+// ══════════════════════════════════════════════════════════════════════════
+function ggApriInvioCliente(){
+  var s = DB.getObj('settings', {});
+  if (!s.guidaOspitiUrl) { showToast('Imposta prima l\'indirizzo della pagina pubblica in Impostazioni → Struttura'); return; }
+  var oggi = today();
+  var dal = addDays(oggi, -2), al = addDays(oggi, 60);
+  var guests = DB.get('guests') || [];
+  var bks = (DB.get('bookings')||[]).filter(function(b){
+    return b.status !== 'cancellata' && b.checkin >= dal && b.checkin <= al;
+  }).sort(function(a,b){ return (a.checkin||'').localeCompare(b.checkin||''); });
+
+  if (!bks.length) { showToast('Nessuna prenotazione trovata nei prossimi 60 giorni'); return; }
+
+  showModal('Invia la Guida Ospiti a un cliente',
+    '<div style="font-size:12.5px;color:var(--text3);margin-bottom:10px">Scegli la prenotazione — manda il link della guida al telefono/email di quell\'ospite.</div>'+
+    '<div style="max-height:400px;overflow-y:auto;display:flex;flex-direction:column;gap:6px">'+
+    bks.map(function(b){
+      var g = b.guestId ? guests.find(function(x){ return x.id===b.guestId; }) : null;
+      var tel = g && g.phone ? g.phone : '';
+      var mail = g && g.email ? g.email : '';
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border:.5px solid var(--border);border-radius:8px">'+
+        '<div><div style="font-weight:700;font-size:13px">'+(b.guestName||'').replace(/</g,'&lt;')+'</div>'+
+        '<div style="font-size:11.5px;color:var(--text3)">'+fmtDate(b.checkin)+' → '+fmtDate(b.checkout)+' · '+(b.roomName||'')+(tel?' · 📞 '+tel:'')+'</div></div>'+
+        '<div style="display:flex;gap:5px">'+
+          '<button class="btn btn-sm" '+(tel?'':'disabled title="Nessun telefono salvato per questo ospite"')+' onclick="ggInviaClienteWA(\''+b.id+'\')">💬</button>'+
+          '<button class="btn btn-sm" '+(mail?'':'disabled title="Nessuna email salvata per questo ospite"')+' onclick="ggInviaClienteMail(\''+b.id+'\')">✉️</button>'+
+        '</div></div>';
+    }).join('')+
+    '</div>',
+    '<button class="btn" onclick="closeModal()">Chiudi</button>'
+  );
+}
+function ggTestoInvioCliente(b){
+  var s = DB.getObj('settings', {});
+  var d = DB.getObj('guidaOspiti', null) || GG_DEFAULT_DATA;
+  var modello = d.messaggioInvio || GG_MESSAGGIO_INVIO_DEFAULT;
+  return modello
+    .replace(/\{nome\}/g, b.guestName||'')
+    .replace(/\{checkin\}/g, fmtDate(b.checkin))
+    .replace(/\{checkout\}/g, fmtDate(b.checkout))
+    .replace(/\{link\}/g, s.guidaOspitiUrl||'');
+}
+function ggInviaClienteWA(bookingId){
+  var b = (DB.get('bookings')||[]).find(function(x){ return x.id===bookingId; });
+  var guests = DB.get('guests') || [];
+  var g = b && b.guestId ? guests.find(function(x){ return x.id===b.guestId; }) : null;
+  if (!b || !g || !g.phone) { showToast('Telefono non disponibile per questo ospite'); return; }
+  var tel = g.phone.replace(/[^\d+]/g,'');
+  window.open('https://api.whatsapp.com/send?phone='+encodeURIComponent(tel)+'&text='+encodeURIComponent(ggTestoInvioCliente(b)), '_blank');
+  closeModal();
+}
+async function ggInviaClienteMail(bookingId){
+  var b = (DB.get('bookings')||[]).find(function(x){ return x.id===bookingId; });
+  var guests = DB.get('guests') || [];
+  var g = b && b.guestId ? guests.find(function(x){ return x.id===b.guestId; }) : null;
+  if (!b || !g || !g.email) { showToast('Email non disponibile per questo ospite'); return; }
+  var s = DB.getObj('settings', {});
+  if (!s.supabaseUrl || !s.supabaseKey) { showToast('Configura prima Supabase in Impostazioni per l\'invio automatico'); return; }
+  showToast('Invio in corso…');
+  try {
+    var res = await fetch(s.supabaseUrl.replace(/\/$/,'') + '/functions/v1/invio-ricevuta', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer '+s.supabaseKey, 'apikey': s.supabaseKey },
+      body: JSON.stringify({
+        smtpEmail: s.emailInvioPromemoria, smtpPassword: s.passwordInvioPromemoria,
+        to: g.email, toName: b.guestName,
+        subject: 'La tua guida — Greta\'s House',
+        message: ggTestoInvioCliente(b),
+      })
+    });
+    var data = await res.json();
+    if (!data.ok) throw new Error(data.errore || 'invio non riuscito');
+    showToast('✅ Email inviata a '+g.email);
+    closeModal();
+  } catch (err) {
+    console.error('Errore invio guida via email:', err);
+    showToast('⚠ Invio non riuscito — controlla la configurazione email in Impostazioni');
+  }
+}
+function ggShareMail(){window.location.href="mailto:?subject="+encodeURIComponent("La tua guida — Hotel Villa Aurora")+"&body="+encodeURIComponent(ggBuildText())}
+function ggCopyText(btn){
+  navigator.clipboard.writeText(ggBuildText()).then(()=>{
+    const o=btn.textContent;btn.textContent="✓ Copiato!";setTimeout(()=>btn.textContent=o,2000);
+  });
+}
+
 function trovaDatiPrecedenti(cognome, nome) {
   const key = chiaveStorico(cognome, nome);
   if (key === '|') return null;
@@ -28283,6 +28950,10 @@ function renderImpostazioni() {
               <input type="text" id="s-hub-url" value="${s.hubUrl||''}" placeholder="https://.../hub-amministratore.html">
             </div>
             <div class="form-group full">
+              <label>Indirizzo pagina pubblica Guida Ospiti (da inviare ai clienti)</label>
+              <input type="text" id="s-guida-ospiti-url" value="${s.guidaOspitiUrl||''}" placeholder="https://.../guida-ospiti-villaaurora.html">
+            </div>
+            <div class="form-group full">
               <label>Email Amministratore Generale (solo per l'etichetta mostrata — non limita nessun potere)</label>
               <input type="email" id="s-email-admin-generale" value="${s.emailAdminGenerale||''}" placeholder="tuaemail@...">
               <div style="font-size:11px;color:var(--text3);margin-top:3px">Chi accede con questa email vede scritto "Amministratore Generale"; chiunque altro non limitato in Utenti & Permessi vede "Amministratore di struttura" — entrambi hanno comunque pieni poteri su questa struttura, è solo un'etichetta per riconoscere a colpo d'occhio chi ha una visione su tutte le strutture.</div>
@@ -28941,6 +29612,7 @@ function saveImpostazioni() {
   const s = DB.getObj('settings', {}); // partiamo da TUTTO quello che c'è già, non lo ricostruiamo da zero
   s.propertyName  = document.getElementById('s-name').value;
   s.hubUrl        = document.getElementById('s-hub-url')?.value.trim() || '';
+  s.guidaOspitiUrl = document.getElementById('s-guida-ospiti-url')?.value.trim() || '';
   s.emailAdminGenerale = document.getElementById('s-email-admin-generale')?.value.trim().toLowerCase() || '';
   s.emailMittente = document.getElementById('s-email-mittente')?.value.trim() || '';
   s.currency      = document.getElementById('s-currency').value;
