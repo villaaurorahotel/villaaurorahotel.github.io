@@ -339,7 +339,7 @@ tr:hover td{background:var(--surface2)}
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
       <span id="utente-corrente-badge" style="display:none;font-size:10.5px;font-weight:700;color:var(--accent);margin-top:2px"></span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 15/09/2026 · 08:19</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 20/09/2026 · 20:41</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -19540,6 +19540,7 @@ function openDettaglioPrenotazione(id) {
         `<button class="btn" onclick="closeModal(); apriContoScegli('${b.id}')">🧾 Conto</button>` +
         `<button class="btn" onclick="apriProforma('${b.id}')" title="Riepilogo dell'importo dovuto da mostrare/stampare, senza registrare nulla nei Corrispettivi">📋 Proforma</button>` +
         `<button class="btn" onclick="stampaSchedaPrenotazione('${b.id}')">🖨 Stampa scheda</button>` +
+        `<button class="btn" style="background:#0070ba;color:#fff;border-color:#0070ba" onclick="closeModal(); pyApriRichiesta('${b.id}')">💳 Richiedi pagamento</button>` +
       '</div>' +
       (function(){
         const corrTxFooter = (typeof corrState !== 'undefined' && corrState && corrState.transactions)
@@ -21879,6 +21880,165 @@ function ggCopyText(btn){
   navigator.clipboard.writeText(ggBuildText()).then(()=>{
     const o=btn.textContent;btn.textContent="✓ Copiato!";setTimeout(()=>btn.textContent=o,2000);
   });
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// RICHIESTA DI PAGAMENTO — PayPal.me / SumUp
+// Pulsante nella scheda prenotazione: scrivi l'importo, il PMS genera il
+// messaggio (con link PayPal e, se incollato, anche link SumUp) da mandare
+// via WhatsApp o email. Il pagamento va controllato manualmente e poi
+// segnato nel Conto scegliendo "PayPal" come metodo.
+// ══════════════════════════════════════════════════════════════════════════
+var PY_MSG_DEFAULT = {
+  it: 'Ciao {nome}! 👋\n\nTi scrivo per il pagamento{nota} di {importo} per il tuo soggiorno presso {struttura}.\n\nPuoi pagare comodamente con PayPal o carta di credito da questo link, senza bisogno di un account PayPal:\n\n👉 {link}\n\nGrazie mille!',
+  en: 'Hi {nome}! 👋\n\nGetting in touch about the payment{nota} of {importo} for your stay at {struttura}.\n\nYou can pay easily with PayPal or a credit card via this link, no PayPal account needed:\n\n👉 {link}\n\nThank you so much!',
+};
+var PY_SUMUP_EXTRA = {
+  it: '\n\nIn alternativa, puoi pagare con carta anche tramite questo link SumUp:\n👉 {link_sumup}',
+  en: '\n\nAlternatively, you can also pay by card via this SumUp link:\n👉 {link_sumup}',
+};
+function pyCambiaSchedaLingua(lang){
+  document.querySelectorAll('.py-lang-tab').forEach(function(btn){
+    btn.style.background = btn.dataset.lang===lang ? 'var(--accent)' : '';
+    btn.style.color = btn.dataset.lang===lang ? '#fff' : '';
+  });
+  document.querySelectorAll('.py-lang-pane').forEach(function(el){
+    el.style.display = el.dataset.lang===lang ? '' : 'none';
+  });
+}
+function pyLinkImporto(importo){
+  var s = DB.getObj('settings', {});
+  var handle = (s.paypalMeHandle||'').trim();
+  var val = (Math.round(importo*100)/100).toString();
+  return 'https://paypal.me/'+handle+'/'+val+'EUR';
+}
+function pyTestoRichiesta(b, importo, nota, sumupLink){
+  var s = DB.getObj('settings', {});
+  var guests = DB.get('guests') || [];
+  var g = b.guestId ? guests.find(function(x){ return x.id===b.guestId; }) : null;
+  var lang = waMassivoIndovinaLingua(g);
+  var importoTxt = (Math.round(importo*100)/100).toFixed(2).replace('.', ',') + ' €';
+  var link = pyLinkImporto(importo);
+  var modelli = s.pagamentoMsgByLang || {};
+  var modello = modelli[lang] || modelli.it || PY_MSG_DEFAULT[lang] || PY_MSG_DEFAULT.it;
+  var notaTxt = nota ? (' ('+nota+')') : '';
+  var testo = modello.replace(/\{nome\}/g, b.guestName||'').replace(/\{importo\}/g, importoTxt).replace(/\{link\}/g, link).replace(/\{nota\}/g, notaTxt).replace(/\{struttura\}/g, s.propertyName||'');
+  if (sumupLink) {
+    var extra = PY_SUMUP_EXTRA[lang] || PY_SUMUP_EXTRA.it;
+    testo += extra.replace(/\{link_sumup\}/g, sumupLink);
+  }
+  return testo;
+}
+function pyApriRichiesta(bookingId){
+  var s = DB.getObj('settings', {});
+  if (!s.paypalMeHandle) { showToast('Imposta prima il tuo nome utente PayPal.me in Impostazioni'); return; }
+  var b = (DB.get('bookings')||[]).find(function(x){ return x.id===bookingId; });
+  if (!b) return;
+  var guests = DB.get('guests') || [];
+  var g = b.guestId ? guests.find(function(x){ return x.id===b.guestId; }) : null;
+  var tel = g && g.phone ? g.phone : '';
+  var mail = g && g.email ? g.email : '';
+  var importoIniziale = b.totalPrice ? Math.round(b.totalPrice*100)/100 : 0;
+  var testoIniziale = importoIniziale ? pyTestoRichiesta(b, importoIniziale, '') : '';
+  showModal('Richiedi pagamento a '+(b.guestName||''),
+    '<div style="font-size:12.5px;color:var(--text3);margin-bottom:12px">'+(b.pagamentoRichiesto?'⚠ Già inviata una richiesta in precedenza — puoi comunque inviarne un\'altra.':'')+'</div>'+
+    '<div class="form-grid">'+
+      '<div class="form-group">'+
+        '<label>Importo da richiedere (€)</label>'+
+        '<input type="number" id="py-importo" min="0" step="0.01" placeholder="Es. 100" value="'+(importoIniziale||'')+'" oninput="pyRigeneraTesto(\''+b.id+'\')">'+
+      '</div>'+
+      '<div class="form-group">'+
+        '<label>Nota (facoltativa — es. "caparra", "saldo")</label>'+
+        '<input type="text" id="py-nota" placeholder="Es. caparra" oninput="pyRigeneraTesto(\''+b.id+'\')">'+
+      '</div>'+
+      '<div class="form-group full">'+
+        '<label>Link SumUp (facoltativo — crealo prima dalla tua app SumUp e incollalo qui se vuoi offrire anche questa opzione)</label>'+
+        '<input type="text" id="py-sumup-link" placeholder="https://pay.sumup.com/..." oninput="pyRigeneraTesto(\''+b.id+'\')">'+
+      '</div>'+
+      '<div class="form-group full">'+
+        '<label>Messaggio che verrà inviato — puoi modificarlo liberamente prima di mandarlo</label>'+
+        '<textarea id="py-testo" rows="8" style="width:100%">'+(testoIniziale||'').replace(/</g,'&lt;')+'</textarea>'+
+        '<div style="font-size:11px;color:var(--text3);margin-top:3px">Se cambi importo, nota o link SumUp qui sopra, il testo viene rigenerato dal modello (impostabile in Impostazioni → 💳 Pagamenti PayPal) — eventuali modifiche manuali al testo vengono sovrascritte.</div>'+
+      '</div>'+
+    '</div>'+
+    '<div style="display:flex;gap:8px;margin-top:14px">'+
+      '<button class="btn" style="flex:1" '+(tel?'':'disabled')+' onclick="pyInviaWA(\''+b.id+'\')">💬 WhatsApp'+(tel?'':' (nessun telefono)')+'</button>'+
+      '<button class="btn" style="flex:1" '+(mail?'':'disabled')+' onclick="pyInviaMail(\''+b.id+'\')">✉️ Email'+(mail?'':' (nessuna email)')+'</button>'+
+    '</div>',
+    '<button class="btn" onclick="closeModal()">Annulla</button>'
+  );
+}
+function pyLeggiImporto(){
+  var val = parseFloat(document.getElementById('py-importo')?.value);
+  if (!val || val<=0) { showToast('Inserisci un importo valido'); return null; }
+  return val;
+}
+function pyRigeneraTesto(bookingId){
+  var importo = parseFloat(document.getElementById('py-importo')?.value);
+  var nota = (document.getElementById('py-nota')?.value || '').trim();
+  var sumupLink = (document.getElementById('py-sumup-link')?.value || '').trim();
+  var b = (DB.get('bookings')||[]).find(function(x){ return x.id===bookingId; });
+  var ta = document.getElementById('py-testo');
+  if (!b || !ta) return;
+  ta.value = (importo && importo>0) ? pyTestoRichiesta(b, importo, nota, sumupLink) : '';
+}
+function pySegnaRichiesta(bookingId){
+  var bookings = DB.get('bookings') || [];
+  var idx = bookings.findIndex(function(x){ return x.id===bookingId; });
+  if (idx>=0) { bookings[idx].pagamentoRichiesto = true; DB.set('bookings', bookings); }
+}
+function pyLeggiTesto(){
+  var testo = (document.getElementById('py-testo')?.value || '').trim();
+  if (!testo) { showToast('Il messaggio è vuoto'); return null; }
+  return testo;
+}
+function pyInviaWA(bookingId){
+  var importo = pyLeggiImporto();
+  if (importo===null) return;
+  var testo = pyLeggiTesto();
+  if (testo===null) return;
+  var b = (DB.get('bookings')||[]).find(function(x){ return x.id===bookingId; });
+  var guests = DB.get('guests') || [];
+  var g = b && b.guestId ? guests.find(function(x){ return x.id===b.guestId; }) : null;
+  if (!b || !g || !g.phone) { showToast('Telefono non disponibile'); return; }
+  var tel = g.phone.replace(/[^\d+]/g,'');
+  window.open('https://api.whatsapp.com/send?phone='+encodeURIComponent(tel)+'&text='+encodeURIComponent(testo), '_blank');
+  pySegnaRichiesta(bookingId);
+  closeModal();
+  showToast('✅ Richiesta di pagamento inviata');
+}
+async function pyInviaMail(bookingId){
+  var importo = pyLeggiImporto();
+  if (importo===null) return;
+  var testo = pyLeggiTesto();
+  if (testo===null) return;
+  var b = (DB.get('bookings')||[]).find(function(x){ return x.id===bookingId; });
+  var guests = DB.get('guests') || [];
+  var g = b && b.guestId ? guests.find(function(x){ return x.id===b.guestId; }) : null;
+  if (!b || !g || !g.email) { showToast('Email non disponibile'); return; }
+  var s = DB.getObj('settings', {});
+  if (!s.supabaseUrl || !s.supabaseKey) { showToast('Configura prima Supabase in Impostazioni'); return; }
+  showToast('Invio in corso…');
+  try {
+    var res = await fetch(s.supabaseUrl.replace(/\/$/,'') + '/functions/v1/invio-ricevuta', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer '+s.supabaseKey, 'apikey': s.supabaseKey },
+      body: JSON.stringify({
+        smtpEmail: s.emailInvioPromemoria, smtpPassword: s.passwordInvioPromemoria,
+        to: g.email, toName: b.guestName,
+        subject: 'Richiesta di pagamento — '+(s.propertyName||'Hotel Villa Aurora'),
+        message: testo,
+      })
+    });
+    var data = await res.json();
+    if (!data.ok) throw new Error(data.errore || 'invio non riuscito');
+    pySegnaRichiesta(bookingId);
+    showToast('✅ Email inviata a '+g.email);
+    closeModal();
+  } catch (err) {
+    console.error('Errore invio richiesta pagamento:', err);
+    showToast('⚠ Invio non riuscito — controlla la configurazione email in Impostazioni');
+  }
 }
 
 function trovaDatiPrecedenti(cognome, nome) {
@@ -28936,7 +29096,6 @@ function renderImpostazioni() {
   document.getElementById('page-impostazioni').innerHTML = `
     <div class="page-header"><div><div class="page-title">Impostazioni</div></div></div>
     <div class="page-content" style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">
-      ${renderCanaliOTAHTML()}
       <div class="card" style="max-width:500px;flex:1 1 460px">
         <div class="card-header"><span class="card-title">Struttura</span></div>
         <div class="modal-body">
@@ -28999,6 +29158,33 @@ function renderImpostazioni() {
               Durante un soggiorno, l'Housekeeping segnala automaticamente i giorni in cui va cambiata la biancheria, in base a questo intervallo. Il cambio non viene segnalato se cade nell'ultimo giorno (o nel penultimo) prima della partenza, per evitare cambi inutili quando l'ospite sta per lasciare la camera.
             </div>
       </div></div></div>
+
+      <div class="card" id="imp-sez-paypal" style="max-width:500px;flex:1 1 460px">
+        <div class="card-header"><span class="card-title">💳 Pagamenti PayPal</span></div>
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group full">
+              <label>Il tuo nome utente PayPal.me</label>
+              <input type="text" id="s-paypalme-handle" value="${s.paypalMeHandle||''}" placeholder="nometuastruttura">
+              <div style="font-size:11px;color:var(--text3);margin-top:3px">Solo il nome utente, senza "paypal.me/" davanti. Gratuito, nessun abbonamento: crealo su <a href="https://www.paypal.com/paypalme" target="_blank" rel="noopener">paypal.com/paypalme</a>. Una volta impostato, dalla scheda di ogni prenotazione potrai generare un link con l'importo che vuoi chiedere e mandarlo via WhatsApp o email — il pagamento andrà controllato manualmente su PayPal e poi segnato nel Conto.</div>
+            </div>
+            <div class="form-group full">
+              <label>Messaggio richiesta di pagamento — una versione per lingua</label>
+              <div style="font-size:11px;color:var(--text3);margin-top:3px;margin-bottom:8px">Usa <code>{nome}</code>, <code>{importo}</code>, <code>{nota}</code> e <code>{link}</code> — vengono sostituiti automaticamente. Questo è solo il testo di partenza: prima di ogni invio potrai comunque modificarlo a mano nella finestra "Richiedi pagamento".</div>
+              <div style="display:flex;gap:4px;margin-bottom:8px" id="py-lang-tabs">
+                ${['it','en'].map(function(lang,i){
+                  var bandiere = {it:'🇮🇹 IT', en:'🇬🇧 EN'};
+                  return '<button type="button" class="btn btn-sm py-lang-tab" data-lang="'+lang+'" onclick="pyCambiaSchedaLingua(\''+lang+'\')" style="'+(i===0?'background:var(--accent);color:#fff':'')+'">'+bandiere[lang]+'</button>';
+                }).join('')}
+              </div>
+              ${['it','en'].map(function(lang, i){
+                var valore = (s.pagamentoMsgByLang && s.pagamentoMsgByLang[lang]) || PY_MSG_DEFAULT[lang];
+                return '<textarea id="s-pagamento-msg-'+lang+'" class="py-lang-pane" data-lang="'+lang+'" rows="6" style="width:100%;'+(i===0?'':'display:none')+'">'+valore.replace(/</g,'&lt;')+'</textarea>';
+              }).join('')}
+            </div>
+      </div></div></div>
+
+      ${renderCanaliOTAHTML()}
 
       <div class="card" style="max-width:500px;flex:1 1 460px">
         <div class="card-header"><span class="card-title">Tassa di soggiorno</span></div>
@@ -29622,6 +29808,11 @@ function saveImpostazioni() {
   s.cityTaxChildRate = parseFloat(document.getElementById('s-tax-child-rate')?.value)||0;
   s.cityTaxMaxNights = parseInt(document.getElementById('s-tax-max-nights')?.value)||0;
   s.hkGiorniCambioBiancheria = parseInt(document.getElementById('s-hk-cambio-biancheria')?.value)||3;
+  s.paypalMeHandle = (document.getElementById('s-paypalme-handle')?.value || '').trim().replace(/^@/, '').replace(/^https?:\/\/(www\.)?paypal\.me\//i, '').replace(/\/$/, '');
+  s.pagamentoMsgByLang = {};
+  ['it','en'].forEach(function(lang){
+    s.pagamentoMsgByLang[lang] = document.getElementById('s-pagamento-msg-'+lang)?.value || '';
+  });
   s.address       = document.getElementById('s-address').value;
   s.city          = document.getElementById('s-city').value;
   s.provincia     = document.getElementById('s-prov').value;
@@ -31517,7 +31708,7 @@ function leggiDatiFatturazioneForm() {
 }
 
 // ── Gestione righe di pagamento multiplo nella maschera Conto ──
-const CONTO_METODI = ['Contanti','Carta di credito','POS','Bonifico','Altro'];
+const CONTO_METODI = ['Contanti','Carta di credito','POS','Bonifico','PayPal','Altro'];
 function rigaPagamentoHTML(metodo, importo, destinazione) {
   const rid = 'pagrow_'+uid();
   const mostraDestinazione = metodo === 'Bonifico';
