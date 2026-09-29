@@ -339,7 +339,7 @@ tr:hover td{background:var(--surface2)}
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
       <span id="utente-corrente-badge" style="display:none;font-size:10.5px;font-weight:700;color:var(--accent);margin-top:2px"></span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 29/09/2026 · 14:30</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 29/09/2026 · 15:00</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -712,9 +712,31 @@ async function inviaCheckinOnlineReale(bookingId, link) {
   }
 }
 
+// L'indirizzo e la chiave del database a cui questo browser si collega vengono tenuti SEMPRE in una
+// chiave locale dedicata (mai dentro l'oggetto "settings" condiviso/sincronizzato) — altrimenti, una
+// volta collegati per errore al progetto sbagliato, correggere l'indirizzo qui dentro finirebbe per
+// salvare la correzione nel progetto SBAGLIATO (quello a cui si è già collegati) invece che su questo
+// PC, rendendo impossibile correggersi da soli senza intervenire a mano su Supabase.
+function getLocalSupabaseConn() {
+  try {
+    return { url: localStorage.getItem('pms_local_supabase_url') || '', key: localStorage.getItem('pms_local_supabase_key') || '' };
+  } catch(e) { return { url: '', key: '' }; }
+}
+function setLocalSupabaseConn(url, key) {
+  try {
+    localStorage.setItem('pms_local_supabase_url', url || '');
+    localStorage.setItem('pms_local_supabase_key', key || '');
+  } catch(e) { /* storage non disponibile: si continua comunque */ }
+}
 function getSupabaseConfig() {
+  const locale = getLocalSupabaseConn();
+  if (locale.url && locale.key) return locale;
+  // Compatibilità con versioni precedenti di questo file: se su questo PC non c'è ancora nulla nella
+  // chiave locale dedicata, recupera (una sola volta) l'eventuale valore già presente nelle Impostazioni
+  // e lo copia subito nella chiave locale, così da quel momento in poi si userà sempre e solo quella.
   const s = DB.getObj('settings', {});
-  return { url: s.supabaseUrl || '', key: s.supabaseKey || '' };
+  if (s.supabaseUrl && s.supabaseKey) { setLocalSupabaseConn(s.supabaseUrl, s.supabaseKey); return { url: s.supabaseUrl, key: s.supabaseKey }; }
+  return { url: '', key: '' };
 }
 
 function loadSupabaseSDK() {
@@ -1896,6 +1918,10 @@ function importaConfigurazione(inputEl) {
       const imported = JSON.parse(e.target.result);
       if (!imported || typeof imported !== 'object') throw new Error('File non valido');
       DB.setObj('settings', imported);
+      // Porta subito l'indirizzo/chiave Supabase del file importato nella chiave locale dedicata di
+      // questo PC, così il collegamento userà davvero quello appena importato (non uno vecchio rimasto
+      // da prima, né uno eventualmente diverso già presente online per un altro progetto).
+      if (imported.supabaseUrl && imported.supabaseKey) setLocalSupabaseConn(imported.supabaseUrl, imported.supabaseKey);
       showToast('Configurazione importata — la pagina si ricarica…');
       setTimeout(function(){ location.reload(); }, 900);
     } catch (err) {
@@ -1910,11 +1936,18 @@ function salvaConnessioneSupabase() {
   const url = (document.getElementById('s-supaUrl')?.value || '').trim();
   const key = (document.getElementById('s-supaKey')?.value || '').trim();
   if (!url || !key) { showToast('Compila sia URL che chiave prima di salvare'); return; }
+  // Scritta SEMPRE nella chiave locale dedicata di questo PC (mai nell'oggetto "settings" condiviso) —
+  // così funziona anche per correggere un collegamento già attivo ma sbagliato: se scrivessimo dentro
+  // "settings" mentre si è già connessi (anche al progetto sbagliato), la correzione finirebbe salvata
+  // online nel progetto sbagliato invece che qui sul PC.
+  setLocalSupabaseConn(url, key);
+  // La teniamo anche dentro "settings" solo per compatibilità con Esporta/Importa configurazione e con
+  // le funzioni che inviano email/ricevute — ma da qui in poi il collegamento vero usa solo la chiave locale.
   const s = DB.getObj('settings', {});
   s.supabaseUrl = url;
   s.supabaseKey = key;
   DB.setObj('settings', s);
-  showToast('🟢 Connessione Supabase salvata — ricarica la pagina (F5) per attivarla');
+  showToast('🟢 Connessione Supabase salvata su questo PC — ricarica la pagina (F5) per attivarla');
   renderImpostazioni();
 }
 
@@ -14207,7 +14240,7 @@ function renderDashboard() {
     var presentiIeriNotte = bookings.filter(function(b){ return b.checkin<tod && b.checkout>=tod && b.status!=='cancellata'; });
     var colazioniOggi = presentiIeriNotte.reduce(function(s,b){ return s + (b.colazioneInclusa!==false ? (Number(b.adults||1)+Number(b.children||0)) : 0); }, 0);
     var cfgDash = DB.getObj('settings', {});
-    var isFreshPC = !cfgDash.supabaseUrl || !cfgDash.supabaseKey;
+    var isFreshPC = !getLocalSupabaseConn().url || !getLocalSupabaseConn().key;
     if(_revMeteoCache===null){ _revCaricaMeteo(); } // parte in background, ridisegna da sola quando pronto
 
     var ieriTod = addDays(tod, -1);
@@ -31674,11 +31707,11 @@ function renderImpostazioni() {
           <div class="form-grid">
             <div class="form-group full">
               <label>Project URL</label>
-              <input type="text" id="s-supaUrl" value="${s.supabaseUrl||''}" placeholder="https://xxxxxxxxxxx.supabase.co">
+              <input type="text" id="s-supaUrl" value="${getLocalSupabaseConn().url||''}" placeholder="https://xxxxxxxxxxx.supabase.co">
             </div>
             <div class="form-group full">
               <label>Anon / Public key</label>
-              <input type="text" id="s-supaKey" value="${s.supabaseKey||''}" placeholder="eyJ...">
+              <input type="text" id="s-supaKey" value="${getLocalSupabaseConn().key||''}" placeholder="eyJ...">
             </div>
             <button type="button" class="btn btn-sm btn-primary full" onclick="salvaConnessioneSupabase()">💾 Salva connessione Supabase</button>
             <div class="form-group full" style="display:flex;gap:8px">
@@ -31689,7 +31722,7 @@ function renderImpostazioni() {
             <div class="form-group full" style="background:var(--surface2);border-radius:8px;padding:10px 12px;font-size:13px">
               ${supabaseReady
                 ? '🟢 Connesso — tutto il programma è condiviso in tempo reale tra i PC collegati'
-                : (s.supabaseUrl && s.supabaseKey ? '🔴 Configurato ma non connesso — salva e ricarica la pagina' : '⚪ Non ancora configurato — il programma funziona offline come sempre')}
+                : (getLocalSupabaseConn().url && getLocalSupabaseConn().key ? '🔴 Configurato ma non connesso — salva e ricarica la pagina' : '⚪ Non ancora configurato — il programma funziona offline come sempre')}
             </div>
             <button type="button" class="btn btn-sm full" onclick="verificaConnessioneSupabase()">🔍 Verifica connessione (diagnostica)</button>
             <div id="supabase-diagnostica" style="font-size:12.5px;line-height:1.7"></div>
@@ -32388,10 +32421,14 @@ document.addEventListener('DOMContentLoaded', async function() {
   var lbl = document.getElementById('prop-name');
   if(lbl && cfg.propertyName) lbl.textContent = cfg.propertyName;
 
-  if (cfg.supabaseUrl && cfg.supabaseKey) {
+  // Il collegamento a Supabase usa SEMPRE l'indirizzo/chiave salvati in locale su questo PC (mai quelli
+  // eventualmente presenti nell'oggetto "settings" condiviso, che potrebbero arrivare da un altro
+  // progetto se ci si fosse collegati per errore a quello sbagliato in passato).
+  var connLocale = getSupabaseConfig();
+  if (connLocale.url && connLocale.key) {
     try {
       await loadSupabaseSDK();
-      supabaseClient = supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey);
+      supabaseClient = supabase.createClient(connLocale.url, connLocale.key);
       // Login RIPRISTINATO su richiesta di Gian (04/09/2026), per poter avere utenti con permessi
       // diversi (Amministratore/Reception) — era stato tolto il 13/08/2026 per entrare sempre
       // diretti, ma senza un login il PMS non può sapere CHI sta usando il programma in un dato
