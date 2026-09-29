@@ -339,7 +339,7 @@ tr:hover td{background:var(--surface2)}
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
       <span id="utente-corrente-badge" style="display:none;font-size:10.5px;font-weight:700;color:var(--accent);margin-top:2px"></span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 29/09/2026 · 18:15</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 29/09/2026 · 20:35</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -27842,7 +27842,13 @@ function renderListino() {
   });
   if(cmlbl)mspans.push({l:cmlbl,s:cscnt});
   var mTH=mspans.map(function(s){return '<th colspan="'+s.s+'" style="min-width:'+s.s*COL+'px;padding:8px 6px;text-align:center;font-size:16px;font-weight:700;color:var(--text1);background:var(--surface2);border-left:.5px solid var(--border2);border-bottom:.5px solid var(--border)">'+s.l+'</th>';}).join('');
-  var dTH=allDays.map(function(d){var ds=fmt(d),iT=ds===tod,iW=d.getDay()===0||d.getDay()===6,iS=lstSelFrom&&lstSelTo&&ds>=lstSelFrom&&ds<=lstSelTo;return '<th style="min-width:'+COL+'px;width:'+COL+'px;padding:3px 1px;text-align:center;font-size:10px;border-left:.5px solid var(--border);background:'+(iS?'#fff3cd':iT?'var(--accent)':iW?'var(--accent-light)':'var(--surface2)')+';color:'+(iS?'#856404':iT?'#fff':iW?'var(--accent)':'var(--text2)')+';font-weight:'+(iW||iT?'700':'400')+'"><div style="font-size:13px;font-weight:600">'+d.getDate()+'</div><div style="font-size:9px;opacity:.7">'+dow[d.getDay()]+'</div></th>';}).join('');
+  var dTH=allDays.map(function(d){var ds=fmt(d),iT=ds===tod,iW=d.getDay()===0||d.getDay()===6,iS=lstSelFrom&&lstSelTo&&ds>=lstSelFrom&&ds<=lstSelTo;
+    // Meteo previsto (se disponibile — solo per i prossimi ~16 giorni, caricato dalla pagina "Prezzo
+    // consigliato") mostrato al passaggio del mouse sulla data, invece di occupare una riga fissa che
+    // per la maggior parte dei ~60 giorni della vista resterebbe comunque vuota.
+    var meteoTH=meteoInfoPerData(ds);
+    var titleTH=meteoTH ? (METEO_ETICHETTE[meteoTH.code]||'')+' · '+Math.round(meteoTH.temp)+'°C' : '';
+    return '<th title="'+titleTH.replace(/"/g,'&quot;')+'" style="min-width:'+COL+'px;width:'+COL+'px;padding:3px 1px;text-align:center;font-size:10px;border-left:.5px solid var(--border);background:'+(iS?'#fff3cd':iT?'var(--accent)':iW?'var(--accent-light)':'var(--surface2)')+';color:'+(iS?'#856404':iT?'#fff':iW?'var(--accent)':'var(--text2)')+';font-weight:'+(iW||iT?'700':'400')+'"><div style="font-size:13px;font-weight:600">'+d.getDate()+(meteoTH?' <span style="font-size:9px">'+(METEO_ETICHETTE[meteoTH.code]||'').split(' ')[0]+'</span>':'')+'</div><div style="font-size:9px;opacity:.7">'+dow[d.getDay()]+'</div></th>';}).join('');
   // Letti UNA volta sola qui (non dentro il ciclo dei giorni) — prima venivano riletti dal
   // database per ognuno dei ~60 giorni della vista, rendendo la pagina lenta ad ogni apertura.
   var livLivelliCache = livGetLivelli();
@@ -27858,6 +27864,14 @@ function renderListino() {
       '<select onchange="livCambiaGiorno(\''+ds+'\', this.value); setTimeout(renderListino, 0);" title="Livello tariffario per questo giorno — se hai selezionato un periodo (Da → A), si applica a tutto il periodo" '+
       'style="width:'+(COL-10)+'px;text-align:center;padding:2px 1px;font-size:10px;border:.5px solid var(--border2);border-radius:4px;background:var(--surface);font-weight:'+(livId?'700':'400')+';color:'+(livId?'var(--accent)':'var(--text3)')+'">'+opzioni+'</select></th>';
   }).join('');
+  // Dati per la riga "Prezzo consigliato" (sola lettura) qui sotto — stessa logica/formula già usata
+  // nella pagina "Prezzo consigliato", calcolata una sola volta qui per tutto il periodo mostrato
+  // nel Listino, così non serve andare avanti e indietro tra le due pagine per confrontare i prezzi.
+  var revCfgLst = getRevenueConfig();
+  var lstDalRev = fmt(allDays[0]), lstAlRev = fmt(allDays[allDays.length-1]);
+  var lstFatturatoAttualeRev = DB.get('bookings').filter(function(b){return b.status!=='cancellata' && b.checkin<lstAlRev && b.checkout>lstDalRev;}).reduce(function(s,b){return s+(Number(b.totalPrice)||0);},0);
+  var lstObiettivoRev = Number(revCfgLst.fatturatoObiettivo)||0;
+  var lstGapPctRev = lstObiettivoRev>0 ? Math.max(0, Math.min(30, Math.round((lstObiettivoRev-lstFatturatoAttualeRev)/lstObiettivoRev*100))) : 0;
   var body='';
   var currentCat=null;
   var catConPrezziGiaResi={};
@@ -27908,6 +27922,28 @@ function renderListino() {
         }).join('');
         body+='<tr><td colspan="2" style="padding:2px 8px;background:var(--surface2);border-bottom:1px solid var(--border2);position:sticky;left:0;z-index:3;border-right:1px solid var(--border2);font-size:8px;color:var(--text3);text-transform:uppercase">🎚 Livello ↴</td>'+livCells+'</tr>';
       }
+
+      // Riga "Prezzo consigliato" (sola lettura) — stessa formula della pagina "Prezzo consigliato",
+      // per confrontare al volo il prezzo che hai impostato con quello suggerito, senza dover andare
+      // avanti e indietro tra le due pagine. Verde/rosso indicano se il suggerito è sopra/sotto il
+      // prezzo base di quella tipologia; passa il mouse per il dettaglio del calcolo.
+      (function(){
+        var repRoomPC = roomsTipo[0];
+        if (!repRoomPC) return;
+        var pcCells = allDays.map(function(d){
+          var ds=fmt(d);
+          var occPC=calcolaOccupazione(ds);
+          var spintaPC=(occPC>50)?lstGapPctRev:0;
+          var domandaPC=contaRicerchePerData(ds);
+          var calcPC=calcolaPrezzoConsigliato(repRoomPC, ds, revCfgLst, spintaPC, domandaPC);
+          if(!calcPC) return '<td style="padding:2px 1px;border-left:.5px solid var(--border);border-bottom:1px solid var(--border2);background:var(--surface2)"></td>';
+          var diffPC = calcPC.base>0 ? Math.round((calcPC.suggerito-calcPC.base)/calcPC.base*100) : 0;
+          var detailPC='Base '+fmtCurrency(calcPC.base)+' · Occ. '+calcPC.occ+'%'+(calcPC.weekend?' · Weekend +'+calcPC.weekendAdj+'%':'')+(calcPC.meteoAdj?' · Meteo '+(calcPC.meteoAdj>=0?'+':'')+calcPC.meteoAdj+'%':'');
+          return '<td style="padding:2px 1px;border-left:.5px solid var(--border);border-bottom:1px solid var(--border2);background:var(--surface2);text-align:center" title="'+detailPC.replace(/"/g,'&quot;')+'">'+
+            '<span style="font-size:10px;font-weight:700;color:'+(diffPC>0?'var(--green)':diffPC<0?'var(--red)':'var(--text3)')+'">'+fmtCurrency(calcPC.suggerito)+'</span></td>';
+        }).join('');
+        body+='<tr><td colspan="2" style="padding:2px 8px;background:var(--surface2);border-bottom:1px solid var(--border2);position:sticky;left:0;z-index:3;border-right:1px solid var(--border2);font-size:8px;color:var(--text3);text-transform:uppercase">💡 Prezzo consigliato ↴</td>'+pcCells+'</tr>';
+      })();
 
       // Riga "Camere libere" — conteggio reale (prenotazioni + blocchi singola camera + chiusura
       // generale), la stessa logica usata per mandare i dati a Hostex — utile per decidere il
