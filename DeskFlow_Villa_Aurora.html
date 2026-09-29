@@ -339,7 +339,7 @@ tr:hover td{background:var(--surface2)}
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
       <span id="utente-corrente-badge" style="display:none;font-size:10.5px;font-weight:700;color:var(--accent);margin-top:2px"></span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 29/09/2026 · 20:35</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 29/09/2026 · 20:42</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -26899,6 +26899,14 @@ function _ssResetRange() {
   _ssCaricaERendi();
 }
 
+// Imposta subito il periodo a "solo oggi", senza dover scrivere la data a mano nei campi Da/A.
+function _ssOggi() {
+  var t = today();
+  window._ssRangeDa = t;
+  window._ssRangeA = t;
+  _ssCaricaERendi();
+}
+
 function _ssEsportaExcel() {
   var visite = window._ssUltimeVisite || [];
   var periodo = _ssPeriodo();
@@ -27083,10 +27091,12 @@ function _ssRenderHTML(visite, periodo, ricerche) {
   }).join('');
 
   var rangeAttivo = !!(window._ssRangeDa && window._ssRangeA);
-  var periodoBtns = [7,30,90].map(function(g){
-    var active = !rangeAttivo && g === window._ssGiorni;
-    return '<button class="btn btn-sm'+(active?' btn-primary':'')+'" onclick="_ssCambiaPeriodo('+g+')">'+g+' giorni</button>';
-  }).join(' ');
+  var oggiAttivo = rangeAttivo && window._ssRangeDa===today() && window._ssRangeA===today();
+  var periodoBtns = '<button class="btn btn-sm'+(oggiAttivo?' btn-primary':'')+'" onclick="_ssOggi()">📅 Oggi</button> ' +
+    [7,30,90].map(function(g){
+      var active = !rangeAttivo && g === window._ssGiorni;
+      return '<button class="btn btn-sm'+(active?' btn-primary':'')+'" onclick="_ssCambiaPeriodo('+g+')">'+g+' giorni</button>';
+    }).join(' ');
 
   var etichettaPeriodo = rangeAttivo
     ? ('Dal '+fmtDate(periodo.da)+' al '+fmtDate(periodo.a))
