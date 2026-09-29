@@ -339,7 +339,7 @@ tr:hover td{background:var(--surface2)}
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
       <span id="utente-corrente-badge" style="display:none;font-size:10.5px;font-weight:700;color:var(--accent);margin-top:2px"></span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 29/09/2026 · 09:15</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 29/09/2026 · 14:30</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -32305,6 +32305,9 @@ async function doLogin() {
     await initSupabase();
     var banner = document.getElementById('supabase-connecting');
     if (banner) banner.remove();
+    var lblLogin = document.getElementById('prop-name');
+    var sLogin = DB.getObj('settings', {});
+    if (lblLogin && sLogin && sLogin.propertyName) lblLogin.textContent = sLogin.propertyName;
     showToast('🟢 Accesso effettuato — benvenuto/a');
     var logoutBtn = document.getElementById('btn-logout');
     if (logoutBtn) logoutBtn.style.display = 'flex';
@@ -32432,6 +32435,11 @@ document.addEventListener('DOMContentLoaded', async function() {
       var banner = document.getElementById('supabase-connecting');
       if (banner) banner.remove();
       if (ok) showToast('🟢 Connesso a Supabase — tutto il programma è condiviso in tempo reale');
+      // Ora che Supabase ha caricato le vere Impostazioni (nome struttura, ecc.), aggiorna l'etichetta
+      // che all'apertura pagina era stata scritta con i dati locali (spesso ancora vuoti/vecchi su un PC nuovo)
+      var lblAggiornata = document.getElementById('prop-name');
+      var sAggiornata = DB.getObj('settings', {});
+      if (lblAggiornata && sAggiornata && sAggiornata.propertyName) lblAggiornata.textContent = sAggiornata.propertyName;
       var logoutBtn2 = document.getElementById('btn-logout');
       if (logoutBtn2) logoutBtn2.style.display = 'flex';
       fixPrezziPrenotazioniEsistenti(); // opera sui dati appena caricati da Supabase
