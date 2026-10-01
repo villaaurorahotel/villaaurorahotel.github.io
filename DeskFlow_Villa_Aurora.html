@@ -339,7 +339,7 @@ tr:hover td{background:var(--surface2)}
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
       <span id="utente-corrente-badge" style="display:none;font-size:10.5px;font-weight:700;color:var(--accent);margin-top:2px"></span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 30/09/2026 · 12:20</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 01/10/2026 · 19:20</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -15790,6 +15790,130 @@ async function pyInviaMail(bookingId){
   }
 }
 
+// ===== Richiesta di pagamento via PayPal.me — TOTALE DI GRUPPO =====
+// Richiesto da Gian: la "Richiedi pagamento" esisteva solo per singola camera; serviva poterla
+// inviare per l'intero conto di gruppo (tutte le camere collegate), con un unico link per
+// l'importo totale, usando il referente del gruppo se impostato (altrimenti il primo ospite).
+function pyCalcolaTotaleGruppo(groupId){
+  var bookings = (DB.get('bookings')||[]).filter(function(b){ return b.groupId === groupId && b.status !== 'cancellata'; });
+  var totaleDovuto = bookings.reduce(function(s,b){
+    var taxInfo = calcTassaSoggiorno(b);
+    var extrasTotal = (b.extras||[]).reduce(function(s2,ex){ return s2+(Number(ex.totale)||0); },0);
+    return s + parseFloat(b.totalPrice||0) + taxInfo.tax + extrasTotal;
+  }, 0);
+  var caparraTotale = bookings.reduce(function(s,b){ return s+parseFloat(b.caparra||0); }, 0);
+  var daPagare = Math.max(0, totaleDovuto - caparraTotale);
+  return { bookings: bookings, totaleDovuto: totaleDovuto, caparraTotale: caparraTotale, daPagare: daPagare };
+}
+function pyApriRichiestaGruppo(groupId){
+  var s = DB.getObj('settings', {});
+  if (!s.paypalMeHandle) { showToast('Imposta prima il tuo nome utente PayPal.me in Impostazioni'); return; }
+  var calc = pyCalcolaTotaleGruppo(groupId);
+  if (!calc.bookings.length) { showToast('Nessuna prenotazione trovata per questo gruppo'); return; }
+  var info = gruppiInfoGet()[groupId] || {};
+  var primo = calc.bookings[0];
+  var guests = DB.get('guests') || [];
+  var g0 = primo.guestId ? guests.find(function(x){ return x.id===primo.guestId; }) : null;
+  var nomeRef = info.referenteNome || primo.guestName || '';
+  var tel = info.referenteTelefono || (g0 && g0.phone) || '';
+  var mail = info.referenteEmail || (g0 && g0.email) || '';
+  var importoIniziale = Math.round(calc.daPagare*100)/100;
+  var bookingFinto = Object.assign({}, primo, { guestName: nomeRef });
+  var testoIniziale = importoIniziale ? pyTestoRichiesta(bookingFinto, importoIniziale, '') : '';
+  window._pyGruppoContatti = { tel: tel, mail: mail };
+  showModal('Richiedi pagamento — Gruppo '+(info.nomeEvento || groupId),
+    '<div style="font-size:12.5px;color:var(--text3);margin-bottom:12px">Totale di tutte le '+calc.bookings.length+' camere del gruppo'+(calc.caparraTotale>0?' (già dedotta la caparra incassata di '+fmtCurrency(calc.caparraTotale)+')':'')+'.'+(!tel&&!mail?' ⚠ Nessun telefono/email trovato — imposta un referente da "✏️ Referente/Evento" nella pagina Gruppi, oppure invia dalla singola prenotazione.':'')+'</div>'+
+    '<div class="form-grid">'+
+      '<div class="form-group">'+
+        '<label>Importo da richiedere (€)</label>'+
+        '<input type="number" id="py-importo" min="0" step="0.01" value="'+(importoIniziale||'')+'" oninput="pyRigeneraTestoGruppo(\''+groupId.replace(/'/g,"\\'")+'\')">'+
+      '</div>'+
+      '<div class="form-group">'+
+        '<label>Nota (facoltativa — es. "saldo gruppo")</label>'+
+        '<input type="text" id="py-nota" oninput="pyRigeneraTestoGruppo(\''+groupId.replace(/'/g,"\\'")+'\')">'+
+      '</div>'+
+      '<div class="form-group full">'+
+        '<label>Link SumUp (facoltativo — crealo prima dalla tua app SumUp per l\'importo totale e incollalo qui)</label>'+
+        '<input type="text" id="py-sumup-link" placeholder="https://pay.sumup.com/..." oninput="pyRigeneraTestoGruppo(\''+groupId.replace(/'/g,"\\'")+'\')">'+
+      '</div>'+
+      '<div class="form-group full">'+
+        '<label>Messaggio che verrà inviato — puoi modificarlo liberamente prima di mandarlo</label>'+
+        '<textarea id="py-testo" rows="8" style="width:100%">'+(testoIniziale||'').replace(/</g,'&lt;')+'</textarea>'+
+        '<div style="font-size:11px;color:var(--text3);margin-top:3px">Se cambi importo, nota o link SumUp qui sopra, il testo viene rigenerato dal modello — eventuali modifiche manuali al testo vengono sovrascritte.</div>'+
+      '</div>'+
+    '</div>'+
+    '<div style="display:flex;gap:8px;margin-top:14px">'+
+      '<button class="btn" style="flex:1" '+(tel?'':'disabled')+' onclick="pyInviaWAGruppo(\''+groupId.replace(/'/g,"\\'")+'\')">💬 WhatsApp'+(tel?'':' (nessun telefono)')+'</button>'+
+      '<button class="btn" style="flex:1" '+(mail?'':'disabled')+' onclick="pyInviaMailGruppo(\''+groupId.replace(/'/g,"\\'")+'\')">✉️ Email'+(mail?'':' (nessuna email)')+'</button>'+
+    '</div>',
+    '<button class="btn" onclick="closeModal()">Annulla</button>'
+  );
+}
+function pyRigeneraTestoGruppo(groupId){
+  var importo = parseFloat(document.getElementById('py-importo')?.value);
+  var nota = (document.getElementById('py-nota')?.value || '').trim();
+  var sumupLink = (document.getElementById('py-sumup-link')?.value || '').trim();
+  var calc = pyCalcolaTotaleGruppo(groupId);
+  if (!calc.bookings.length) return;
+  var info = gruppiInfoGet()[groupId] || {};
+  var primo = calc.bookings[0];
+  var nomeRef = info.referenteNome || primo.guestName || '';
+  var bookingFinto = Object.assign({}, primo, { guestName: nomeRef });
+  var ta = document.getElementById('py-testo');
+  if (!ta) return;
+  ta.value = (importo && importo>0) ? pyTestoRichiesta(bookingFinto, importo, nota, sumupLink) : '';
+}
+function pySegnaRichiestaGruppo(groupId){
+  var bookings = DB.get('bookings') || [];
+  var changed = false;
+  bookings.forEach(function(b){ if (b.groupId === groupId) { b.pagamentoRichiesto = true; changed = true; } });
+  if (changed) DB.set('bookings', bookings);
+}
+function pyInviaWAGruppo(groupId){
+  var importo = pyLeggiImporto();
+  if (importo===null) return;
+  var testo = pyLeggiTesto();
+  if (testo===null) return;
+  var tel = (window._pyGruppoContatti && window._pyGruppoContatti.tel) || '';
+  if (!tel) { showToast('Telefono non disponibile'); return; }
+  tel = tel.replace(/[^\d+]/g,'');
+  window.open('https://api.whatsapp.com/send?phone='+encodeURIComponent(tel)+'&text='+encodeURIComponent(testo), '_blank');
+  pySegnaRichiestaGruppo(groupId);
+  closeModal();
+  showToast('✅ Richiesta di pagamento inviata');
+}
+async function pyInviaMailGruppo(groupId){
+  var importo = pyLeggiImporto();
+  if (importo===null) return;
+  var testo = pyLeggiTesto();
+  if (testo===null) return;
+  var mail = (window._pyGruppoContatti && window._pyGruppoContatti.mail) || '';
+  if (!mail) { showToast('Email non disponibile'); return; }
+  var s = DB.getObj('settings', {});
+  if (!s.supabaseUrl || !s.supabaseKey) { showToast('Configura prima Supabase in Impostazioni'); return; }
+  showToast('Invio in corso…');
+  try {
+    var res = await fetch(s.supabaseUrl.replace(/\/$/,'') + '/functions/v1/invio-ricevuta', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer '+s.supabaseKey, 'apikey': s.supabaseKey },
+      body: JSON.stringify({
+        smtpEmail: s.emailInvioPromemoria, smtpPassword: s.passwordInvioPromemoria,
+        to: mail, toName: groupId,
+        subject: 'Richiesta di pagamento — '+(s.propertyName||'Gruppo'),
+        message: testo,
+      })
+    });
+    var data = await res.json();
+    if (!data.ok) throw new Error(data.errore || 'invio non riuscito');
+    pySegnaRichiestaGruppo(groupId);
+    showToast('✅ Email inviata a '+mail);
+    closeModal();
+  } catch (err) {
+    console.error('Errore invio richiesta pagamento gruppo:', err);
+    showToast('⚠ Invio non riuscito — controlla la configurazione email in Impostazioni');
+  }
+}
+
 function renderRecensioni(){
   var html = '<div class="page-header"><div><div class="page-title">⭐ Recensioni</div>'+
     '<div class="page-subtitle">Lette e rispondibili direttamente da qui, tramite Hostex</div></div>'+
@@ -18424,7 +18548,8 @@ function apriGruppoCollegato(groupId) {
     }).join('')
     +'</tbody></table></div>',
     '<button class="btn" onclick="closeModal()">Chiudi</button>'
-    +'<button class="btn" style="font-size:13px" onclick="closeModal(); apriContoGruppo(\''+groupId.replace(/'/g,"\\'")+'\')">🧾 Conto unico di gruppo</button>',
+    +'<button class="btn" style="font-size:13px" onclick="closeModal(); apriContoGruppo(\''+groupId.replace(/'/g,"\\'")+'\')">🧾 Conto unico di gruppo</button>'
+    +'<button class="btn" style="font-size:13px;background:#0070ba;color:#fff;border-color:#0070ba" onclick="closeModal(); pyApriRichiestaGruppo(\''+groupId.replace(/'/g,"\\'")+'\')">💳 Richiedi pagamento (gruppo)</button>',
     '760px'
   );
 }
