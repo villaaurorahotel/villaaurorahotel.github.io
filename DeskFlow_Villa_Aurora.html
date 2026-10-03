@@ -339,7 +339,7 @@ tr:hover td{background:var(--surface2)}
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
       <span id="utente-corrente-badge" style="display:none;font-size:10.5px;font-weight:700;color:var(--accent);margin-top:2px"></span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 01/10/2026 · 19:20</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 03/10/2026 · 11:25</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -33825,7 +33825,7 @@ function apriContoGruppo(groupId) {
         '</div>'+
         '<div class="form-grid">'+
           '<div class="form-group full"><label>Intestatario (ragione sociale o nome e cognome)</label>'+
-            '<input type="text" id="fatt-intestatario" value="'+(bookings[0].fattura?.intestatario||bookings[0].guestName||'')+'" placeholder="Rossi S.r.l. oppure Mario Rossi"></div>'+
+            '<input type="text" id="fatt-intestatario" value="'+(bookings[0].fattura?.intestatario||(gruppiInfoGet()[groupId]||{}).referenteNome||bookings[0].guestName||'')+'" placeholder="Rossi S.r.l. oppure Mario Rossi"></div>'+
           '<div class="form-group full"><label>Indirizzo</label>'+
             '<input type="text" id="fatt-indirizzo" value="'+(bookings[0].fattura?.indirizzo||'')+'" placeholder="Via Roma 1"></div>'+
           '<div class="form-group"><label>Città</label>'+
@@ -34037,7 +34037,7 @@ function costruisciContoGruppoHTML(groupId) {
   const pagatoGenerale = bookings.reduce((s,b) => s + (b.pagamenti||[]).reduce((s2,p)=>s2+(Number(p.importo)||0),0), 0);
   const rimanenzaGenerale = Math.max(0, totaleGenerale - caparraGenerale - pagatoGenerale);
   const corrTxGruppo = (typeof corrState !== 'undefined' && corrState && corrState.transactions) ? corrState.transactions.find(t => t.groupRef === groupId) : null;
-  const nomeClientePrincipale = (bookings[0].tipoDocumentoConto==='F' && bookings[0].fattura?.intestatario) || bookings[0].guestName;
+  const nomeClientePrincipale = (bookings[0].tipoDocumentoConto==='F' && bookings[0].fattura?.intestatario) || (gruppiInfoGet()[groupId]||{}).referenteNome || bookings[0].guestName;
   const content = '<div class="sheet">'+
     '<div class="head">'+
       '<h1>'+(cfg.propertyName||'')+'</h1>'+
@@ -34063,36 +34063,39 @@ function stampaContoGruppo(groupId) {
   const r = costruisciContoGruppoHTML(groupId);
   if (!r) { showToast('Nessuna prenotazione trovata per questo gruppo'); return; }
   const content = r.content;
-  const win = window.open('','_blank','width=1000,height=700');
+  const win = window.open('','_blank','width=900,height=700');
+  // BUG TROVATO E CORRETTO ("la ricevuta di gruppo non è completa sul foglio"): il vecchio layout
+  // stampava SEMPRE 2 copie affiancate dentro un riquadro di altezza fissa (200mm) con
+  // "overflow:hidden" — con gruppi di poche camere stava comodo, ma con gruppi grandi (es. 9-10
+  // camere) il contenuto superava l'altezza disponibile e la parte in eccesso veniva tagliata via
+  // invece di proseguire su un foglio successivo. Ora si stampa una sola copia a piena pagina, con
+  // flusso naturale: se il contenuto è lungo, prosegue automaticamente sui fogli successivi.
   var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Conto unico — '+groupId+'</title>' +
     '<style>' +
-    '@page{size:A4 landscape;margin:5mm}' +
+    '@page{size:A4;margin:14mm}' +
     '*{box-sizing:border-box}' +
     'html,body{margin:0;padding:0}' +
-    '.sheet2up{display:flex;width:287mm;height:200mm}' +
-    '.copy{width:148mm;padding:12mm 10mm;font-family:Arial,sans-serif;color:#333;font-size:13px;overflow:hidden}' +
-    '.copy.second{border-left:1px dashed #bbb}' +
-    'h1{font-size:17px;margin:0}' +
-    '.head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:4px}' +
+    'body{font-family:Arial,sans-serif;color:#333;font-size:13px}' +
+    '.sheet{max-width:100%}' +
+    'h1{font-size:19px;margin:0}' +
+    '.head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px}' +
     '.doc-num-box{text-align:right;flex-shrink:0}' +
     '.doc-title{font-size:15px;font-weight:800;letter-spacing:1px;margin:0 0 2px;display:flex;align-items:center;justify-content:flex-end;gap:10px}' +
     '.doc-num{font-size:12px;font-weight:700;color:#444}' +
     '.stamp{font-size:11px;font-weight:800;letter-spacing:.5px;border:2px solid;border-radius:5px;padding:2px 8px;transform:rotate(-4deg)}' +
     '.stamp.ok{color:#1a7a3c;border-color:#1a7a3c}' +
     '.stamp.no{color:#b5482f;border-color:#b5482f}' +
-    '.fatt-box{background:#f7f9fc;border:1px solid #dde3ec;border-radius:6px;padding:7px 10px;margin:6px 0 10px}' +
+    '.fatt-box{background:#f7f9fc;border:1px solid #dde3ec;border-radius:6px;padding:8px 12px;margin:8px 0 12px}' +
     '.fatt-lbl{font-size:9.5px;color:#888;text-transform:uppercase;letter-spacing:.5px}' +
-    '.fatt-name{font-size:13.5px;font-weight:700;margin:1px 0}' +
-    '.sub{font-size:10.5px;color:#999;margin-top:-4px;padding-bottom:4px;border-bottom:1px solid #eee}' +
-    '.section-title{font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin:10px 0 4px}' +
-    '.gruppo-camera-box{border:1px solid #eee;border-radius:6px;padding:6px 8px;margin-bottom:6px}' +
-    '.gruppo-camera-nome{font-weight:700;font-size:12.5px;margin-bottom:2px}' +
-    '.row.total{display:flex;justify-content:space-between;font-size:15px;font-weight:bold;color:#1a73e8}' +
+    '.fatt-name{font-size:14px;font-weight:700;margin:1px 0}' +
+    '.sub{font-size:11px;color:#999;margin-top:-4px;padding-bottom:6px;border-bottom:1px solid #eee}' +
+    '.section-title{font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin:12px 0 5px}' +
+    '.gruppo-camera-box{border:1px solid #eee;border-radius:6px;padding:7px 10px;margin-bottom:7px;break-inside:avoid;page-break-inside:avoid}' +
+    '.gruppo-camera-nome{font-weight:700;font-size:13px;margin-bottom:2px}' +
+    '.row{display:flex;justify-content:space-between;padding:4px 0}' +
+    '.row.total{font-size:15px;font-weight:bold;color:#1a73e8;border-top:1.5px solid #1a73e8;margin-top:8px;padding-top:6px}' +
     '</style></head><body>' +
-    '<div class="sheet2up">' +
-      '<div class="copy">'+content+'</div>' +
-      '<div class="copy second">'+content+'</div>' +
-    '</div>' +
+    content +
     '</body></html>';
   win.document.write(html);
   win.document.close();
