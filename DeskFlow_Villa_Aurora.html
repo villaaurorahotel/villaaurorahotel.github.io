@@ -339,7 +339,7 @@ tr:hover td{background:var(--surface2)}
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
       <span id="utente-corrente-badge" style="display:none;font-size:10.5px;font-weight:700;color:var(--accent);margin-top:2px"></span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 03/10/2026 · 11:25</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 09/10/2026 · 20:10</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -14359,7 +14359,7 @@ function renderDashboard() {
             return '<div style="text-align:center;min-width:58px">' +
               '<div style="font-size:12px;color:var(--text3);margin-bottom:4px;text-transform:capitalize">'+lbl+'</div>' +
               (m
-                ? '<div style="font-size:22px">'+(METEO_ETICHETTE[m.code]||'—').split(' ')[0]+'</div><div style="font-size:15px;font-weight:700">'+Math.round(m.temp)+'°C</div><div style="font-size:10.5px;color:var(--text3);white-space:nowrap">'+(METEO_ETICHETTE[m.code]||'—').split(' ').slice(1).join(' ')+'</div>'
+                ? '<div style="width:42px;height:42px;margin:0 auto 2px">'+meteoIconaSVG(m.code)+'</div><div style="font-size:15px;font-weight:700">'+Math.round(m.temp)+'°C</div><div style="font-size:10.5px;color:var(--text3);white-space:nowrap">'+(METEO_ETICHETTE[m.code]||'—').split(' ').slice(1).join(' ')+'</div>'
                 : '<div style="font-size:12px;color:var(--text3)">—</div>')+
             '</div>';
           }).join('') +
@@ -30520,6 +30520,38 @@ var METEO_ETICHETTE = {
   85:'🌨 Rovesci di neve',86:'🌨 Rovesci di neve forti',
   95:'⛈ Temporale',96:'⛈ Temporale con grandine',99:'⛈ Temporale con grandine forte'
 };
+// Icone meteo disegnate (non emoji): tutte della stessa dimensione/stile, a colori, così nella
+// card Meteo della Dashboard non si vedono più simboli di "peso" visivo diverso tra loro (es. ☀️
+// piccola accanto a ⛈ più marcata). meteoCategoriaPerCodice() raggruppa i tanti codici Open-Meteo
+// in poche categorie disegnate; meteoIconaSVG() restituisce l'SVG pronto da inserire in una div
+// di dimensione fissa (width/height al 100% dell'SVG, così basta impostare la dimensione sul
+// contenitore esterno).
+function meteoCategoriaPerCodice(code){
+  if(code===0) return 'sole';
+  if(code===1) return 'pocoNuvoloso';
+  if(code===2) return 'parzNuvoloso';
+  if(code===3) return 'nuvoloso';
+  if(code===45||code===48) return 'nebbia';
+  if([51,53,55,56,57,61,63,65,66,67].indexOf(code)>=0) return 'pioggia';
+  if([71,73,75,77,85,86].indexOf(code)>=0) return 'neve';
+  if([80,81,82].indexOf(code)>=0) return 'rovesci';
+  if([95,96,99].indexOf(code)>=0) return 'temporale';
+  return 'nuvoloso';
+}
+var METEO_ICONE_SVG = {
+  sole: '<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><g stroke="#f59e0b" stroke-width="4" stroke-linecap="round"><line x1="32" y1="4" x2="32" y2="14"/><line x1="32" y1="50" x2="32" y2="60"/><line x1="4" y1="32" x2="14" y2="32"/><line x1="50" y1="32" x2="60" y2="32"/><line x1="12" y1="12" x2="19" y2="19"/><line x1="45" y1="45" x2="52" y2="52"/><line x1="12" y1="52" x2="19" y2="45"/><line x1="45" y1="19" x2="52" y2="12"/></g><circle cx="32" cy="32" r="14" fill="#fbbf24"/></svg>',
+  pocoNuvoloso: '<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><circle cx="26" cy="24" r="13" fill="#fbbf24"/><g stroke="#f59e0b" stroke-width="3" stroke-linecap="round"><line x1="26" y1="4" x2="26" y2="9"/><line x1="8" y1="24" x2="13" y2="24"/><line x1="12" y1="10" x2="15.5" y2="13.5"/></g><path d="M20 46a10 10 0 0 1 9-15 12 12 0 0 1 23 4 9 9 0 0 1-2 18H24a8 8 0 0 1-4-7z" fill="#e5e7eb"/></svg>',
+  parzNuvoloso: '<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="22" r="11" fill="#fbbf24"/><path d="M14 48a12 12 0 0 1 10-18 14 14 0 0 1 27 5 10 10 0 0 1-3 21H21a9 9 0 0 1-7-8z" fill="#d1d5db"/></svg>',
+  nuvoloso: '<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><path d="M12 46a13 13 0 0 1 11-19 15 15 0 0 1 29 5 11 11 0 0 1-3 24H20a10 10 0 0 1-8-10z" fill="#9ca3af"/></svg>',
+  nebbia: '<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><path d="M14 30a11 11 0 0 1 10-15 13 13 0 0 1 25 4 9 9 0 0 1-2 20H22a9 9 0 0 1-8-9z" fill="#cbd5e1"/><g stroke="#94a3b8" stroke-width="4" stroke-linecap="round"><line x1="8" y1="46" x2="56" y2="46"/><line x1="8" y1="54" x2="56" y2="54"/></g></svg>',
+  pioggia: '<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><path d="M12 34a12 12 0 0 1 10-17 14 14 0 0 1 27 5 10 10 0 0 1-3 22H20a9 9 0 0 1-8-10z" fill="#93c5fd"/><g fill="#2563eb"><path d="M20 48c0 3-2 5-4 5s-4-2-4-5c0-3 4-9 4-9s4 6 4 9z"/><path d="M36 50c0 3-2 5-4 5s-4-2-4-5c0-3 4-9 4-9s4 6 4 9z"/><path d="M52 48c0 3-2 5-4 5s-4-2-4-5c0-3 4-9 4-9s4 6 4 9z"/></g></svg>',
+  neve: '<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><path d="M12 32a12 12 0 0 1 10-17 14 14 0 0 1 27 5 10 10 0 0 1-3 20H20a9 9 0 0 1-8-8z" fill="#bfdbfe"/><g fill="#38bdf8"><circle cx="18" cy="50" r="3"/><circle cx="32" cy="54" r="3"/><circle cx="46" cy="50" r="3"/></g></svg>',
+  rovesci: '<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><circle cx="22" cy="20" r="9" fill="#fbbf24"/><path d="M14 36a11 11 0 0 1 9-15 13 13 0 0 1 25 4 9 9 0 0 1-2 19H22a9 9 0 0 1-8-8z" fill="#cbd5e1"/><g fill="#2563eb"><path d="M22 48c0 2.5-1.8 4.5-3.5 4.5S15 50.5 15 48c0-2.5 3.5-8 3.5-8s3.5 5.5 3.5 8z"/><path d="M40 50c0 2.5-1.8 4.5-3.5 4.5S33 52.5 33 50c0-2.5 3.5-8 3.5-8s3.5 5.5 3.5 8z"/></g></svg>',
+  temporale: '<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><path d="M12 32a12 12 0 0 1 10-17 14 14 0 0 1 27 5 10 10 0 0 1-3 20H20a9 9 0 0 1-8-8z" fill="#64748b"/><path d="M34 34 24 50h8l-4 12 16-20h-9l5-8z" fill="#facc15"/></svg>'
+};
+function meteoIconaSVG(code){
+  return METEO_ICONE_SVG[meteoCategoriaPerCodice(code)] || METEO_ICONE_SVG.nuvoloso;
+}
 // Posizione della struttura: presa da Impostazioni → Struttura (s.lat/s.lon), così se un giorno
 // cambia struttura basta aggiornarla lì una volta sola. Se non è ancora stata impostata, si usano
 // le coordinate di partenza salvate a suo tempo in Prezzo consigliato come ripiego.
@@ -30580,7 +30612,7 @@ function apriMeteoCompleto(){
     var dLabel=parseLD(ds).toLocaleDateString('it-IT',{weekday:'short',day:'numeric',month:'short'});
     return '<tr>'+
       '<td>'+dLabel+'</td>'+
-      '<td>'+(METEO_ETICHETTE[m.code]||'—')+'</td>'+
+      '<td><span style="display:inline-block;width:20px;height:20px;vertical-align:middle;margin-right:5px">'+meteoIconaSVG(m.code)+'</span><span style="vertical-align:middle">'+(METEO_ETICHETTE[m.code]||'—').replace(/^\S+\s*/,'')+'</span></td>'+
       '<td style="text-align:right">'+Math.round(m.temp)+'°C</td>'+
       '<td style="text-align:right">'+(m.pioggia!=null?m.pioggia+' mm':'—')+'</td>'+
       '</tr>';
