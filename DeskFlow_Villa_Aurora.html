@@ -36099,7 +36099,7 @@ function corrAttachRegistroHandlers(){
   alInput.onchange = ()=>{ corrRegAl = alInput.value; if(corrRegDal && corrRegAl) corrRender(); };
   const resetBtn = document.getElementById('regRangeReset');
   if(resetBtn) resetBtn.onclick = ()=>{ corrRegDal=''; corrRegAl=''; corrRender(); };
-  document.getElementById('exportRegXlsx').onclick = ()=> (corrRegDal && corrRegAl) ? corrExportRangeXlsx(corrRegDal, corrRegAl) : corrExportMonthXlsx(monthInput.value);
+  document.getElementById('exportRegXlsx').onclick = ()=> corrExportPrimaNotaFmt(corrRegDal, corrRegAl, monthInput.value);
   document.getElementById('exportRegPdf').onclick = ()=> corrEsportaRegistroPDF(corrRegDal, corrRegAl, monthInput.value);
   document.querySelectorAll('[data-edit]').forEach(b=> b.onclick = ()=>{ corrEditingId=b.dataset.edit; corrTab='nuovo'; corrRender(); });
   document.querySelectorAll('[data-del]').forEach(b=> b.onclick = async ()=>{
@@ -36118,7 +36118,7 @@ function corrAttachRegistroHandlers(){
 function corrAttachCorrispettiviHandlers(){
   const monthInput = document.getElementById('corrMonth');
   monthInput.onchange = ()=>{ corrSelectedDay = monthInput.value + '-01'; corrRender(); };
-  document.getElementById('exportXlsx').onclick = ()=> corrExportMonthXlsx(monthInput.value);
+  document.getElementById('exportXlsx').onclick = ()=> corrExportCorrispettiviFmt(monthInput.value);
   document.getElementById('exportPdf').onclick = ()=> corrEsportaCorrispettiviMensiliPDF(monthInput.value);
 }
 
@@ -36332,6 +36332,232 @@ function corrExportMonthXlsx(mk){
   XLSX.utils.book_append_sheet(wb, ws3, 'Chiusure cassa');
 
   XLSX.writeFile(wb, `corrispettivi_${mk}.xlsx`);
+}
+
+// ---------- Export Excel FORMATTATO (stessa impaginazione dei file Corrispettivi / Prima nota fatti a mano) ----------
+// La libreria SheetJS gratuita non salva bordi, celle unite, formato € né impostazioni di stampa:
+// per questi due export il file .xlsx viene quindi costruito direttamente qui sotto, già pronto da stampare.
+const CORR_MESI_UP = ['GENNAIO','FEBBRAIO','MARZO','APRILE','MAGGIO','GIUGNO','LUGLIO','AGOSTO','SETTEMBRE','OTTOBRE','NOVEMBRE','DICEMBRE'];
+
+function corrXlsxEsc(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'');
+}
+function corrXlsxCol(c){ let s=''; c++; while(c>0){ const m=(c-1)%26; s=String.fromCharCode(65+m)+s; c=Math.floor((c-1)/26); } return s; }
+function corrXlsxDateSerial(iso){ const [y,m,d]=iso.split('-').map(Number); return Math.round((Date.UTC(y,m-1,d)-Date.UTC(1899,11,30))/86400000); }
+function corrXlsxR2(v){ return Math.round((Number(v)||0)*100)/100; }
+
+// Piccolo "costruttore" di fogli: celle con stile (font, bordi, allineamento, formato numero)
+function corrXlsxBook(){
+  const fonts=[], borders=[], xfs=[], fontKey={}, borderKey={}, xfKey={};
+  const fontId = f=>{ const k=JSON.stringify(f); if(fontKey[k]===undefined){ fontKey[k]=fonts.length; fonts.push(f);} return fontKey[k]; };
+  const borderId = b=>{ const k=JSON.stringify(b); if(borderKey[k]===undefined){ borderKey[k]=borders.length; borders.push(b);} return borderKey[k]; };
+  fontId({sz:11}); borderId({});
+  const NUMFMT = {date:164, eur:165, int:1};
+  const style = (o)=>{
+    o=o||{};
+    const xf = {font:fontId({sz:o.sz||11, b:!!o.bold}), border:borderId(o.border||{}), fmt:o.fmt?NUMFMT[o.fmt]:0, h:o.h||'', v:o.v||'center'};
+    const k=JSON.stringify(xf); if(xfKey[k]===undefined){ xfKey[k]=xfs.length; xfs.push(xf); } return xfKey[k];
+  };
+  style({v:'bottom'}); // stile 0 = normale
+  return {sheets:[], style, fonts, borders, xfs};
+}
+function corrXlsxStylesXml(book){
+  const side=(name,s)=> s ? `<${name} style="${s[0]}"><color rgb="FF${s[1]}"/></${name}>` : `<${name}/>`;
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+   +'<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+   +'<numFmts count="2"><numFmt numFmtId="164" formatCode="dd/mm/yyyy"/><numFmt numFmtId="165" formatCode="&quot;€&quot;\\ #,##0.00"/></numFmts>'
+   +`<fonts count="${book.fonts.length}">`+book.fonts.map(f=>`<font>${f.b?'<b/>':''}<sz val="${f.sz}"/><color theme="1"/><name val="Calibri"/><family val="2"/><scheme val="minor"/></font>`).join('')+'</fonts>'
+   +'<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>'
+   +`<borders count="${book.borders.length}">`+book.borders.map(b=>'<border>'+side('left',b.l)+side('right',b.r)+side('top',b.t)+side('bottom',b.b)+'<diagonal/></border>').join('')+'</borders>'
+   +'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+   +`<cellXfs count="${book.xfs.length}">`+book.xfs.map(x=>`<xf numFmtId="${x.fmt}" fontId="${x.font}" fillId="0" borderId="${x.border}" xfId="0"${x.fmt?' applyNumberFormat="1"':''} applyFont="1" applyBorder="1" applyAlignment="1"><alignment${x.h?` horizontal="${x.h}"`:''} vertical="${x.v}"/></xf>`).join('')+'</cellXfs>'
+   +'<cellStyles count="1"><cellStyle name="Normale" xfId="0" builtinId="0"/></cellStyles>'
+   +'</styleSheet>';
+}
+// sheet = {name, cols:[larghezze], rows:{r:{c:{v,t,s}}}, merges:['A1:D1'], breaks:[riga], heights:{r:h}}
+function corrXlsxSheetXml(sh){
+  const rowNums = Object.keys(sh.rows).map(Number).sort((a,b)=>a-b);
+  let maxC=0; rowNums.forEach(r=>Object.keys(sh.rows[r]).forEach(c=>{ maxC=Math.max(maxC,Number(c)); }));
+  const lastR = rowNums.length ? rowNums[rowNums.length-1] : 0;
+  let x = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+   +'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+   +'<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>'
+   +`<dimension ref="A1:${corrXlsxCol(maxC)}${lastR+1}"/>`
+   +'<sheetViews><sheetView workbookViewId="0" zoomScale="100"/></sheetViews>'
+   +'<sheetFormatPr defaultRowHeight="15"/>'
+   +'<cols>'+sh.cols.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('')+'</cols>'
+   +'<sheetData>';
+  rowNums.forEach(r=>{
+    const h = sh.heights && sh.heights[r];
+    x += `<row r="${r+1}"${h?` ht="${h}" customHeight="1"`:''}>`;
+    Object.keys(sh.rows[r]).map(Number).sort((a,b)=>a-b).forEach(c=>{
+      const cell = sh.rows[r][c]; const ref = corrXlsxCol(c)+(r+1);
+      if(cell.v===null || cell.v===undefined || cell.v===''){ x += `<c r="${ref}" s="${cell.s||0}"/>`; }
+      else if(typeof cell.v==='number'){ x += `<c r="${ref}" s="${cell.s||0}"><v>${cell.v}</v></c>`; }
+      else { x += `<c r="${ref}" s="${cell.s||0}" t="inlineStr"><is><t xml:space="preserve">${corrXlsxEsc(cell.v)}</t></is></c>`; }
+    });
+    x += '</row>';
+  });
+  x += '</sheetData>';
+  if(sh.merges && sh.merges.length) x += `<mergeCells count="${sh.merges.length}">`+sh.merges.map(m=>`<mergeCell ref="${m}"/>`).join('')+'</mergeCells>';
+  x += '<printOptions horizontalCentered="1"/>'
+     + '<pageMargins left="0.25" right="0.25" top="0.5" bottom="0.5" header="0.3" footer="0.3"/>'
+     + '<pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/>';
+  if(sh.breaks && sh.breaks.length) x += `<rowBreaks count="${sh.breaks.length}" manualBreakCount="${sh.breaks.length}">`+sh.breaks.map(b=>`<brk id="${b}" max="16383" man="1"/>`).join('')+'</rowBreaks>';
+  return x + '</worksheet>';
+}
+// ZIP senza compressione (sufficiente per un .xlsx, nessuna libreria esterna: funziona anche offline)
+function corrZipStore(files){
+  const enc = new TextEncoder();
+  const crcT = corrZipStore._t || (corrZipStore._t = (()=>{ const t=new Uint32Array(256); for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c = (c&1)?(0xEDB88320^(c>>>1)):(c>>>1); t[n]=c>>>0; } return t; })());
+  const crc32 = d=>{ let c=0xFFFFFFFF; for(let i=0;i<d.length;i++) c = crcT[(c^d[i])&0xFF]^(c>>>8); return (c^0xFFFFFFFF)>>>0; };
+  const parts=[], central=[]; let offset=0;
+  files.forEach(f=>{
+    const name=enc.encode(f.name), data=enc.encode(f.data), crc=crc32(data);
+    const lh=new DataView(new ArrayBuffer(30));
+    lh.setUint32(0,0x04034b50,true); lh.setUint16(4,20,true); lh.setUint16(6,0x0800,true); lh.setUint16(8,0,true);
+    lh.setUint16(10,0,true); lh.setUint16(12,0x21,true); lh.setUint32(14,crc,true); lh.setUint32(18,data.length,true); lh.setUint32(22,data.length,true);
+    lh.setUint16(26,name.length,true); lh.setUint16(28,0,true);
+    parts.push(new Uint8Array(lh.buffer), name, data);
+    const ch=new DataView(new ArrayBuffer(46));
+    ch.setUint32(0,0x02014b50,true); ch.setUint16(4,20,true); ch.setUint16(6,20,true); ch.setUint16(8,0x0800,true); ch.setUint16(10,0,true);
+    ch.setUint16(12,0,true); ch.setUint16(14,0x21,true); ch.setUint32(16,crc,true); ch.setUint32(20,data.length,true); ch.setUint32(24,data.length,true);
+    ch.setUint16(28,name.length,true); ch.setUint32(42,offset,true);
+    central.push(new Uint8Array(ch.buffer), name);
+    offset += 30+name.length+data.length;
+  });
+  const cSize = central.reduce((a,p)=>a+p.length,0);
+  const end=new DataView(new ArrayBuffer(22));
+  end.setUint32(0,0x06054b50,true); end.setUint16(8,files.length,true); end.setUint16(10,files.length,true);
+  end.setUint32(12,cSize,true); end.setUint32(16,offset,true);
+  return new Blob([...parts, ...central, new Uint8Array(end.buffer)], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+function corrXlsxBuildBlob(book){
+  const sheetsXml = book.sheets.map((s,i)=>`<sheet name="${corrXlsxEsc(s.name)}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join('');
+  const files = [
+    {name:'[Content_Types].xml', data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+      + book.sheets.map((s,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('') + '</Types>'},
+    {name:'_rels/.rels', data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'},
+    {name:'xl/workbook.xml', data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView/></bookViews><sheets>'+sheetsXml+'</sheets></workbook>'},
+    {name:'xl/_rels/workbook.xml.rels', data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+      + book.sheets.map((s,i)=>`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join('')
+      + `<Relationship Id="rId${book.sheets.length+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`},
+    {name:'xl/styles.xml', data:corrXlsxStylesXml(book)}
+  ];
+  book.sheets.forEach((s,i)=>files.push({name:`xl/worksheets/sheet${i+1}.xml`, data:corrXlsxSheetXml(s)}));
+  return corrZipStore(files);
+}
+function corrXlsxDownload(book, filename){
+  const blob = corrXlsxBuildBlob(book);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download=filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 1500);
+}
+function corrXlsxFileBase(){ return String(corrState.hotelName||'Struttura').toUpperCase().replace(/[\\/:*?"<>|]+/g,' ').replace(/\s+/g,' ').trim(); }
+
+// Bordi: nero per righe e bordo esterno/gruppi, grigio chiaro per le righe verticali interne ai gruppi
+const CORR_BK = ['thin','000000'], CORR_GR = ['thin','BFBFBF'], CORR_MED = ['medium','000000'];
+
+// ===== CORRISPETTIVI MENSILI (Scontrini + Fatture, un giorno per riga) =====
+function corrExportCorrispettiviFmt(mk){
+  const book = corrXlsxBook(); const S = book.style;
+  const sh = {name:'Corrispettivi', cols:[12.7].concat(Array(12).fill(10.7)).concat([9.3,11.7]), rows:{}, merges:[], breaks:[], heights:{}};
+  const set=(r,c,v,s)=>{ (sh.rows[r]=sh.rows[r]||{})[c]={v,s}; };
+  // bordo di una cella della tabella (colonne 0..14): separatori di gruppo neri, interni grigi
+  const groupStart = c=> c===1||c===5||c===9||c===13||c===14;
+  const brd = (c, extra)=>Object.assign({ l: groupStart(c)||c===0 ? CORR_BK : CORR_GR, r: (c===0||c===4||c===8||c===12||c===13||c===14) ? CORR_BK : CORR_GR, t:CORR_BK, b:CORR_BK }, extra||{});
+  const sTitle = S({h:'left', v:'bottom'});
+  const sHead  = c=>S({h:'center', border:brd(c)});
+  const sDate  = S({fmt:'date', h:'left', border:brd(0)});
+  const sTxt   = S({h:'left', border:brd(0)});
+  const sEur   = c=>S({fmt:'eur', h:'right', border:brd(c)});
+  const sSmall = S({sz:7, h:'left', border:brd(0)});
+
+  set(0,0,`${corrState.hotelName} - Corrispettivi ${mk}`, sTitle);
+  let r = 2;
+  const scontrini = corrBuildMonthMatrix(mk,'S');
+  const fatture = corrBuildMonthMatrix(mk,'F');
+  const money = v=>{ const x=corrXlsxR2(v); return x===0 ? '' : x; };
+  const section = (title, data)=>{
+    set(r,0,title,sTitle); r++;
+    // riga intestazione gruppi
+    set(r,0,'Giorno',sTitle);
+    [['Soggiorno',1],['Tassa soggiorno',5],['Extra',9]].forEach(([lbl,c0])=>{
+      for(let c=c0;c<c0+4;c++) set(r,c,c===c0?lbl:'',sHead(c));
+      sh.merges.push(`${corrXlsxCol(c0)}${r+1}:${corrXlsxCol(c0+3)}${r+1}`);
+    });
+    set(r,13,'Sospesi',sHead(13)); set(r,14,'Totale',sHead(14)); r++;
+    // riga metodi di pagamento
+    for(let c=1;c<=12;c++) set(r,c,CORR_METHODS[(c-1)%4].label,sHead(c));
+    set(r,13,'',sHead(13)); set(r,14,'',sHead(14)); r++;
+    data.rows.forEach(row=>{
+      set(r,0,corrXlsxDateSerial(row.iso),sDate);
+      let c=1; CORR_CATS.forEach(cat=>CORR_METHODS.forEach(m=>{ set(r,c,money(row.agg[cat.key][m.key]),sEur(c)); c++; }));
+      set(r,13,money(row.agg.sospesi),sEur(13)); set(r,14,money(row.tot),sEur(14)); r++;
+    });
+    set(r,0,'Totale',sTxt);
+    let c=1; CORR_CATS.forEach(cat=>CORR_METHODS.forEach(m=>{ set(r,c,money(data.totals[cat.key][m.key]),sEur(c)); c++; }));
+    set(r,13,money(data.totals.sospesi),sEur(13)); set(r,14,money(data.totals.tot),sEur(14)); r++;
+  };
+  section('SCONTRINI', scontrini);
+  r++;                       // riga vuota
+  sh.breaks.push(r);         // le FATTURE iniziano su una nuova pagina, come nel file originale
+  section('FATTURE', fatture);
+  for(let c=0;c<=14;c++) set(r,c,'',c===0?sTxt:sEur(c)); r++;   // riga vuota bordata
+  set(r,0,'Totale fatturato mese',sSmall);
+  for(let c=1;c<=13;c++) set(r,c,'',sEur(c));
+  set(r,14,corrXlsxR2(scontrini.totals.tot+fatture.totals.tot),sEur(14));
+
+  book.sheets.push(sh);
+  const [y,m] = mk.split('-');
+  corrXlsxDownload(book, `${corrXlsxFileBase()} CORRISPETTIVI ${CORR_MESI_UP[parseInt(m,10)-1]} ${y}.xlsx`);
+}
+
+// ===== PRIMA NOTA (un movimento per riga) — mese oppure intervallo Dal/Al =====
+function corrExportPrimaNotaFmt(dal, al, mk){
+  const usaRange = !!(dal && al);
+  const list = corrState.transactions
+    .filter(t => usaRange ? (t.date>=dal && t.date<=al) : corrMonthKey(t.date)===mk)
+    .sort((a,b)=> a.date===b.date ? (Number(a.numero)||0)-(Number(b.numero)||0) : a.date.localeCompare(b.date));
+  if(!list.length){ alert('Nessun movimento nel periodo selezionato.'); return; }
+  const book = corrXlsxBook(); const S = book.style;
+  const sh = {name:'Prima nota', cols:[11,9.6,7.3].concat(Array(12).fill(10)).concat([8.4,11.7,18]), rows:{}, merges:[], breaks:[], heights:{}};
+  const set=(r,c,v,s)=>{ (sh.rows[r]=sh.rows[r]||{})[c]={v,s}; };
+  // colonne: 0 Data,1 Tipo,2 Numero, 3-6 Soggiorno, 7-10 Tassa, 11-14 Extra, 15 Sospesi, 16 Totale, 17 Note
+  const leftThick = c=> c===3||c===7||c===11||c===15;
+  const brd = (c,last)=>({ l: leftThick(c) ? CORR_MED : (c<=3||c>=15 ? CORR_BK : CORR_GR),
+                           r: leftThick(c+1) ? CORR_MED : (c<=2||c>=14 ? CORR_BK : CORR_GR),
+                           t: CORR_BK, b: last ? CORR_MED : CORR_BK });
+  const sGroup = S({h:'center', v:'bottom'});
+  const sHead = c=>S({h:'center', border:brd(c,false)});
+
+  [['SOGGIORNO',3],['TASSA DI SOGGIORNO',7],['EXTRA',11]].forEach(([lbl,c0])=>{
+    set(0,c0,lbl,sGroup); for(let c=c0+1;c<c0+4;c++) set(0,c,'',sGroup);
+    sh.merges.push(`${corrXlsxCol(c0)}1:${corrXlsxCol(c0+3)}1`);
+  });
+  const hdr = ['Data','Tipo','Numero'].concat(...CORR_CATS.map(()=>CORR_METHODS.map(m=>m.label))).concat(['Sospesi','Totale','Note']);
+  hdr.forEach((h,c)=>set(1,c,h,sHead(c)));
+
+  const money = v=>{ const x=corrXlsxR2(v); return x===0 ? '' : x; };
+  list.forEach((t,i)=>{
+    const r = i+2, last = i===list.length-1;
+    set(r,0,corrXlsxDateSerial(t.date),S({fmt:'date',h:'left',border:brd(0,last)}));
+    set(r,1,t.tipo==='S'?'Scontrino':'Fattura',S({h:'left',border:brd(1,last)}));
+    const num = Number(t.numero);
+    set(r,2,(t.numero!==''&&t.numero!=null&&!isNaN(num))?num:(t.numero||''),S({h:'center',border:brd(2,last)}));
+    let c=3; CORR_CATS.forEach(cat=>CORR_METHODS.forEach(m=>{ set(r,c,money(t[cat.key][m.key]),S({fmt:'eur',h:'right',border:brd(c,last)})); c++; }));
+    set(r,15,money(t.sospesi),S({fmt:'eur',h:'right',border:brd(15,last)}));
+    set(r,16,money(corrRowTotal(t)),S({fmt:'eur',h:'right',border:brd(16,last)}));
+    set(r,17,t.note||'',S({h:'left',border:brd(17,last)}));
+  });
+
+  book.sheets.push(sh);
+  let nome;
+  if(usaRange){ nome = `${corrXlsxFileBase()} PRIMANOTA dal ${corrItDate(dal).replace(/\//g,'-')} al ${corrItDate(al).replace(/\//g,'-')}.xlsx`; }
+  else { const [y,m] = mk.split('-'); nome = `${corrXlsxFileBase()} PRIMANOTA ${CORR_MESI_UP[parseInt(m,10)-1]} ${y}.xlsx`; }
+  corrXlsxDownload(book, nome);
 }
 
 // ---------- Esportazione PDF "carina e ordinata" del Registro corrispettivi ----------
