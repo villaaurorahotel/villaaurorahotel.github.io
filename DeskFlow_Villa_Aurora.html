@@ -345,7 +345,7 @@ tr:hover td{background:var(--surface2)}
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
       <span id="utente-corrente-badge" style="display:none;font-size:10.5px;font-weight:700;color:var(--accent);margin-top:2px"></span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 15/10/2026 · 13:05</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 16/10/2026 · 14:30</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -780,7 +780,8 @@ function bookingToSupabase(b) {
     fattura:b.fattura||null, garanzia:b.garanzia||null, alloggiati_web_inviato_at:b.alloggiatiWebInviatoAt||null, created_at:b.createdAt||new Date().toISOString(),
     modified_at:b.modifiedAt||null, cancelled_at:b.cancelledAt||null,
     bloccata:!!b.bloccata, comunicazioni:b.comunicazioni||[], tipo_alloggiato_manuale:b.tipoAlloggiatoManuale||null, escludi_conteggi:!!b.escludiConteggi,
-    registro_modifiche:b.registroModifiche||[], recensione_richiesta:!!b.recensioneRichiesta
+    registro_modifiche:b.registroModifiche||[], recensione_richiesta:!!b.recensioneRichiesta,
+    ...(b.contoOta ? {conto_ota:b.contoOta} : {}) // colonna aggiunta con il conto diviso OTA: inviata solo se usata
   };
 }
 function bookingFromSupabase(b) {
@@ -800,7 +801,8 @@ function bookingFromSupabase(b) {
     fattura:b.fattura||null, garanzia:b.garanzia||null, alloggiatiWebInviatoAt:b.alloggiati_web_inviato_at||null, createdAt:b.created_at||new Date().toISOString(),
     modifiedAt:b.modified_at||'', cancelledAt:b.cancelled_at||'',
     bloccata:!!b.bloccata, comunicazioni:b.comunicazioni||[], tipoAlloggiatoManuale:b.tipo_alloggiato_manuale||'', escludiConteggi:!!b.escludi_conteggi,
-    registroModifiche:b.registro_modifiche||[], recensioneRichiesta:!!b.recensione_richiesta
+    registroModifiche:b.registro_modifiche||[], recensioneRichiesta:!!b.recensione_richiesta,
+    contoOta:b.conto_ota||null
   };
 }
 
@@ -1708,6 +1710,8 @@ function salvaCheckinOnlineUrl() {
   const s = DB.getObj('settings', {});
   s.checkinOnlineUrl = url;
   s.checkinOnlineMessage = (document.getElementById('s-checkinOnlineMsg')?.value || '').trim();
+  if (document.getElementById('s-roomingListUrl')) s.roomingListUrl = document.getElementById('s-roomingListUrl').value.trim();
+  if (document.getElementById('s-roomingListMsg')) s.roomingListMessage = document.getElementById('s-roomingListMsg').value.trim();
   s.checkinAutoAttivo = !!document.getElementById('s-checkinAutoAttivo')?.checked;
   s.checkinAutoGiorni = Math.max(1, Math.min(30, parseInt(document.getElementById('s-checkinAutoGiorni')?.value) || 3));
   DB.setObj('settings', s);
@@ -11361,7 +11365,7 @@ function navigate(page){
   currentPage=page;
   var map={
     dashboard:renderDashboard,calendario:renderCalendario,prenotazioni:renderPrenotazioni,gruppi:renderGruppiEventi,fatture:renderFatture,recensioni:renderRecensioni,messaggi:renderMessaggi,mobilecheckin:renderMobileCheckin,wamassivo:renderWaMassivo,emailmassiva:renderEmailMassiva,
-    checkin:renderCheckin,checkout:renderCheckout,'arrivi-partenze':renderArriviPartenze,checkineffettuati:renderCheckinEffettuati,checkouteffettuati:renderCheckoutEffettuati,effettuati:renderEffettuati,planner:renderPlanner,contidasaldare:renderContiDaSaldare,corrispettivi:renderCorrispettiviPage,condizioni:renderCondizioni,revenue:renderRevenue,camere:renderCamere,ospiti:renderOspiti,archivioospiti:renderArchivioOspiti,guidaospiti:renderGuidaOspiti,
+    checkin:renderCheckin,checkout:renderCheckout,'arrivi-partenze':renderArriviPartenze,checkineffettuati:renderCheckinEffettuati,checkouteffettuati:renderCheckoutEffettuati,planner:renderPlanner,contidasaldare:renderContiDaSaldare,corrispettivi:renderCorrispettiviPage,condizioni:renderCondizioni,revenue:renderRevenue,camere:renderCamere,ospiti:renderOspiti,archivioospiti:renderArchivioOspiti,guidaospiti:renderGuidaOspiti,
     listino:renderListino,livelli:renderLivelliTariffari,tipologie:renderTipologie,tassasoggiorno:renderTassaSoggiorno,preventivi:renderPreventivi,addebitiextra:renderAddebitiExtra,
     housekeeping:renderHousekeeping,previsionale:renderPrevisionale,report:renderReport,biancheria:renderBiancheria,
     extra:renderExtra,manutenzione:renderManutenzione,adempimenti:renderAdempimenti,reportpasti:renderReportPasti,
@@ -11837,131 +11841,11 @@ function tsExport() {
   showToast('Esportato in Excel');
 }
 
-function renderCassa() {
-  const movs = DB.get('movimenti');
-  const cfg  = DB.getObj('settings',{currency:'€'});
 
-  // Apply filters
-  let filtered = movs;
-  if (cassaFilter.from)   filtered = filtered.filter(m=>m.date>=cassaFilter.from);
-  if (cassaFilter.to)     filtered = filtered.filter(m=>m.date<=cassaFilter.to);
-  if (cassaFilter.type)   filtered = filtered.filter(m=>m.type===cassaFilter.type);
-  if (cassaFilter.cat)    filtered = filtered.filter(m=>m.category===cassaFilter.cat);
-  if (cassaFilter.method) filtered = filtered.filter(m=>m.method===cassaFilter.method);
-  filtered.sort((a,b)=>b.date.localeCompare(a.date));
 
-  const entrate  = filtered.filter(m=>m.type==='entrata').reduce((s,m)=>s+Number(m.amount),0);
-  const uscite   = filtered.filter(m=>m.type==='uscita').reduce((s,m)=>s+Number(m.amount),0);
-  const saldo    = entrate - uscite;
 
-  const categories = ['Soggiorno','Caparra','Tassa di soggiorno','Cibo & Bevande','Servizi extra','Stipendi','Utenze','Manutenzione','Tasse','Altro'];
-  const methods    = ['Contanti','Carta di credito','Bonifico','POS','Altro'];
 
-  // Presets
-  const presets = [
-    {label:'Oggi',    from:today(), to:today()},
-    {label:'Settimana',from:(()=>{const d=new Date();d.setDate(d.getDate()-d.getDay()+1);return (function(x){return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');})(d)})(), to:today()},
-    {label:'Mese',   from:today().slice(0,8)+'01', to:today()},
-    {label:'Anno',   from:today().slice(0,5)+'01-01', to:today()},
-  ];
 
-  document.getElementById('page-cassa').innerHTML =
-    '<div class="page-header"><div><div class="page-title">Cassa</div><div class="page-subtitle">Entrate e uscite</div></div>'
-    +'<button class="btn btn-primary" onclick="openMovimento()">+ Movimento</button></div>'
-    +'<div class="page-content">'
-    +'<div style="margin-bottom:12px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">'
-    +presets.map(p=>'<button class="btn btn-sm" style="font-size:11px;padding:3px 7px" onclick="cassaPreset(\''+p.from+'\',\''+p.to+'\')">'+p.label+'</button>').join('')
-    +'<span style="color:var(--border2);margin:0 2px">|</span>'
-    +'<input type="date" id="cf-from" value="'+cassaFilter.from+'" onchange="cassaFilter.from=this.value;renderCassa()" style="font-size:11px;padding:3px 6px;border:.5px solid var(--border2);border-radius:5px;width:120px">'
-    +'<span style="font-size:11px;color:var(--text3)">→</span>'
-    +'<input type="date" id="cf-to" value="'+cassaFilter.to+'" onchange="cassaFilter.to=this.value;renderCassa()" style="font-size:11px;padding:3px 6px;border:.5px solid var(--border2);border-radius:5px;width:120px">'
-    +'<span style="color:var(--border2);margin:0 2px">|</span>'
-    +'<select onchange="cassaFilter.type=this.value;renderCassa()" style="font-size:10px;padding:2px 4px;border-radius:4px;border:.5px solid var(--border2);max-width:90px">'
-    +'<option value="">Tutti tipi</option>'
-    +'<option value="entrata"'+(cassaFilter.type==='entrata'?' selected':'')+'>Entrate</option>'
-    +'<option value="uscita"'+(cassaFilter.type==='uscita'?' selected':'')+'>Uscite</option>'
-    +'</select>'
-    +'<select onchange="cassaFilter.method=this.value;renderCassa()" style="font-size:10px;padding:2px 4px;border-radius:4px;border:.5px solid var(--border2);max-width:90px">'
-    +'<option value="">Tutti metodi</option>'
-    +methods.map(mt=>'<option value="'+mt+'"'+(cassaFilter.method===mt?' selected':'')+'>'+mt+'</option>').join('')
-    +'</select>'
-    +(cassaFilter.from||cassaFilter.to||cassaFilter.type||cassaFilter.method?'<button class="btn btn-sm" style="font-size:11px;padding:3px 7px" onclick="cassaFilter={from:\'\',to:\'\',type:\'\',cat:\'\',method:\'\'};renderCassa()">✕ Reset</button>':'')
-    +'<button class="btn btn-sm" style="font-size:11px;padding:3px 7px" onclick="cassaExport()">📊 Excel</button>'
-    +'</div>'
-    +'<div class="metrics-grid" style="margin-bottom:16px">'
-    +'<div class="metric-card"><div class="metric-label">Entrate</div><div class="metric-value" style="color:var(--green)">'+fmtCurrency(entrate)+'</div></div>'
-    +'<div class="metric-card"><div class="metric-label">Uscite</div><div class="metric-value" style="color:var(--red)">'+fmtCurrency(uscite)+'</div></div>'
-    +'<div class="metric-card"><div class="metric-label">Saldo</div><div class="metric-value" style="color:'+(saldo>=0?'var(--green)':'var(--red)')+'">'+fmtCurrency(saldo)+'</div></div>'
-    +'</div>'
-    +'<div class="card">'
-    +(filtered.length===0?'<div class="empty-state"><p>Nessun movimento trovato</p></div>'
-    :'<table><thead><tr><th>Data</th><th>Tipo</th><th>Categoria</th><th>Descrizione</th><th>Metodo</th><th>Importo</th><th></th></tr></thead><tbody>'
-    +filtered.map(m=>{
-      const isIn = m.type==='entrata';
-      return '<tr><td>'+fmtDate(m.date)+'</td>'
-        +'<td><span class="badge '+(isIn?'badge-green':'badge-red')+'">'+(isIn?'↑ Entrata':'↓ Uscita')+'</span></td>'
-        +'<td>'+m.category+'</td>'
-        +'<td>'+m.description+'</td>'
-        +'<td><span class="badge badge-gray">'+m.method+'</span></td>'
-        +'<td style="font-weight:600;color:'+(isIn?'var(--green)':'var(--red)')+'">'+(isIn?'+':'-')+fmtCurrency(m.amount)+'</td>'
-        +'<td><button class="btn btn-sm" onclick="editMovimento(\''+m.id+'\')">✏</button>'
-        +'<button class="btn btn-sm btn-danger" onclick="delMovimento(\''+m.id+'\')">🗑</button></td></tr>';
-    }).join('')+'</tbody></table>')
-    +'</div></div>';
-}
-
-function cassaPreset(from, to) {
-  cassaFilter.from = from; cassaFilter.to = to;
-  renderCassa();
-}
-
-function openMovimento(editId) {
-  const categories = ['Soggiorno','Caparra','Tassa di soggiorno','Cibo & Bevande','Servizi extra','Stipendi','Utenze','Manutenzione','Tasse','Altro'];
-  const methods    = ['Contanti','Carta di credito','Bonifico','POS','Altro'];
-  let m = null;
-  if (editId) { m = DB.get('movimenti').find(x=>x.id===editId); if (!m) return; }
-  showModal(editId ? 'Modifica movimento' : 'Nuovo movimento',
-    '<div class="form-grid">'
-    +'<div class="form-group"><label>Data</label><input type="date" id="mv-date" value="'+(m?m.date:today())+'"></div>'
-    +'<div class="form-group"><label>Tipo</label><select id="mv-type"><option value="entrata"'+(m&&m.type==='entrata'?' selected':'')+'>Entrata</option><option value="uscita"'+(m&&m.type==='uscita'?' selected':'')+'>Uscita</option></select></div>'
-    +'<div class="form-group"><label>Categoria</label><select id="mv-cat">'+categories.map(c=>'<option'+(m&&m.category===c?' selected':'')+'>'+c+'</option>').join('')+'</select></div>'
-    +'<div class="form-group"><label>Metodo</label><select id="mv-method">'+methods.map(mt=>'<option'+(m&&m.method===mt?' selected':'')+'>'+mt+'</option>').join('')+'</select></div>'
-    +'<div class="form-group full"><label>Descrizione</label><input type="text" id="mv-desc" value="'+(m?m.description:'')+'" placeholder="Es. Soggiorno Rossi..."></div>'
-    +'<div class="form-group"><label>Importo (€)</label><input type="number" id="mv-amount" value="'+(m?m.amount:'')+'" min="0" step="0.01"></div>'
-    +'</div>',
-    '<button class="btn" onclick="closeModal()">Annulla</button>'
-    +'<button class="btn btn-primary" onclick="saveMovimento(\''+( editId||'')+'\')">Salva</button>'
-  );
-}
-
-function editMovimento(id) { openMovimento(id); }
-
-function saveMovimento(editId) {
-  const date   = document.getElementById('mv-date').value;
-  const amount = parseFloat(document.getElementById('mv-amount').value)||0;
-  if (!date||amount<=0) { showToast('Compila data e importo'); return; }
-  const mov = {
-    id: editId||uid(), date,
-    type:        document.getElementById('mv-type').value,
-    category:    document.getElementById('mv-cat').value,
-    method:      document.getElementById('mv-method').value,
-    description: document.getElementById('mv-desc').value,
-    amount,
-  };
-  const movs = DB.get('movimenti');
-  if (editId) { const i=movs.findIndex(x=>x.id===editId); movs[i]=mov; } else movs.push(mov);
-  DB.set('movimenti', movs);
-  closeModal();
-  showToast('Movimento salvato');
-  renderCassa();
-}
-
-function delMovimento(id) {
-  if (!confirm('Eliminare questo movimento?')) return;
-  DB.set('movimenti', DB.get('movimenti').filter(m=>m.id!==id));
-  showToast('Movimento eliminato');
-  renderCassa();
-}
 
 function cassaExport() {
   const XL = typeof XLSX !== 'undefined' ? XLSX : null;
@@ -12314,12 +12198,9 @@ function biSetPreset(p) {
   renderBiancheria();
 }
 function renderBiancheria() {
-  const rangeStart = new Date(biFrom); rangeStart.setHours(0,0,0,0);
-  const rangeEnd   = new Date(biTo);   rangeEnd.setHours(0,0,0,0);
+  // Elenco dei giorni dal/al calcolato sulle date "locali" (prima toISOString spostava tutto indietro di un giorno)
   const giorni = [];
-  for (let d = new Date(rangeStart); d <= rangeEnd; d.setDate(d.getDate()+1)) {
-    giorni.push(new Date(d).toISOString().slice(0,10));
-  }
+  for (let ds = biFrom; ds && biTo && ds <= biTo && giorni.length < 400; ds = addDays(ds, 1)) giorni.push(ds);
   if (!giorni.length) giorni.push(biFrom);
 
   const perGiorno = giorni.map(function(ds){ return { ds:ds, dati: calcolaBiancheriaGiorno(ds) }; });
@@ -12547,130 +12428,6 @@ function hkExport() {
   showToast('Housekeeping esportato in Excel');
 }
 
-function hkExportXLSX() {
-  const XL = typeof XLSX !== 'undefined' ? XLSX : null;
-  if (!XL) { showToast('SheetJS non disponibile'); hkExport(); return; }
-
-  const allRows = window._hkExportRows || [];
-  if (allRows.length <= 1) { showToast('Nessun dato da esportare'); return; }
-
-  const dataRows = allRows.slice(1);
-
-  function parseRow(r) {
-    const nameParts = (r[5]||'').trim().split(' ');
-    return {
-      canale:  '',
-      camera:  r[2]||'',
-      nome:    nameParts.length>1 ? nameParts.slice(0,-1).join(' ') : (r[5]||''),
-      cognome: nameParts.length>1 ? nameParts[nameParts.length-1] : '',
-      checkin: r[6]||'',
-      checkout:r[7]||'',
-      notti:   (r[6]&&r[7]) ? String(nights(r[6],r[7])) : '',
-      ora:     '',
-      pax:     '',
-      tipo:    r[3]||'',
-      note:    r[9]||'',
-      stato:   r[4]||'',
-      data:    r[0]||'',
-    };
-  }
-
-  const sorted = dataRows.slice().sort((a,b)=>
-    (a[0]||'').localeCompare(b[0]||'') ||
-    (a[2]||'').localeCompare(b[2]||'','it',{numeric:true})
-  );
-
-  const arrivi  = sorted.filter(r=>r[4]==='Arrivo'||r[4]==='Arrivo/Partenza').map(parseRow);
-  const partenze= sorted.filter(r=>r[4]==='Partenza'||r[4]==='Arrivo/Partenza').map(parseRow);
-  const fermate = sorted.filter(r=>r[4]==='Fermata').map(parseRow);
-
-  const colHdr = ['CANALE','CAMERA','NOME','COGNOME','CHECK-IN','CHECK-OUT','NOTTI','ORA ARR.','PAX','TIPO C.','NOTE'];
-  const toRow  = r => [r.canale,r.camera,r.nome,r.cognome,r.checkin,r.checkout,r.notti,r.ora,r.pax,r.tipo,r.note];
-
-  const cfg  = DB.getObj('settings',{propertyName:''});
-  const pLabel = hkFrom===hkTo ? fmtDate(hkFrom) : fmtDate(hkFrom)+' -> '+fmtDate(hkTo);
-  const aoa  = [];
-
-  // Title row
-  aoa.push([(cfg.propertyName||'Housekeeping')+'  —  '+pLabel]);
-  aoa.push([]);
-
-  // ARRIVI
-  aoa.push(['ARRIVI ('+arrivi.length+')']);
-  aoa.push(colHdr);
-  if (arrivi.length) arrivi.forEach(r=>aoa.push(toRow(r)));
-  else aoa.push(['Nessun arrivo']);
-  aoa.push([]); aoa.push([]);
-
-  // PARTENZE
-  aoa.push(['PARTENZE ('+partenze.length+')']);
-  aoa.push(colHdr);
-  if (partenze.length) partenze.forEach(r=>aoa.push(toRow(r)));
-  else aoa.push(['Nessuna partenza']);
-  aoa.push([]); aoa.push([]);
-
-  // FERMATE
-  aoa.push(['FERMATE ('+fermate.length+')']);
-  aoa.push(colHdr);
-  if (fermate.length) fermate.forEach(r=>aoa.push(toRow(r)));
-  else aoa.push(['Nessuna fermata']);
-
-  const ws = XL.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [{wch:16},{wch:14},{wch:16},{wch:18},{wch:11},{wch:11},{wch:7},{wch:9},{wch:5},{wch:7},{wch:28}];
-
-  // Style: find and color section/header rows
-  const SEC = {'ARRIVI':true,'PARTENZE':true,'FERMATE':true};
-  const secColor = {'ARRIVI':'4CAF50','PARTENZE':'FF9800','FERMATE':'9E9E9E'};
-  let curSec = null;
-  aoa.forEach((row, ri) => {
-    const f = String(row[0]||'');
-    const isSection = Object.keys(SEC).some(k=>f.startsWith(k));
-    const isColHdr  = f === 'CANALE';
-    const isTitleRow= ri === 0;
-    if (isSection) {
-      curSec = Object.keys(SEC).find(k=>f.startsWith(k));
-    }
-    for (let ci=0; ci<11; ci++) {
-      const addr = XL.utils.encode_cell({r:ri,c:ci});
-      if (!ws[addr]) ws[addr]={t:'s',v:''};
-      if (isTitleRow && ci===0) {
-        ws[addr].s={font:{bold:true,sz:13,color:{rgb:'253D4F'}}};
-      } else if (isSection) {
-        ws[addr].s={font:{bold:true,sz:12,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:secColor[curSec]||'607D8B'}}};
-      } else if (isColHdr) {
-        ws[addr].s={font:{bold:true,sz:10,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'253D4F'}},alignment:{horizontal:'center'}};
-      }
-    }
-  });
-
-  // Riepilogo sheet
-  const byDay = {};
-  sorted.forEach(r=>{
-    const d=r[0]; if(!d)return;
-    if(!byDay[d])byDay[d]={data:d,giorno:r[1],arrivi:0,partenze:0,apb:0,fermate:0};
-    const s=r[4];
-    if(s==='Arrivo')             byDay[d].arrivi++;
-    else if(s==='Partenza')      byDay[d].partenze++;
-    else if(s==='Arrivo/Partenza')byDay[d].apb++;
-    else if(s==='Fermata')       byDay[d].fermate++;
-  });
-  const sh2 = [['DATA','GIORNO','ARRIVI','ARR+PART','PARTENZE','FERMATE','TOT']];
-  Object.values(byDay).forEach(d=>sh2.push([d.data,d.giorno,d.arrivi,d.apb,d.partenze,d.fermate,d.arrivi+d.apb+d.partenze+d.fermate]));
-  const ws2 = XL.utils.aoa_to_sheet(sh2);
-  ws2['!cols']=[{wch:11},{wch:12},{wch:8},{wch:9},{wch:9},{wch:8},{wch:6}];
-  for(let c=0;c<7;c++){
-    const a=XL.utils.encode_cell({r:0,c});
-    if(ws2[a])ws2[a].s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'253D4F'}}};
-  }
-
-  const wb = XL.utils.book_new();
-  XL.utils.book_append_sheet(wb, ws,  'Piano pulizie');
-  XL.utils.book_append_sheet(wb, ws2, 'Riepilogo');
-
-  const fname = 'housekeeping-'+hkFrom+(hkTo&&hkTo!==hkFrom?'_'+hkTo:'')+'.xlsx';
-  XL.writeFile(wb, fname);
-  showToast('Excel esportato: '+fname);
-}
 
 
 var preventiviTab = 'preventivi';
@@ -14073,7 +13830,7 @@ function renderPrevisionale() {
   else{mStart=new Date(now.getFullYear(),now.getMonth(),1);mEnd=new Date(now.getFullYear(),now.getMonth()+5,30);}
   var months=[];for(var dd=new Date(mStart);dd<=mEnd;dd.setMonth(dd.getMonth()+1))months.push({y:dd.getFullYear(),m:dd.getMonth(),lbl:new Date(dd).toLocaleDateString('it-IT',{month:'long',year:'numeric'})});
   var rows=months.map(function(mo){
-    var from=mo.y+'-'+String(mo.m+1).padStart(2,'0')+'-01',to=new Date(mo.y,mo.m+1,0).toISOString().split('T')[0];
+    var from=mo.y+'-'+String(mo.m+1).padStart(2,'0')+'-01',to=mo.y+'-'+String(mo.m+1).padStart(2,'0')+'-'+String(new Date(mo.y,mo.m+1,0).getDate()).padStart(2,'0');
     var mb=filtered.filter(function(b){return b.checkin>=from&&b.checkin<=to;});
     var rev=mb.reduce(function(s,b){return s+Number(b.totalPrice);},0),notti=mb.reduce(function(s,b){return s+nights(b.checkin,b.checkout);},0);
     var dim=new Date(mo.y,mo.m+1,0).getDate(),occ=rooms.length?Math.min(100,Math.round(notti/(rooms.length*dim)*100)):0;
@@ -14174,7 +13931,6 @@ function prevExportXLSX() {
 }
 
 var prevFrom='',prevTo='';
-function prevSetPreset(p){prevPreset(p);}
 function prevPreset(p){
   var n=new Date();n.setHours(0,0,0,0);
   function f(d){return (function(x){return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');})(d);}
@@ -14564,112 +14320,6 @@ function _riepilogoUltimiNGiorni(n, endDate) {
   var out = [];
   for (var i=n-1; i>=0; i--) out.push(addDays(endDate, -i));
   return out;
-}
-function _riepilogoSparklineSVG(valori, colore) {
-  var w = 260, h = 44, pad = 3;
-  var max = Math.max.apply(null, valori.concat([1]));
-  var min = Math.min.apply(null, valori.concat([0]));
-  var range = (max - min) || 1;
-  var step = valori.length>1 ? (w - pad*2) / (valori.length-1) : 0;
-  var pts = valori.map(function(v,i){
-    var x = pad + i*step;
-    var y = h - pad - ((v - min) / range) * (h - pad*2);
-    return x.toFixed(1)+','+y.toFixed(1);
-  });
-  return '<svg viewBox="0 0 '+w+' '+h+'" width="100%" height="'+h+'" preserveAspectRatio="none" style="display:block">' +
-    '<polyline points="'+pts.join(' ')+'" fill="none" stroke="'+colore+'" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>' +
-    '</svg>';
-}
-function renderRiepilogo() {
-  var el = document.getElementById('page-riepilogo');
-  if (!el) return;
-  try {
-    var bookings = DB.get('bookings') || [];
-    var oggi = today();
-    var ieri = addDays(oggi, -1);
-
-    var revenueOggi = fatturatoDelGiorno(oggi);
-    var revenueIeri = fatturatoDelGiorno(ieri);
-    var percVar = revenueIeri>0 ? Math.round((revenueOggi-revenueIeri)/revenueIeri*100) : null;
-
-    // Pagamenti giornalieri: caparre/depositi effettivamente incassati oggi (diverso dal fatturato,
-    // che viene dal Registro Corrispettivi)
-    var pagamentiOggi = bookings.reduce(function(s,b){ return s + (b.dataCaparra===oggi ? Number(b.caparra||0) : 0); }, 0);
-
-    var checkinOggi = bookings.filter(function(b){ return b.checkin===oggi && b.status!=='cancellata'; }).length;
-    var checkoutOggi = bookings.filter(function(b){ return b.checkout===oggi && b.status!=='cancellata'; }).length;
-
-    var giorni15 = _riepilogoUltimiNGiorni(15, oggi);
-    var checkinSerie = giorni15.map(function(ds){ return bookings.filter(function(b){ return b.checkin===ds && b.status!=='cancellata'; }).length; });
-    var checkoutSerie = giorni15.map(function(ds){ return bookings.filter(function(b){ return b.checkout===ds && b.status!=='cancellata'; }).length; });
-
-    var nuovePrenOggi = bookings.filter(function(b){ return b.createdAt && b.createdAt.slice(0,10)===oggi; });
-    var nuovePrenOggiRevenue = nuovePrenOggi.reduce(function(s,b){ return s+Number(b.totalPrice||0); }, 0);
-    var nuovePrenSerie = giorni15.map(function(ds){ return bookings.filter(function(b){ return b.createdAt && b.createdAt.slice(0,10)===ds; }).length; });
-
-    var settimana = _riepilogoUltimiNGiorni(7, oggi);
-    var checkinSettimana = bookings.filter(function(b){ return settimana.indexOf(b.checkin)>=0 && b.status!=='cancellata'; }).length;
-    var checkoutSettimana = bookings.filter(function(b){ return settimana.indexOf(b.checkout)>=0 && b.status!=='cancellata'; }).length;
-    var nuovePrenSettimana = bookings.filter(function(b){ return b.createdAt && settimana.indexOf(b.createdAt.slice(0,10))>=0; }).length;
-
-    var oraAggiornamento = new Date().toLocaleString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
-
-    function cardShell(colore, titolo, iconaSfondo, icona, corpo) {
-      return '<div style="background:var(--surface);border:1px solid var(--border2);border-radius:10px;border-top:4px solid '+colore+';padding:16px 18px;flex:1;min-width:280px;display:flex;flex-direction:column">' +
-        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">' +
-          '<div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.5px;text-transform:uppercase">'+titolo+'</div>' +
-          '<div style="display:flex;align-items:center;gap:8px">' +
-            '<div style="width:34px;height:34px;border-radius:50%;background:'+iconaSfondo+';display:flex;align-items:center;justify-content:center;font-size:15px">'+icona+'</div>' +
-            '<span onclick="renderRiepilogo()" title="Aggiorna" style="cursor:pointer;color:var(--text3);font-size:14px">↻</span>' +
-          '</div>' +
-        '</div>' +
-        corpo +
-        '<div style="margin-top:auto;padding-top:10px;font-size:10.5px;color:var(--text3);border-top:1px solid var(--border2)">Aggiornato il: '+oraAggiornamento+'</div>' +
-      '</div>';
-    }
-
-    var card1 = cardShell('#22c55e', 'Revenue di oggi', '#d1fae5', '💳',
-      '<div style="font-size:30px;font-weight:800;color:var(--text1);margin-bottom:6px">'+fmtCurrency(revenueOggi)+'</div>' +
-      (percVar!==null ? '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12px;flex-wrap:wrap">'+
-        '<span style="background:'+(percVar<0?'#fee2e2':'#dcfce7')+';color:'+(percVar<0?'#dc2626':'#166534')+';border-radius:5px;padding:2px 7px;font-weight:700">'+(percVar<0?'↘':'↗')+' '+Math.abs(percVar)+'%</span>'+
-        '<span style="color:var(--text3)">rispetto a ieri ('+fmtCurrency(revenueIeri)+')</span>' +
-      '</div>' : '<div style="height:24px"></div>') +
-      '<div style="border-top:1px solid var(--border2);padding-top:8px;font-size:12.5px;color:var(--text2)">Pagamenti giornalieri: <strong>'+fmtCurrency(pagamentiOggi)+'</strong></div>'
-    );
-
-    var card2 = cardShell('#1a73e8', 'Attività di oggi', '#dbeafe', '👥',
-      '<div style="display:flex;gap:26px;margin-bottom:12px">' +
-        '<div><div style="font-size:30px;font-weight:800;color:#16a34a">'+checkinOggi+'</div><div style="font-size:11.5px;color:var(--text3)">Check-in</div></div>' +
-        '<div><div style="font-size:30px;font-weight:800;color:#ea8c1e">'+checkoutOggi+'</div><div style="font-size:11.5px;color:var(--text3)">Check-out</div></div>' +
-      '</div>' +
-      '<div style="font-size:11px;color:var(--text3);margin-bottom:2px">Check-in (15 giorni)</div>' +
-      _riepilogoSparklineSVG(checkinSerie, '#16a34a') +
-      '<div style="font-size:11px;color:var(--text3);margin:6px 0 2px">Check-out (15 giorni)</div>' +
-      _riepilogoSparklineSVG(checkoutSerie, '#ea8c1e')
-    );
-
-    var card3 = cardShell('#f59e0b', 'Nuove prenotazioni di oggi', '#fef3c7', '📅',
-      '<div style="display:flex;gap:26px;margin-bottom:12px">' +
-        '<div><div style="font-size:30px;font-weight:800;color:var(--text1)">'+nuovePrenOggi.length+'</div><div style="font-size:11.5px;color:var(--text3)">Prenotazioni</div></div>' +
-        '<div><div style="font-size:22px;font-weight:800;color:#16a34a">'+fmtCurrency(nuovePrenOggiRevenue)+'</div><div style="font-size:11.5px;color:var(--text3)">Revenue</div></div>' +
-      '</div>' +
-      '<div style="font-size:11px;color:var(--text3);margin-bottom:2px">Nuove prenotazioni (15 gg)</div>' +
-      _riepilogoSparklineSVG(nuovePrenSerie, '#f59e0b') +
-      '<div style="display:flex;gap:18px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border2)">' +
-        '<div style="text-align:center;flex:1"><div style="font-size:17px;font-weight:800">'+checkinSettimana+'</div><div style="font-size:10px;color:var(--text3)">Check-in della settimana</div></div>' +
-        '<div style="text-align:center;flex:1"><div style="font-size:17px;font-weight:800">'+checkoutSettimana+'</div><div style="font-size:10px;color:var(--text3)">Check-out della settimana</div></div>' +
-        '<div style="text-align:center;flex:1"><div style="font-size:17px;font-weight:800">'+nuovePrenSettimana+'</div><div style="font-size:10px;color:var(--text3)">Prenotazioni della settimana</div></div>' +
-      '</div>'
-    );
-
-    el.innerHTML =
-      '<div class="page-header"><div><div class="page-title">📈 Riepilogo</div><div class="page-subtitle">'+fmtDate(oggi)+'</div></div></div>' +
-      '<div class="page-content">' +
-        '<div style="display:flex;gap:16px;flex-wrap:wrap">' + card1 + card2 + card3 + '</div>' +
-      '</div>';
-  } catch(e) {
-    el.innerHTML = '<div style="padding:24px"><div style="background:#fee2e2;color:#dc2626;padding:12px;border-radius:8px;font-size:12px;font-family:monospace"><strong>Riepilogo error:</strong><br>'+e.message+'<br>'+e.stack+'</div></div>';
-  }
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -15202,6 +14852,574 @@ function renderEmailMassiva() {
 // prenotazione specifica, e un referente unico per il gruppo (oggi ogni
 // camera ha solo il proprio ospite, non un punto di contatto comune).
 // ══════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════
+// CONTO DIVISO OTA / OSPITE — richiesto da Gian (ispirato a GestHotel):
+// per le prenotazioni da portale (Booking.com, Expedia…) si sceglie chi paga il pernottamento.
+// Se lo paga l'OTA con la carta virtuale, il conto dell'ospite contiene SOLO tassa di soggiorno,
+// extra ed eventuale differenza di tariffa (es. cambio camera); il pernottamento diventa un
+// incasso separato "carta virtuale OTA", con il suo documento nel registro Corrispettivi.
+// Dati salvati su b.contoOta = {pagatore:'ota'|'ospite', ota, importo, differenza, stato, dataIncasso, tipoDoc}
+// ══════════════════════════════════════════════════════════════════════════
+const OTA_FONTI = ['Booking.com','Expedia','Airbnb','Agoda','Hotels.com','HRS','Trip.com','Vrbo','Hostelworld'];
+function isFonteOta(src){
+  var s = String(src||'').toLowerCase();
+  return OTA_FONTI.some(function(f){ return s.indexOf(f.toLowerCase()) >= 0; });
+}
+function contoRound2(v){ return Math.round((Number(v)||0)*100)/100; }
+
+// Scompone il conto di una prenotazione nelle due parti (OTA e ospite). Se il conto diviso non è
+// attivo, la parte ospite coincide con il conto normale di sempre.
+function contoParti(b){
+  var tax = calcTassaSoggiorno(b).tax || 0;
+  var extra = (b.extras||[]).reduce(function(s,ex){ return s+(Number(ex.totale)||0); }, 0);
+  var sogg = Number(b.totalPrice)||0;
+  var co = b.contoOta || null;
+  var otaAttivo = !!(co && co.pagatore === 'ota');
+  var importoOta = otaAttivo ? ((co.importo !== undefined && co.importo !== null && co.importo !== '') ? (Number(co.importo)||0) : sogg) : 0;
+  var differenza = otaAttivo ? (Number(co.differenza)||0) : 0;
+  var soggiornoOspite = otaAttivo ? differenza : sogg;
+  return {
+    otaAttivo: otaAttivo,
+    nomeOta: (co && co.ota) || b.source || 'OTA',
+    importoOta: contoRound2(importoOta),
+    differenza: contoRound2(differenza),
+    soggiornoOspite: contoRound2(soggiornoOspite),
+    tax: contoRound2(tax), extra: contoRound2(extra),
+    totOspite: contoRound2(soggiornoOspite + tax + extra),
+    incassataOta: otaAttivo && co.stato === 'incassata',
+    dataIncasso: (co && co.dataIncasso) || '',
+    tipoDocOta: (co && co.tipoDoc) || 'S'
+  };
+}
+
+// Sezione "Chi paga il pernottamento?" dentro la maschera Conto — compare solo per prenotazioni
+// da portale (o se il conto diviso era già stato attivato in precedenza)
+function contoOtaPanelHTML(b, p){
+  if (!isFonteOta(b.source) && !b.contoOta) return '';
+  var co = b.contoOta || {};
+  var idq = b.id.replace(/'/g,"\\'");
+  var lbl = 'font-weight:700;color:var(--accent);margin:4px 0 6px;text-transform:uppercase;font-size:11px;letter-spacing:.5px';
+  var html = '<div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;margin-bottom:16px">'+
+    '<div style="'+lbl+'">💳 Chi paga il pernottamento?</div>'+
+    '<select id="conto-ota-pagatore" onchange="contoOtaCambiaPagatore(\''+idq+'\', this.value)" style="width:100%;padding:7px 9px;border:.5px solid var(--border2);border-radius:7px;font-size:13px">'+
+      '<option value="ospite"'+(!p.otaAttivo?' selected':'')+'>L\'ospite (conto unico, come sempre)</option>'+
+      '<option value="ota"'+(p.otaAttivo?' selected':'')+'>'+(b.source||'L\'OTA').replace(/</g,'&lt;')+' con carta virtuale — all\'ospite solo tassa, extra e differenze</option>'+
+    '</select>';
+  if (p.otaAttivo) {
+    var cambioCamera = b.originalRoomId && b.originalRoomId !== b.roomId;
+    html += '<div class="form-grid" style="margin-top:10px">'+
+      '<div class="form-group"><label>Portale</label><input type="text" id="conto-ota-nome" value="'+String(p.nomeOta).replace(/"/g,'&quot;')+'"></div>'+
+      '<div class="form-group"><label>Importo sulla carta virtuale</label><input type="number" step="0.01" min="0" id="conto-ota-importo" value="'+p.importoOta.toFixed(2)+'"></div>'+
+      '<div class="form-group"><label>Stato carta virtuale</label><select id="conto-ota-stato">'+
+        '<option value="da_incassare"'+(!p.incassataOta?' selected':'')+'>Da incassare</option>'+
+        '<option value="incassata"'+(p.incassataOta?' selected':'')+'>Incassata sul POS</option>'+
+      '</select></div>'+
+      '<div class="form-group"><label>Data incasso</label><input type="date" id="conto-ota-data" value="'+(p.dataIncasso||today())+'"></div>'+
+      '<div class="form-group"><label>Documento per il pernottamento</label><select id="conto-ota-tipo">'+
+        '<option value="S"'+(p.tipoDocOta!=='F'?' selected':'')+'>🧾 Scontrino</option>'+
+        '<option value="F"'+(p.tipoDocOta==='F'?' selected':'')+'>📄 Fattura</option>'+
+      '</select></div>'+
+      '<div class="form-group"><label>Differenza a carico dell\'ospite</label>'+
+        '<div style="display:flex;gap:6px"><input type="number" step="0.01" min="0" id="conto-ota-diff" value="'+p.differenza.toFixed(2)+'" style="flex:1">'+
+        (cambioCamera ? '<button type="button" class="btn btn-sm" title="Calcola la differenza di prezzo tra la camera prenotata e quella attuale, notte per notte, dal Listino" onclick="contoOtaCalcolaDifferenza(\''+idq+'\')">🧮 Da listino</button>' : '')+
+        '</div></div>'+
+    '</div>'+
+    '<div style="font-size:11.5px;color:var(--text3);margin:4px 0 10px">'+
+      (cambioCamera ? '⬆ Camera cambiata rispetto a quella prenotata: la tariffa del portale resta quella, l\'eventuale differenza va all\'ospite. ' : '')+
+      'Il riepilogo e i pagamenti qui sotto riguardano <strong>solo la parte dell\'ospite</strong>.</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+      '<button type="button" class="btn btn-sm btn-primary" onclick="contoOtaSalva(\''+idq+'\')">💾 Salva parte OTA</button>'+
+      '<button type="button" class="btn btn-sm" onclick="contoOtaSalva(\''+idq+'\', true)">🖨 Salva e stampa conto OTA</button>'+
+    '</div>';
+  }
+  return html + '</div>';
+}
+
+// Riepilogo "Conteggi" della maschera Conto quando il pernottamento lo paga l'OTA
+function contoOtaConteggiHTML(b, p){
+  var td = 'padding:5px 0;color:var(--text2)';
+  return '<div style="font-weight:700;color:var(--accent);margin-bottom:6px;text-transform:uppercase;font-size:11px;letter-spacing:.5px">Conto dell\'ospite</div>'+
+    '<table style="width:100%;border-collapse:collapse;margin-bottom:16px">'+
+      '<tr><td style="'+td+'">Soggiorno</td><td style="color:var(--text3)">'+fmtCurrency(p.importoOta)+' — a carico di '+String(p.nomeOta).replace(/</g,'&lt;')+' '+(p.incassataOta?'<span class="badge badge-green" style="font-size:9px">carta incassata</span>':'<span class="badge badge-amber" style="font-size:9px">carta da incassare</span>')+'</td></tr>'+
+      (p.differenza>0 ? '<tr><td style="'+td+'">Differenza tariffa / camera</td><td>'+fmtCurrency(p.differenza)+'</td></tr>' : '')+
+      '<tr><td style="'+td+'">Tassa di soggiorno</td><td>'+fmtCurrency(p.tax)+'</td></tr>'+
+      '<tr><td style="'+td+'">Extra</td><td>'+fmtCurrency(p.extra)+'</td></tr>'+
+      '<tr><td style="padding:10px 0;font-weight:800;font-size:15px;border-top:1.5px solid var(--border)">TOTALE OSPITE</td><td style="padding:10px 0;font-weight:800;font-size:15px;border-top:1.5px solid var(--border)">'+fmtCurrency(p.totOspite)+'</td></tr>'+
+      '<tr><td style="'+td+'">Caparra già incassata</td><td>'+fmtCurrency(b.caparra||0)+'</td></tr>'+
+    '</table>';
+}
+
+function contoOtaLeggiForm(b){
+  var el = function(id){ return document.getElementById(id); };
+  var co = Object.assign({}, b.contoOta||{});
+  co.pagatore = 'ota';
+  if (el('conto-ota-nome')) co.ota = (el('conto-ota-nome').value||'').trim() || b.source || 'OTA';
+  if (el('conto-ota-importo')) co.importo = contoRound2(parseFloat(el('conto-ota-importo').value)||0);
+  if (el('conto-ota-diff')) co.differenza = contoRound2(parseFloat(el('conto-ota-diff').value)||0);
+  if (el('conto-ota-stato')) co.stato = el('conto-ota-stato').value;
+  if (el('conto-ota-data')) co.dataIncasso = el('conto-ota-data').value || today();
+  if (el('conto-ota-tipo')) co.tipoDoc = el('conto-ota-tipo').value || 'S';
+  return co;
+}
+
+// La parte OTA si salva nella colonna "conto_ota" delle prenotazioni su Supabase: se la colonna non
+// esiste ancora, il salvataggio delle prenotazioni fallirebbe — quindi prima di attivarla si controlla.
+var _contoOtaColonnaOk = null;
+const CONTO_OTA_SQL = 'alter table public.bookings add column if not exists conto_ota jsonb;';
+async function contoOtaVerificaColonna(){
+  if (!rlConn()) return true; // senza Supabase i dati restano in questo browser: nessuna colonna da creare
+  if (_contoOtaColonnaOk === true) return true;
+  try { var r = await supabaseClient.from('bookings').select('conto_ota').limit(1); _contoOtaColonnaOk = !r.error; }
+  catch(e) { _contoOtaColonnaOk = false; }
+  return _contoOtaColonnaOk;
+}
+function contoOtaMostraSetup(){
+  showModal('Conto diviso OTA — da attivare',
+    '<div style="font-size:13px;line-height:1.5"><p>Per salvare la parte pagata dall\'OTA serve una colonna in più nel database. Si fa <strong>una sola volta</strong>:</p>'+
+    '<ol style="padding-left:18px;margin:6px 0"><li>Premi <strong>📋 Copia istruzione</strong></li><li>Supabase → <strong>SQL Editor</strong> → <strong>New query</strong>, incolla e premi <strong>Run</strong></li><li>Torna qui e riprova</li></ol>'+
+    '<code style="display:block;background:var(--surface2);padding:8px;border-radius:6px;font-size:12px;margin-top:8px">'+CONTO_OTA_SQL+'</code></div>',
+    '<button class="btn" onclick="closeModal()">Chiudi</button><button class="btn btn-primary" onclick="navigator.clipboard.writeText(CONTO_OTA_SQL).then(function(){showToast(\'Istruzione copiata\');})">📋 Copia istruzione</button>');
+}
+
+async function contoOtaCambiaPagatore(bookingId, val){
+  if (val === 'ota' && !(await contoOtaVerificaColonna())) {
+    var sel = document.getElementById('conto-ota-pagatore'); if (sel) sel.value = 'ospite';
+    contoOtaMostraSetup();
+    return;
+  }
+  var bookings = DB.get('bookings');
+  var b = bookings.find(function(x){ return x.id===bookingId; });
+  if (!b) return;
+  var co = Object.assign({}, b.contoOta||{});
+  co.pagatore = val === 'ota' ? 'ota' : 'ospite';
+  if (co.pagatore === 'ota') {
+    if (!co.ota) co.ota = b.source || 'OTA';
+    if (co.importo === undefined || co.importo === null || co.importo === '') co.importo = contoRound2(b.totalPrice);
+    if (!co.stato) co.stato = 'da_incassare';
+    if (co.differenza === undefined) co.differenza = 0;
+  }
+  b.contoOta = co;
+  DB.set('bookings', bookings);
+  registraModificaPrenotazione(bookingId, 'pagamento', co.pagatore==='ota'
+    ? 'Conto diviso: pernottamento a carico di '+co.ota+' (carta virtuale), all\'ospite tassa ed extra'
+    : 'Conto diviso disattivato: pernottamento di nuovo a carico dell\'ospite');
+  contoOtaRiallineaCorrispettivi(bookingId);
+  closeModal();
+  apriConto(bookingId);
+}
+
+function contoOtaSalva(bookingId, stampa){
+  var bookings = DB.get('bookings');
+  var b = bookings.find(function(x){ return x.id===bookingId; });
+  if (!b) return;
+  var co = contoOtaLeggiForm(b);
+  if (!(co.importo > 0)) { showToast('Inserisci l\'importo addebitato sulla carta virtuale'); return; }
+  b.contoOta = co;
+  DB.set('bookings', bookings);
+  registraModificaPrenotazione(bookingId, 'pagamento', 'Parte OTA ('+co.ota+'): '+fmtCurrency(co.importo)+' — '+(co.stato==='incassata'?'carta virtuale incassata il '+fmtDate(co.dataIncasso):'da incassare')+(co.differenza>0?' · differenza all\'ospite '+fmtCurrency(co.differenza):''));
+  contoOtaRiallineaCorrispettivi(bookingId);
+  showToast(co.stato==='incassata' ? '💳 Incasso carta virtuale registrato nei Corrispettivi' : 'Parte OTA salvata — sarà registrata nei Corrispettivi quando la segni come incassata');
+  closeModal();
+  if (stampa) stampaConto(bookingId, 'ota'); else apriConto(bookingId);
+}
+
+// Tiene allineato il registro Corrispettivi dopo una modifica del conto diviso: crea/aggiorna/toglie
+// l'incasso OTA e, se la parte dell'ospite era già registrata, la ricalcola con i nuovi importi.
+function contoOtaRiallineaCorrispettivi(bookingId){
+  corrSyncOtaToRegister(bookingId);
+  var st = DB.getObj('corrispettivi', {transactions:[]});
+  if ((st.transactions||[]).some(function(t){ return t.bookingRef === bookingId; })) corrSyncBookingToRegister(bookingId, true);
+}
+
+function corrSyncOtaToRegister(bookingId){
+  var b = DB.get('bookings').find(function(x){ return x.id===bookingId; });
+  if (!b) return;
+  var p = contoParti(b);
+  corrState = DB.getObj('corrispettivi', corrDefaultState());
+  if (!corrState.transactions) corrState.transactions = [];
+  var idx = corrState.transactions.findIndex(function(t){ return t.otaRef === bookingId; });
+  if (!p.otaAttivo || !p.incassataOta) {
+    if (idx >= 0) { corrState.transactions.splice(idx,1); DB.setObj('corrispettivi', corrState); }
+    return;
+  }
+  var existing = idx >= 0 ? corrState.transactions[idx] : null;
+  var tipo = p.tipoDocOta === 'F' ? 'F' : 'S';
+  var soggiorno = corrEmptyMoney(); soggiorno.carta = p.importoOta;
+  var tx = {
+    id: existing ? existing.id : corrUid(),
+    date: p.dataIncasso || (existing ? existing.date : corrTodayISO()),
+    tipo: tipo,
+    numero: (existing && existing.tipo === tipo) ? existing.numero : corrNextNumero(tipo),
+    soggiorno: soggiorno, tassa: corrEmptyMoney(), extra: corrEmptyMoney(),
+    sospesi: 0,
+    note: existing ? existing.note : (p.nomeOta+' (carta virtuale) · '+(b.guestName||'')+' · '+(b.roomName||'')),
+    otaRef: bookingId,
+    bookingRef: null
+  };
+  if (idx >= 0) corrState.transactions[idx] = tx; else corrState.transactions.push(tx);
+  DB.setObj('corrispettivi', corrState);
+}
+
+// Differenza di prezzo da Listino tra la camera attuale e quella prenotata in origine, notte per notte
+function contoOtaCalcolaDifferenza(bookingId){
+  var b = DB.get('bookings').find(function(x){ return x.id===bookingId; });
+  if (!b || !b.originalRoomId || b.originalRoomId === b.roomId) { showToast('Nessun cambio camera su questa prenotazione'); return; }
+  var pax = Math.max(1, (parseInt(b.adults)||1) + (parseInt(b.children)||0));
+  var n = nights(b.checkin, b.checkout), diff = 0, mancanti = 0;
+  for (var i=0; i<n; i++) {
+    var ds = addDays(b.checkin, i);
+    var nuovo = getPrezzoListino(b.roomId, pax, ds, b.tariffaId) || 0;
+    var orig = getPrezzoListino(b.originalRoomId, pax, ds, b.tariffaId) || 0;
+    if (!nuovo || !orig) mancanti++;
+    diff += (nuovo - orig);
+  }
+  diff = contoRound2(Math.max(0, diff));
+  var el = document.getElementById('conto-ota-diff');
+  if (el) el.value = diff.toFixed(2);
+  showToast(diff > 0
+    ? 'Differenza da listino: '+fmtCurrency(diff)+' su '+n+' nott'+(n===1?'e':'i')+(mancanti?' (⚠ '+mancanti+' notti senza prezzo in listino)':'')+' — premi "Salva parte OTA"'
+    : 'Da listino non risulta nessuna differenza a favore della struttura'+(mancanti?' (⚠ prezzi mancanti in listino)':''));
+}
+
+// Per "Conti da saldare": importo ancora da incassare, considerando anche la carta virtuale OTA
+function contoDaSaldareInfo(b){
+  var p = contoParti(b);
+  if (!p.otaAttivo) {
+    var dovuto = (parseFloat(b.totalPrice)||0) + calcTassaSoggiorno(b).tax;
+    return { dovuto: dovuto, daSaldare: Math.max(0, dovuto - (parseFloat(b.caparra)||0)), otaDaIncassare: 0, p: p };
+  }
+  var ospiteAperto = (b.pagato||'no') !== 'si';
+  var ospite = ospiteAperto ? Math.max(0, p.soggiornoOspite + p.tax - (parseFloat(b.caparra)||0)) : 0;
+  var ota = p.incassataOta ? 0 : p.importoOta;
+  return { dovuto: p.importoOta + p.soggiornoOspite + p.tax, daSaldare: ospite + ota, otaDaIncassare: ota, p: p };
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// ROOMING LIST ONLINE — richiesto da Gian (ispirato a GestHotel): il capogruppo riceve un link e
+// compila da solo i dati di tutte le persone, camera per camera; DeskFlow vede a che punto è,
+// manda promemoria e importa i dati nelle prenotazioni (pronti per check-in, Alloggiati Web,
+// ISTAT e tassa di soggiorno calcolata per età).
+// I dati viaggiano su Supabase (tabella rooming_lists + 2 funzioni rl_get/rl_salva usate dalla
+// pagina pubblica rooming-list.html, che DeskFlow genera già configurata — vedi Impostazioni).
+// ══════════════════════════════════════════════════════════════════════════
+const RL_SQL = `-- DeskFlow — Rooming list online (da eseguire UNA volta: Supabase → SQL Editor → New query → Run)
+create table if not exists public.rooming_lists (
+  token text primary key,
+  group_id text not null,
+  titolo text,
+  struttura text,
+  camere jsonb not null default '[]',
+  risposte jsonb not null default '{}',
+  stato text not null default 'inviata',
+  ospiti_compilati int not null default 0,
+  ospiti_totali int not null default 0,
+  scadenza date,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  compilata_at timestamptz,
+  importata_at timestamptz
+);
+create index if not exists rooming_lists_group_idx on public.rooming_lists(group_id);
+alter table public.rooming_lists enable row level security;
+drop policy if exists "deskflow_staff" on public.rooming_lists;
+create policy "deskflow_staff" on public.rooming_lists for all to anon, authenticated using (true) with check (true);
+
+-- Lettura per la pagina pubblica: restituisce SOLO la rooming list del codice segreto indicato
+create or replace function public.rl_get(p_token text) returns jsonb
+language sql security definer set search_path = public as $$
+  select jsonb_build_object('titolo', titolo, 'struttura', struttura, 'camere', camere,
+    'risposte', risposte, 'stato', stato, 'scadenza', scadenza)
+  from public.rooming_lists where token = p_token and length(p_token) >= 20;
+$$;
+
+-- Salvataggio dalla pagina pubblica (anche più volte, finché il gruppo non arriva)
+create or replace function public.rl_salva(p_token text, p_risposte jsonb, p_compilati int, p_totali int) returns jsonb
+language plpgsql security definer set search_path = public as $$
+begin
+  update public.rooming_lists set
+    risposte = coalesce(p_risposte, '{}'::jsonb),
+    ospiti_compilati = greatest(0, coalesce(p_compilati, 0)),
+    stato = case when stato = 'importata' then 'aggiornata'
+                 when coalesce(p_compilati,0) >= greatest(ospiti_totali,1) then 'compilata'
+                 else 'parziale' end,
+    compilata_at = case when coalesce(p_compilati,0) >= greatest(ospiti_totali,1) then now() else compilata_at end,
+    updated_at = now()
+  where token = p_token and length(p_token) >= 20;
+  if not found then return jsonb_build_object('ok', false); end if;
+  return jsonb_build_object('ok', true);
+end;
+$$;
+grant execute on function public.rl_get(text) to anon, authenticated;
+grant execute on function public.rl_salva(text, jsonb, int, int) to anon, authenticated;`;
+
+const RL_STATI = {
+  inviata:    {lbl:'Link inviato — non ancora compilata', col:'badge-gray'},
+  parziale:   {lbl:'Compilata in parte',                  col:'badge-amber'},
+  compilata:  {lbl:'Compilata — da importare',            col:'badge-green'},
+  importata:  {lbl:'Importata nel gestionale',            col:'badge-blue'},
+  aggiornata: {lbl:'Modificata dopo l\'importazione',      col:'badge-amber'}
+};
+
+function rlQ(s){ return String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+function rlH(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function rlDomId(gid){ return 'rl-badge-'+String(gid).replace(/[^a-zA-Z0-9_-]/g,'_'); }
+function rlConn(){ return (typeof supabaseReady !== 'undefined' && supabaseReady && typeof supabaseClient !== 'undefined' && supabaseClient) ? supabaseClient : null; }
+function rlErroreTabella(err){ var m = String((err && (err.message||err.code)) || err || ''); return /rooming_lists|42P01|PGRST205|does not exist|schema cache/i.test(m); }
+
+function rlUrlPagina(){
+  var s = DB.getObj('settings', {});
+  if (s.roomingListUrl) return s.roomingListUrl.trim();
+  if (s.checkinOnlineUrl) return s.checkinOnlineUrl.trim().replace(/[^\/]*$/, 'rooming-list.html');
+  return '';
+}
+function rlTesto(nome, link, titolo, promemoria){
+  var s = DB.getObj('settings', {});
+  var modello = (s.roomingListMessage && s.roomingListMessage.trim()) ? s.roomingListMessage
+    : 'Ciao {{nome}}! Per preparare al meglio l\'arrivo del gruppo "{{gruppo}}", ti chiediamo di compilare la rooming list con i dati di tutte le persone, camera per camera:\n\n{{link}}\n\nPuoi compilarla anche in più volte dallo stesso link. Grazie!';
+  var txt = modello.replace(/\{\{nome\}\}/g, nome||'').replace(/\{\{link\}\}/g, link).replace(/\{\{gruppo\}\}/g, titolo||'');
+  if (promemoria) txt = '🔔 Promemoria — la rooming list non è ancora completa.\n\n' + txt;
+  return txt;
+}
+
+function rlGruppo(groupId){
+  var bks = DB.get('bookings').filter(function(b){ return b.groupId === groupId && b.status !== 'cancellata'; })
+    .sort(function(a,b){ return (a.roomName||'').localeCompare(b.roomName||'', 'it', {numeric:true}); });
+  var rooms = DB.get('rooms');
+  var info = (gruppiInfoGet()[groupId]) || {};
+  var camere = bks.map(function(b){
+    var r = rooms.find(function(x){ return x.id === b.roomId; }) || {};
+    // Al cliente non si mostra MAI il numero/nome interno della camera, solo la tipologia
+    return { bookingId: b.id, tipologia: r.type || 'Camera', persone: Math.max(1, (parseInt(b.adults)||1) + (parseInt(b.children)||0)), checkin: b.checkin, checkout: b.checkout };
+  });
+  var checkinMin = bks.reduce(function(m,b){ return (!m||b.checkin<m)?b.checkin:m; }, '');
+  return { bks: bks, camere: camere, info: info, titolo: info.nomeEvento || groupId, checkinMin: checkinMin,
+           totale: camere.reduce(function(s,c){ return s+c.persone; }, 0) };
+}
+
+function rlMostraSetup(motivo){
+  showModal('Rooming list online — da attivare',
+    '<div style="font-size:13px;line-height:1.5">'+
+      (motivo === 'supabase'
+        ? '<p>La rooming list online usa il database Supabase (serve perché il capogruppo possa compilarla da casa). Collega prima Supabase in <strong>Impostazioni</strong>.</p>'
+        : '<p>Manca ancora la tabella della rooming list nel database. Si attiva <strong>una sola volta</strong>, in 3 passi:</p>'+
+          '<ol style="padding-left:18px;margin:6px 0 10px"><li>Premi <strong>📋 Copia istruzioni</strong> qui sotto</li>'+
+          '<li>Apri Supabase → <strong>SQL Editor</strong> → <strong>New query</strong>, incolla e premi <strong>Run</strong></li>'+
+          '<li>Torna qui e riprova</li></ol>'+
+          '<p style="color:var(--text3);font-size:12px">Poi in Impostazioni → "Check-in online e prenotazione web" scarica la pagina <code>rooming-list.html</code> e caricala sul tuo sito, accanto a checkin-online.html.</p>')+
+    '</div>',
+    '<button class="btn" onclick="closeModal()">Chiudi</button>'+
+    (motivo === 'supabase'
+      ? '<button class="btn btn-primary" onclick="closeModal();navigate(\'impostazioni\')">Vai alle Impostazioni</button>'
+      : '<button class="btn btn-primary" onclick="navigator.clipboard.writeText(RL_SQL).then(function(){showToast(\'Istruzioni copiate — incollale nel SQL Editor di Supabase\');})">📋 Copia istruzioni</button>')
+  );
+}
+
+// Crea (o aggiorna) la rooming list del gruppo su Supabase e apre la finestra di invio
+async function rlApri(groupId){
+  var sb = rlConn();
+  if (!sb) { rlMostraSetup('supabase'); return; }
+  var g = rlGruppo(groupId);
+  if (!g.bks.length) { showToast('Nessuna camera attiva in questo gruppo'); return; }
+  var url = rlUrlPagina();
+  if (!url) {
+    showModal('Rooming list online — indirizzo pagina mancante',
+      '<div style="font-size:13px">Indica in <strong>Impostazioni → Check-in online e prenotazione web</strong> l\'indirizzo della pagina <code>rooming-list.html</code> (da scaricare lì stesso e pubblicare sul tuo sito).</div>',
+      '<button class="btn" onclick="closeModal()">Chiudi</button><button class="btn btn-primary" onclick="closeModal();navigate(\'impostazioni\')">Vai alle Impostazioni</button>');
+    return;
+  }
+  showToast('Preparo la rooming list…');
+  try {
+    var esistente = null;
+    var r1 = await sb.from('rooming_lists').select('*').eq('group_id', groupId).order('created_at', {ascending:false}).limit(1);
+    if (r1.error) throw r1.error;
+    esistente = (r1.data||[])[0] || null;
+    var token = esistente ? esistente.token : generaTokenSicuro();
+    var scad = g.checkinMin ? addDays(g.checkinMin, -2) : null;
+    var riga = { token: token, group_id: groupId, titolo: g.titolo, struttura: DB.getObj('settings',{}).propertyName || '',
+                 camere: g.camere, ospiti_totali: g.totale, scadenza: scad, updated_at: new Date().toISOString() };
+    var r2 = await sb.from('rooming_lists').upsert(riga, {onConflict:'token'}).select('*');
+    if (r2.error) throw r2.error;
+    var row = (r2.data||[])[0] || Object.assign({}, esistente||{}, riga);
+    var info = gruppiInfoGet(); info[groupId] = Object.assign({}, info[groupId]||{}, {roomingToken: token}); gruppiInfoSalva(info);
+    rlMostraInvio(groupId, row, url.replace(/\?.*$/,'') + '?t=' + token);
+  } catch (err) {
+    console.error('Rooming list:', err);
+    if (rlErroreTabella(err)) { rlMostraSetup('tabella'); return; }
+    showToast('Rooming list non disponibile: '+(err.message||err));
+  }
+}
+
+function rlMostraInvio(groupId, row, link){
+  var g = rlGruppo(groupId), info = g.info;
+  var st = RL_STATI[row.stato] || RL_STATI.inviata;
+  var promemoria = row.stato === 'inviata' || row.stato === 'parziale';
+  var tel = String(info.referenteTelefono||'').replace(/[^0-9]/g,'');
+  if (tel && !tel.startsWith('39') && tel.length <= 10) tel = '39'+tel;
+  var email = info.referenteEmail || '';
+  var nome = info.referenteNome || '';
+  var testo = rlTesto(nome, link, g.titolo, false), testoProm = rlTesto(nome, link, g.titolo, true);
+  var s = DB.getObj('settings', {});
+  var emailReale = !!(s.supabaseUrl && s.supabaseKey);
+  window._rlLink = link; window._rlTesto = testo; window._rlTestoProm = testoProm;
+  var gq = rlQ(groupId);
+  showModal('📋 Rooming list online — '+rlH(g.titolo),
+    '<div style="font-size:13px">'+
+      '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">'+
+        '<span class="badge '+st.col+'">'+st.lbl+'</span>'+
+        '<span style="color:var(--text2)"><strong>'+(row.ospiti_compilati||0)+' / '+(row.ospiti_totali||g.totale)+'</strong> ospiti completi · '+g.camere.length+' camere</span>'+
+        (row.updated_at && row.stato!=='inviata' ? '<span style="color:var(--text3);font-size:11.5px">ultimo aggiornamento '+new Date(row.updated_at).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'</span>' : '')+
+      '</div>'+
+      (row.scadenza ? '<div style="color:var(--text3);font-size:12px;margin-bottom:10px">Il capogruppo vede come scadenza il <strong>'+fmtDate(row.scadenza)+'</strong> (2 giorni prima dell\'arrivo).</div>' : '')+
+      '<label style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase">Link da inviare al capogruppo</label>'+
+      '<input type="text" readonly value="'+rlH(link)+'" style="width:100%;padding:8px 10px;border:.5px solid var(--border2);border-radius:8px;font-size:12.5px;margin:4px 0 10px">'+
+      (nome || email || tel
+        ? '<div style="color:var(--text2)">Capogruppo: <strong>'+rlH(nome||'—')+'</strong>'+(email?' · '+rlH(email):'')+(info.referenteTelefono?' · '+rlH(info.referenteTelefono):'')+'</div>'
+        : '<div style="color:var(--amber)">⚠ Nessun referente salvato per questo gruppo: <a href="#" onclick="closeModal();gruppiApriModaleReferente(\''+gq+'\');return false">aggiungi nome, email e telefono</a> per inviare il link con un clic.</div>')+
+      '<div style="font-size:11.5px;color:var(--text3);margin-top:10px">Ogni camera mostra al cliente solo la tipologia, mai il numero interno. Se aggiungi o togli camere al gruppo, riapri questa finestra: il link resta lo stesso e si aggiorna da solo.</div>'+
+    '</div>',
+    '<button class="btn" onclick="closeModal()">Chiudi</button>'+
+    '<button class="btn" onclick="navigator.clipboard.writeText(window._rlLink).then(function(){showToast(\'Link copiato\');})">📋 Copia link</button>'+
+    (tel ? '<button class="btn" onclick="rlRegistraInvio(\''+gq+'\',\'WhatsApp\','+(promemoria&&row.stato!=='inviata'?'true':'false')+');window.open(\'https://wa.me/'+tel+'?text=\'+encodeURIComponent('+(promemoria&&row.stato!=='inviata'?'window._rlTestoProm':'window._rlTesto')+'),\'_blank\')">💬 WhatsApp</button>' : '')+
+    (email ? (emailReale
+        ? '<button class="btn" onclick="rlInviaEmail(\''+gq+'\',false)">📤 Invia email</button>'+(row.stato==='parziale'||row.stato==='inviata'?'<button class="btn" onclick="rlInviaEmail(\''+gq+'\',true)">🔔 Promemoria</button>':'')
+        : '<button class="btn" onclick="rlRegistraInvio(\''+gq+'\',\'email\',false);window.open(\'mailto:'+rlH(email)+'?subject=\'+encodeURIComponent(\'Rooming list — '+rlH(rlQ(g.titolo))+'\')+\'&body=\'+encodeURIComponent(window._rlTesto))">✉️ Email</button>') : '')+
+    ((row.ospiti_compilati||0) > 0 ? '<button class="btn btn-primary" onclick="rlImporta(\''+gq+'\')">📥 Importa nel gestionale</button>' : '')
+  );
+}
+
+function rlRegistraInvio(groupId, canale, promemoria){
+  var info = gruppiInfoGet(); var gi = Object.assign({}, info[groupId]||{});
+  gi.roomingInvii = (gi.roomingInvii||[]).concat([{data:new Date().toISOString(), canale:canale, promemoria:!!promemoria}]).slice(-20);
+  info[groupId] = gi; gruppiInfoSalva(info);
+}
+
+async function rlInviaEmail(groupId, promemoria){
+  var g = rlGruppo(groupId), s = DB.getObj('settings', {});
+  var email = g.info.referenteEmail;
+  if (!email) { showToast('Nessuna email del referente'); return; }
+  showToast('Invio in corso…');
+  try {
+    var res = await fetch(s.supabaseUrl.replace(/\/$/,'') + '/functions/v1/invio-ricevuta', {
+      method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+s.supabaseKey,'apikey':s.supabaseKey},
+      body: JSON.stringify({ smtpEmail: s.emailInvioPromemoria, smtpPassword: s.passwordInvioPromemoria, to: email, toName: g.info.referenteNome||'',
+        subject: (promemoria?'Promemoria — ':'')+'Rooming list — '+g.titolo+(s.propertyName?' · '+s.propertyName:''),
+        message: promemoria ? window._rlTestoProm : window._rlTesto })
+    });
+    var data = await res.json();
+    if (!data.ok) throw new Error(data.errore || 'Invio non riuscito');
+    rlRegistraInvio(groupId, 'email', promemoria);
+    closeModal();
+    showToast((promemoria?'🔔 Promemoria':'📤 Link della rooming list')+' inviato a '+email);
+  } catch (err) {
+    showToast('Invio non riuscito: '+(err.message||err));
+  }
+}
+
+// Mappa i dati compilati dal capogruppo nel formato "componenti" usato dal check-in di DeskFlow
+function rlAComponente(p, esistente){
+  var c = Object.assign({}, esistente||{});
+  c.cognome = p.cognome||''; c.nome = p.nome||''; c.sesso = p.sesso||'';
+  c.dataNascita = p.dataNascita||''; c.cittadinanza = p.cittadinanza||'';
+  if (p.natoItalia === false) { c.luogoNascita = ''; c.provNascita = ''; }
+  else { c.luogoNascita = p.luogoNascita||''; c.provNascita = p.provNascita||''; }
+  c.statoResidenza = p.statoResidenza||'';
+  c.residenza = p.residenza||''; c.provResidenza = p.provResidenza||'';
+  if (p.tipoDoc || p.numDoc) { c.tipoDoc = p.tipoDoc||''; c.numDoc = p.numDoc||''; c.luogoDoc = p.luogoDoc||''; }
+  c.daRoomingList = true;
+  return c;
+}
+
+async function rlImporta(groupId){
+  var sb = rlConn(); if (!sb) { rlMostraSetup('supabase'); return; }
+  var r = await sb.from('rooming_lists').select('*').eq('group_id', groupId).order('created_at', {ascending:false}).limit(1);
+  if (r.error) { if (rlErroreTabella(r.error)) rlMostraSetup('tabella'); else showToast('Errore: '+r.error.message); return; }
+  var row = (r.data||[])[0];
+  if (!row) { showToast('Nessuna rooming list per questo gruppo'); return; }
+  var g = rlGruppo(groupId), risp = row.risposte || {};
+  var righe = g.bks.map(function(b, i){
+    var lista = (risp[b.id]||[]).filter(function(p){ return p && (p.cognome||p.nome); });
+    var giaCheckin = (b.componenti||[]).some(function(c){ return c && c.cognome && !c.daRoomingList; });
+    return '<tr><td style="padding:5px 0"><strong>'+rlH(b.roomName)+'</strong></td><td>'+rlH(b.guestName)+'</td>'+
+      '<td>'+lista.length+' / '+Math.max(1,(parseInt(b.adults)||1)+(parseInt(b.children)||0))+'</td>'+
+      '<td style="font-size:12px;color:var(--text3)">'+lista.map(function(p){ return rlH((p.cognome||'')+' '+(p.nome||'')); }).join(', ')+
+      (giaCheckin?'<div style="color:var(--amber)">⚠ ha già dati di check-in: verranno sostituiti</div>':'')+'</td></tr>';
+  }).join('');
+  window._rlRowImport = row;
+  showModal('📥 Importa rooming list — '+rlH(g.titolo),
+    '<div style="font-size:13px">'+
+      '<div style="margin-bottom:8px;color:var(--text2)">I dati compilati dal capogruppo vengono copiati nelle prenotazioni del gruppo: li ritrovi già pronti al check-in, per Alloggiati Web e per la tassa di soggiorno calcolata in base all\'età. Lo stato delle prenotazioni non cambia.</div>'+
+      '<table style="width:100%;border-collapse:collapse;font-size:12.5px"><tr style="color:var(--text3);font-size:11px"><td>Camera</td><td>Prenotazione</td><td>Ospiti</td><td>Nomi</td></tr>'+righe+'</table>'+
+      ((row.ospiti_compilati||0) < (row.ospiti_totali||0) ? '<div style="margin-top:10px;color:var(--amber)">⚠ Rooming list non ancora completa ('+(row.ospiti_compilati||0)+'/'+row.ospiti_totali+'): puoi importare ora e reimportare più tardi.</div>' : '')+
+    '</div>',
+    '<button class="btn" onclick="closeModal()">Annulla</button><button class="btn btn-primary" onclick="rlEseguiImport(\''+rlQ(groupId)+'\')">📥 Importa</button>'
+  );
+}
+
+async function rlEseguiImport(groupId){
+  var row = window._rlRowImport; if (!row || row.group_id !== groupId) return;
+  var risp = row.risposte || {};
+  var bks = DB.get('bookings');
+  var aggiornate = 0, persone = 0, log = [];
+  bks.forEach(function(b){
+    if (b.groupId !== groupId || b.status === 'cancellata') return;
+    var lista = risp[b.id]; if (!lista || !lista.length) return;
+    var vecchi = b.componenti || [];
+    var nuovi = lista.map(function(p, i){ return (p && (p.cognome||p.nome)) ? rlAComponente(p, vecchi[i]) : (vecchi[i] || {}); });
+    while (nuovi.length && !(nuovi[nuovi.length-1] && (nuovi[nuovi.length-1].cognome||nuovi[nuovi.length-1].nome))) nuovi.pop();
+    if (!nuovi.length) return;
+    b.componenti = nuovi;
+    aggiornate++; persone += nuovi.filter(function(c){ return c.cognome; }).length;
+    log.push(b.id);
+  });
+  if (!aggiornate) { showToast('Nessun dato da importare'); return; }
+  DB.set('bookings', bks);
+  log.forEach(function(id){ registraModificaPrenotazione(id, 'checkin', 'Dati ospiti importati dalla rooming list online'); });
+  var sb = rlConn();
+  if (sb) { try { await sb.from('rooming_lists').update({stato:'importata', importata_at:new Date().toISOString()}).eq('token', row.token); } catch(e) {} }
+  closeModal();
+  showToast('📥 Rooming list importata — '+persone+' persone in '+aggiornate+' camere');
+  if (currentPage === 'gruppi') renderGruppiEventi();
+}
+
+// Badge di stato nella pagina Gruppi & Eventi (caricati in un colpo solo per tutti i gruppi mostrati)
+async function rlCaricaStati(groupIds){
+  var sb = rlConn(); if (!sb || !groupIds || !groupIds.length) return;
+  try {
+    var r = await sb.from('rooming_lists').select('group_id,stato,ospiti_compilati,ospiti_totali,updated_at').in('group_id', groupIds);
+    if (r.error) return;
+    (r.data||[]).forEach(function(row){
+      var el = document.getElementById(rlDomId(row.group_id)); if (!el) return;
+      var st = RL_STATI[row.stato] || RL_STATI.inviata;
+      el.innerHTML = '<span class="badge '+st.col+'" title="Rooming list online">📋 '+st.lbl+' · '+(row.ospiti_compilati||0)+'/'+(row.ospiti_totali||0)+'</span>';
+    });
+  } catch(e) { /* senza tabella o senza rete: nessun badge, nient'altro cambia */ }
+}
+
+// Genera la pagina pubblica rooming-list.html già collegata al Supabase di QUESTA struttura
+function rlScaricaPagina(){
+  var conn = getSupabaseConfig();
+  if (!conn.url || !conn.key) { showToast('Collega prima Supabase in Impostazioni: la pagina deve sapere dove salvare i dati'); return; }
+  var s = DB.getObj('settings', {});
+  var tipiDoc = ['IDENT','IDELE','PASOR','PATEN'].map(function(c){ return [c, awDocLabel(c)]; })
+    .concat(AW_DOCUMENTI.filter(function(d){ return ['IDENT','IDELE','PASOR','PATEN'].indexOf(d.codice) === -1; }).map(function(d){ return [d.codice, d.nome]; }));
+  var cfg = { url: conn.url, key: conn.key, struttura: s.propertyName||'', emailStruttura: s.email||'', notifica: true,
+              nazioni: RL_NAZIONI, documenti: tipiDoc, comuni: COMUNI_IT };
+  var accent = /^#[0-9a-f]{6}$/i.test(s.coloreSito||'') ? s.coloreSito : '#1a73e8';
+  var logo = s.logo ? '<img src="'+String(s.logo).replace(/"/g,'&quot;')+'" alt="">' : '';
+  var html = RL_PAGE_TEMPLATE
+    .replace('__CONFIG__', JSON.stringify(cfg).replace(/<\//g,'<\\/'))
+    .replace('__ACCENT__', accent)
+    .replace('__LOGO__', logo);
+  var blob = new Blob([html], {type:'text/html'});
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'rooming-list.html';
+  document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  showToast('⬇ rooming-list.html scaricata — caricala sul tuo sito accanto a checkin-online.html');
+}
+
+const RL_NAZIONI = ['Italia','Afghanistan','Albania','Algeria','Andorra','Angola','Antigua e Barbuda','Arabia Saudita','Argentina','Armenia','Australia','Austria','Azerbaigian','Bahamas','Bahrein','Bangladesh','Barbados','Belgio','Belize','Benin','Bhutan','Bielorussia','Birmania (Myanmar)','Bolivia','Bosnia ed Erzegovina','Botswana','Brasile','Brunei','Bulgaria','Burkina Faso','Burundi','Cambogia','Camerun','Canada','Capo Verde','Ciad','Cile','Cina','Cipro','Città del Vaticano','Colombia','Comore','Corea del Nord','Corea del Sud','Costa d\'Avorio','Costa Rica','Croazia','Cuba','Danimarca','Dominica','Ecuador','Egitto','El Salvador','Emirati Arabi Uniti','Eritrea','Estonia','Eswatini (Swaziland)','Etiopia','Figi','Filippine','Finlandia','Francia','Gabon','Gambia','Georgia','Germania','Ghana','Giamaica','Giappone','Gibuti','Giordania','Grecia','Grenada','Guatemala','Guinea','Guinea-Bissau','Guinea Equatoriale','Guyana','Haiti','Honduras','India','Indonesia','Iran','Iraq','Irlanda','Islanda','Israele','Kazakistan','Kenya','Kirghizistan','Kiribati','Kosovo','Kuwait','Laos','Lesotho','Lettonia','Libano','Liberia','Libia','Liechtenstein','Lituania','Lussemburgo','Macedonia del Nord','Madagascar','Malawi','Malaysia','Maldive','Mali','Malta','Marocco','Isole Marshall','Mauritania','Mauritius','Messico','Micronesia','Moldavia','Monaco','Mongolia','Montenegro','Mozambico','Namibia','Nauru','Nepal','Nicaragua','Niger','Nigeria','Norvegia','Nuova Zelanda','Oman','Paesi Bassi','Pakistan','Palau','Palestina','Panama','Papua Nuova Guinea','Paraguay','Perù','Polonia','Portogallo','Qatar','Regno Unito','Repubblica Ceca','Repubblica Centrafricana','Repubblica del Congo','Repubblica Democratica del Congo','Repubblica Dominicana','Romania','Ruanda','Russia','Saint Kitts e Nevis','Saint Vincent e Grenadine','Salomone','Samoa','San Marino','Santa Lucia','São Tomé e Príncipe','Senegal','Serbia','Seychelles','Sierra Leone','Singapore','Siria','Slovacchia','Slovenia','Somalia','Spagna','Sri Lanka','Stati Uniti d\'America','Sudafrica','Sudan','Sudan del Sud','Suriname','Svezia','Svizzera','Tagikistan','Taiwan','Tanzania','Thailandia','Timor Est','Togo','Tonga','Trinidad e Tobago','Tunisia','Turchia','Turkmenistan','Tuvalu','Ucraina','Uganda','Ungheria','Uruguay','Uzbekistan','Vanuatu','Venezuela','Vietnam','Yemen','Zambia','Zimbabwe'];
+
+const RL_PAGE_TEMPLATE = "<!DOCTYPE html>\n<html lang=\"it\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<meta name=\"robots\" content=\"noindex,nofollow\">\n<title>Rooming list<\/title>\n<style>\n:root{--bg:#f4f5f7;--card:#fff;--text:#1d2330;--muted:#6b7280;--line:#e3e6ea;--accent:__ACCENT__;--ok:#1a7a3c;--bad:#b5482f;--warn:#a16207}\n*{box-sizing:border-box}\nbody{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 -apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,Arial,sans-serif}\nheader{background:var(--accent);color:#fff;padding:22px 16px 26px}\n.wrap{max-width:860px;margin:0 auto;padding:0 16px}\nheader .wrap{padding:0}\n.brand{display:flex;align-items:center;gap:12px}\n.brand img{width:48px;height:48px;object-fit:contain;background:#fff;border-radius:10px;padding:4px}\nh1{font-size:22px;margin:0}\n.sub{opacity:.9;font-size:14px;margin-top:4px}\n.lang{float:right;display:flex;gap:4px}\n.lang button{background:rgba(255,255,255,.18);color:#fff;border:0;border-radius:6px;padding:5px 9px;font-weight:700;cursor:pointer}\n.lang button.on{background:#fff;color:var(--accent)}\nmain{margin-top:-14px;padding-bottom:110px}\n.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}\n.intro{font-size:14px;color:var(--muted)}\n.room-h{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline;margin-bottom:6px}\n.room-h h2{font-size:17px;margin:0}\n.room-h span{font-size:13px;color:var(--muted)}\n.person{border-top:1px solid var(--line);padding-top:12px;margin-top:12px}\n.person-h{font-weight:700;font-size:14px;margin-bottom:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}\n.tag{font-size:11px;font-weight:700;border-radius:20px;padding:2px 8px;background:#eef2ff;color:var(--accent)}\n.tag.ok{background:#e7f5ec;color:var(--ok)}\n.tag.no{background:#fdf0ec;color:var(--bad)}\n.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}\nlabel{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:3px}\ninput,select{width:100%;padding:9px 10px;border:1px solid #cfd4da;border-radius:8px;font:inherit;font-size:15px;background:#fff;color:var(--text)}\ninput:focus,select:focus{outline:2px solid var(--accent);outline-offset:0;border-color:transparent}\n.miss input,.miss select{border-color:var(--bad);background:#fff8f6}\n.doc{background:#f8f9fb;border-radius:8px;padding:10px;margin-top:10px}\n.doc b{font-size:12px;color:var(--muted);display:block;margin-bottom:6px}\n.bar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);padding:12px 16px;box-shadow:0 -4px 16px rgba(0,0,0,.06)}\n.bar .wrap{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:0}\n.bar .stat{font-size:13px;color:var(--muted)}\n.btn{background:var(--accent);color:#fff;border:0;border-radius:9px;padding:12px 20px;font:inherit;font-weight:700;cursor:pointer}\n.btn:disabled{opacity:.6;cursor:default}\n.msg{padding:12px 14px;border-radius:10px;margin-bottom:14px;font-size:14px}\n.msg.ok{background:#e7f5ec;color:var(--ok)}\n.msg.err{background:#fdf0ec;color:var(--bad)}\n.center{text-align:center;padding:60px 16px;color:var(--muted)}\n.privacy{font-size:12px;color:var(--muted)}\n<\/style>\n<\/head>\n<body>\n<header><div class=\"wrap\">\n  <div class=\"lang\"><button data-l=\"it\" class=\"on\">IT<\/button><button data-l=\"en\">EN<\/button><\/div>\n  <div class=\"brand\">__LOGO__<div><h1 id=\"h-titolo\">Rooming list<\/h1><div class=\"sub\" id=\"h-sub\"><\/div><\/div><\/div>\n<\/div><\/header>\n<main class=\"wrap\" id=\"app\"><div class=\"card center\">…<\/div><\/main>\n<div class=\"bar\" id=\"bar\" style=\"display:none\"><div class=\"wrap\"><div class=\"stat\" id=\"stat\"><\/div><button class=\"btn\" id=\"salva\">Salva<\/button><\/div><\/div>\n\n<script>\nvar CFG = __CONFIG__;\nvar T = {\n  it:{loading:'Caricamento…',invalid:'Questo link non è valido o è scaduto. Contatta la struttura.',neterr:'Impossibile collegarsi in questo momento. Riprova tra poco.',\n      intro:'Compila i dati di tutte le persone del gruppo, camera per camera. Puoi salvare anche a metà e tornare più tardi da questo stesso link: i dati già inseriti restano.',\n      deadline:'Da completare entro il',room:'Camera',people:'persone',person:'Persona',leader:'Capogruppo',complete:'Completo',incomplete:'Da completare',\n      surname:'Cognome',name:'Nome',sex:'Sesso',m:'Maschio',f:'Femmina',birth:'Data di nascita',citizenship:'Cittadinanza',bornIn:'Luogo di nascita',bornIt:'In Italia',bornAbroad:'All\\'estero',\n      birthTown:'Comune di nascita',prov:'Provincia',resState:'Stato di residenza',resTown:'Comune di residenza',docTitle:'Documento del capogruppo (obbligatorio per legge)',\n      docType:'Tipo documento',docNum:'Numero documento',docPlace:'Luogo di rilascio (comune o Stato)',choose:'— scegli —',\n      save:'Salva',saving:'Salvataggio…',saved:'Grazie! Dati salvati.',savedPart:'Dati salvati. Mancano ancora alcune informazioni: puoi completarle quando vuoi da questo link.',\n      saveErr:'Salvataggio non riuscito, riprova.',stat:'ospiti completi',done:'La struttura ha già ricevuto la rooming list. Se devi correggere qualcosa, salva di nuovo: verrà avvisata.',\n      privacy:'I dati sono richiesti per la comunicazione obbligatoria degli alloggiati alla Questura (art. 109 TULPS) e per le statistiche turistiche. Non vengono usati per altri scopi.'},\n  en:{loading:'Loading…',invalid:'This link is not valid or has expired. Please contact the property.',neterr:'Cannot connect right now. Please try again shortly.',\n      intro:'Please fill in the details of every person in the group, room by room. You can save halfway and come back later using this same link: what you entered is kept.',\n      deadline:'Please complete by',room:'Room',people:'guests',person:'Guest',leader:'Group leader',complete:'Complete',incomplete:'Missing data',\n      surname:'Surname',name:'First name',sex:'Sex',m:'Male',f:'Female',birth:'Date of birth',citizenship:'Citizenship',bornIn:'Place of birth',bornIt:'In Italy',bornAbroad:'Abroad',\n      birthTown:'Town of birth',prov:'Province',resState:'Country of residence',resTown:'Town of residence',docTitle:'Group leader\\'s ID document (required by law)',\n      docType:'Document type',docNum:'Document number',docPlace:'Place of issue (town or country)',choose:'— select —',\n      save:'Save',saving:'Saving…',saved:'Thank you! Your data has been saved.',savedPart:'Saved. Some details are still missing: you can complete them any time from this link.',\n      saveErr:'Saving failed, please try again.',stat:'guests complete',done:'The property has already received the rooming list. If you need to correct something, just save again: they will be notified.',\n      privacy:'This data is required for the mandatory registration of guests with the Italian police (art. 109 TULPS) and for tourism statistics. It is not used for any other purpose.'}\n};\nvar lang = (navigator.language||'it').slice(0,2)==='it' ? 'it' : 'en';\nvar token = new URLSearchParams(location.search).get('t') || new URLSearchParams(location.search).get('token') || '';\nvar DATA = null, RISP = {}, TENTATO = false;\nvar COMUNI_PROV = {}; CFG.comuni.forEach(function(c){ COMUNI_PROV[c[0].toUpperCase()] = c[1]; });\n\nfunction t(k){ return (T[lang]||T.it)[k] || k; }\nfunction esc(s){ return String(s==null?'':s).replace(/[&<>\"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c];}); }\nfunction fmtD(iso){ if(!iso) return ''; var p=iso.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }\nfunction rpc(fn, args){\n  return fetch(CFG.url.replace(/\\/$/,'')+'/rest/v1/rpc/'+fn, {method:'POST', headers:{'Content-Type':'application/json','apikey':CFG.key,'Authorization':'Bearer '+CFG.key}, body:JSON.stringify(args)})\n    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); });\n}\nfunction isLeader(ri, pi){ return ri===0 && pi===0; }\nfunction campiObbligatori(p, leader){\n  var k = ['cognome','nome','sesso','dataNascita','cittadinanza','statoResidenza'];\n  if (p.natoItalia !== false) k.push('luogoNascita','provNascita');\n  if ((p.statoResidenza||'').toLowerCase()==='italia') k.push('residenza');\n  if (leader) k.push('tipoDoc','numDoc','luogoDoc');\n  return k;\n}\nfunction completo(p, leader){ return campiObbligatori(p, leader).every(function(k){ return String(p[k]||'').trim()!==''; }); }\n\nfunction render(){\n  document.documentElement.lang = lang;\n  document.querySelectorAll('.lang button').forEach(function(b){ b.classList.toggle('on', b.dataset.l===lang); });\n  var app = document.getElementById('app');\n  if (!DATA) return;\n  document.getElementById('h-titolo').textContent = DATA.titolo || 'Rooming list';\n  var cam = DATA.camere||[];\n  var ci = cam.reduce(function(m,c){ return (!m||c.checkin<m)?c.checkin:m; }, ''), co = cam.reduce(function(m,c){ return (!m||c.checkout>m)?c.checkout:m; }, '');\n  document.getElementById('h-sub').textContent = (DATA.struttura||'') + (ci ? ' · '+fmtD(ci)+' → '+fmtD(co) : '');\n  var h = '<div class=\"card intro\">'+esc(t('intro'))+(DATA.scadenza?'<div style=\"margin-top:6px;font-weight:700;color:var(--warn)\">'+esc(t('deadline'))+' '+fmtD(DATA.scadenza)+'<\/div>':'')+\n    (DATA.stato==='importata'?'<div style=\"margin-top:6px\">'+esc(t('done'))+'<\/div>':'')+'<\/div><div id=\"msg\"><\/div>';\n  cam.forEach(function(c, ri){\n    var lista = RISP[c.bookingId] || [];\n    h += '<div class=\"card\"><div class=\"room-h\"><h2>'+esc(t('room'))+' '+(ri+1)+(c.tipologia?' · '+esc(c.tipologia):'')+'<\/h2><span>'+c.persone+' '+esc(t('people'))+' · '+fmtD(c.checkin)+' → '+fmtD(c.checkout)+'<\/span><\/div>';\n    for (var pi=0; pi<c.persone; pi++) {\n      var p = lista[pi] || {}; var L = isLeader(ri,pi); var ok = completo(p, L);\n      var id = ri+'_'+pi;\n      h += '<div class=\"person\" data-r=\"'+ri+'\" data-p=\"'+pi+'\"><div class=\"person-h\">'+esc(t('person'))+' '+(pi+1)+(L?' <span class=\"tag\">'+esc(t('leader'))+'<\/span>':'')+\n        ' <span class=\"tag '+(ok?'ok':'no')+'\" id=\"st_'+id+'\">'+esc(ok?t('complete'):t('incomplete'))+'<\/span><\/div><div class=\"grid\">'+\n        inp('cognome',t('surname'),p,'text',' style=\"text-transform:uppercase\"')+\n        inp('nome',t('name'),p,'text',' style=\"text-transform:uppercase\"')+\n        '<div data-f=\"sesso\"><label>'+esc(t('sex'))+'<\/label><select data-k=\"sesso\"><option value=\"\">'+esc(t('choose'))+'<\/option><option value=\"M\"'+(p.sesso==='M'?' selected':'')+'>'+esc(t('m'))+'<\/option><option value=\"F\"'+(p.sesso==='F'?' selected':'')+'>'+esc(t('f'))+'<\/option><\/select><\/div>'+\n        inp('dataNascita',t('birth'),p,'date','')+\n        inp('cittadinanza',t('citizenship'),p,'text',' list=\"dl-naz\" autocomplete=\"off\"', p.cittadinanza||'')+\n        '<div><label>'+esc(t('bornIn'))+'<\/label><select data-k=\"natoItalia\"><option value=\"1\"'+(p.natoItalia!==false?' selected':'')+'>'+esc(t('bornIt'))+'<\/option><option value=\"0\"'+(p.natoItalia===false?' selected':'')+'>'+esc(t('bornAbroad'))+'<\/option><\/select><\/div>'+\n        (p.natoItalia!==false ? inp('luogoNascita',t('birthTown'),p,'text',' list=\"dl-com\" autocomplete=\"off\" style=\"text-transform:uppercase\"')+inp('provNascita',t('prov'),p,'text',' maxlength=\"2\" style=\"text-transform:uppercase\"') : '')+\n        inp('statoResidenza',t('resState'),p,'text',' list=\"dl-naz\" autocomplete=\"off\"', p.statoResidenza||'')+\n        ((p.statoResidenza||'').toLowerCase()==='italia' ? inp('residenza',t('resTown'),p,'text',' list=\"dl-com\" autocomplete=\"off\" style=\"text-transform:uppercase\"')+inp('provResidenza',t('prov'),p,'text',' maxlength=\"2\" style=\"text-transform:uppercase\"') : '')+\n        '<\/div>';\n      if (L) {\n        h += '<div class=\"doc\"><b>'+esc(t('docTitle'))+'<\/b><div class=\"grid\">'+\n          '<div data-f=\"tipoDoc\"><label>'+esc(t('docType'))+'<\/label><select data-k=\"tipoDoc\"><option value=\"\">'+esc(t('choose'))+'<\/option>'+\n            CFG.documenti.map(function(d){ return '<option value=\"'+esc(d[0])+'\"'+(p.tipoDoc===d[0]?' selected':'')+'>'+esc(d[1])+'<\/option>'; }).join('')+'<\/select><\/div>'+\n          inp('numDoc',t('docNum'),p,'text',' style=\"text-transform:uppercase\"')+\n          inp('luogoDoc',t('docPlace'),p,'text',' list=\"dl-com\" autocomplete=\"off\" style=\"text-transform:uppercase\"')+\n        '<\/div><\/div>';\n      }\n      h += '<\/div>';\n    }\n    h += '<\/div>';\n  });\n  h += '<div class=\"card privacy\">'+esc(t('privacy'))+'<\/div>';\n  h += '<datalist id=\"dl-naz\">'+CFG.nazioni.map(function(n){ return '<option value=\"'+esc(n)+'\">'; }).join('')+'<\/datalist>';\n  h += '<datalist id=\"dl-com\">'+CFG.comuni.map(function(c){ return '<option value=\"'+esc(c[0].toUpperCase())+'\">'; }).join('')+'<\/datalist>';\n  app.innerHTML = h;\n  document.getElementById('bar').style.display = '';\n  document.getElementById('salva').textContent = t('save');\n  aggiornaStat();\n}\nfunction inp(k, lbl, p, type, extra, val){\n  var v = val !== undefined ? val : (p[k]||'');\n  return '<div data-f=\"'+k+'\"><label>'+esc(lbl)+'<\/label><input type=\"'+type+'\" data-k=\"'+k+'\" value=\"'+esc(v)+'\"'+(extra||'')+'><\/div>';\n}\nfunction leggi(){\n  document.querySelectorAll('.person').forEach(function(el){\n    var ri = +el.dataset.r, pi = +el.dataset.p, c = DATA.camere[ri];\n    if (!RISP[c.bookingId]) RISP[c.bookingId] = [];\n    var p = Object.assign({}, RISP[c.bookingId][pi]||{});\n    el.querySelectorAll('[data-k]').forEach(function(f){\n      var k = f.dataset.k, v = f.value;\n      if (k==='natoItalia') { p.natoItalia = v !== '0'; return; }\n      if (['cognome','nome','luogoNascita','provNascita','residenza','provResidenza','numDoc','luogoDoc'].indexOf(k)>=0) v = v.toUpperCase();\n      p[k] = v.trim();\n    });\n    if (p.natoItalia === false) { p.luogoNascita=''; p.provNascita=''; }\n    if ((p.statoResidenza||'').toLowerCase()!=='italia') { p.residenza=''; p.provResidenza=''; }\n    RISP[c.bookingId][pi] = p;\n  });\n}\nfunction conta(){\n  var tot=0, ok=0;\n  (DATA.camere||[]).forEach(function(c, ri){ for (var pi=0; pi<c.persone; pi++){ tot++; if (completo((RISP[c.bookingId]||[])[pi]||{}, isLeader(ri,pi))) ok++; } });\n  return {tot:tot, ok:ok};\n}\nfunction aggiornaStat(){ var c=conta(); document.getElementById('stat').textContent = c.ok+' / '+c.tot+' '+t('stat'); }\nfunction evidenzia(){\n  document.querySelectorAll('.person').forEach(function(el){\n    var ri=+el.dataset.r, pi=+el.dataset.p, c=DATA.camere[ri], p=(RISP[c.bookingId]||[])[pi]||{}, L=isLeader(ri,pi);\n    var req = campiObbligatori(p, L);\n    el.querySelectorAll('[data-f]').forEach(function(w){ w.classList.toggle('miss', req.indexOf(w.dataset.f)>=0 && !String(p[w.dataset.f]||'').trim()); });\n    var st = document.getElementById('st_'+ri+'_'+pi); var ok = completo(p,L);\n    if (st) { st.className = 'tag '+(ok?'ok':'no'); st.textContent = ok?t('complete'):t('incomplete'); }\n  });\n}\ndocument.addEventListener('input', function(e){\n  if (!e.target.dataset || !e.target.dataset.k) return;\n  var k = e.target.dataset.k;\n  if (k==='luogoNascita' || k==='residenza') {\n    var pv = COMUNI_PROV[e.target.value.toUpperCase().trim()];\n    if (pv) { var box = e.target.closest('.person'); var tgt = box.querySelector('[data-k=\"'+(k==='luogoNascita'?'provNascita':'provResidenza')+'\"]'); if (tgt && !tgt.value) tgt.value = pv; }\n  }\n  leggi(); aggiornaStat();\n});\ndocument.addEventListener('change', function(e){\n  if (!e.target.dataset) return;\n  var k = e.target.dataset.k;\n  if (k==='natoItalia' || k==='statoResidenza' || k==='cittadinanza') {\n    leggi();\n    if (k==='cittadinanza') { // propone lo Stato di residenza uguale alla cittadinanza, se ancora vuoto\n      var box = e.target.closest('.person'), c = DATA.camere[+box.dataset.r], p = RISP[c.bookingId][+box.dataset.p];\n      if (!p.statoResidenza) p.statoResidenza = p.cittadinanza;\n      if (p.cittadinanza && p.cittadinanza.toLowerCase()!=='italia' && !p.luogoNascita) p.natoItalia = false; // straniero: di norma nato all'estero (si può cambiare)\n    }\n    var y = window.scrollY; render(); window.scrollTo(0,y); if (TENTATO) evidenzia();\n  }\n});\ndocument.querySelectorAll('.lang button').forEach(function(b){ b.onclick = function(){ if (DATA) leggi(); lang = b.dataset.l; render(); if (TENTATO) evidenzia(); }; });\ndocument.getElementById('salva').onclick = function(){\n  leggi(); TENTATO = true; evidenzia();\n  var c = conta(), btn = this; btn.disabled = true; btn.textContent = t('saving');\n  rpc('rl_salva', {p_token: token, p_risposte: RISP, p_compilati: c.ok, p_totali: c.tot}).then(function(r){\n    if (!r || r.ok === false) throw new Error('save');\n    document.getElementById('msg').innerHTML = '<div class=\"msg ok\">'+esc(c.ok>=c.tot ? t('saved') : t('savedPart'))+'<\/div>';\n    window.scrollTo({top:0, behavior:'smooth'});\n    if (CFG.notifica && CFG.emailStruttura) {\n      fetch(CFG.url.replace(/\\/$/,'')+'/functions/v1/invio-ricevuta', {method:'POST', headers:{'Content-Type':'application/json','apikey':CFG.key,'Authorization':'Bearer '+CFG.key},\n        body: JSON.stringify({to: CFG.emailStruttura, toName: DATA.struttura||'', subject: 'Rooming list aggiornata — '+(DATA.titolo||''),\n          message: 'La rooming list del gruppo \"'+(DATA.titolo||'')+'\" è stata aggiornata dal capogruppo: '+c.ok+' ospiti completi su '+c.tot+'.\\n\\nApri DeskFlow → Gruppi & Eventi → Rooming list online per importarla.'})}).catch(function(){});\n    }\n  }).catch(function(){\n    document.getElementById('msg').innerHTML = '<div class=\"msg err\">'+esc(t('saveErr'))+'<\/div>';\n    window.scrollTo({top:0, behavior:'smooth'});\n  }).then(function(){ btn.disabled = false; btn.textContent = t('save'); });\n};\n\n(function avvio(){\n  var app = document.getElementById('app');\n  app.innerHTML = '<div class=\"card center\">'+esc(t('loading'))+'<\/div>';\n  if (!token) { app.innerHTML = '<div class=\"card center\">'+esc(t('invalid'))+'<\/div>'; return; }\n  rpc('rl_get', {p_token: token}).then(function(d){\n    if (!d || !d.camere) { app.innerHTML = '<div class=\"card center\">'+esc(t('invalid'))+'<\/div>'; return; }\n    DATA = d; RISP = d.risposte || {};\n    render();\n  }).catch(function(){ app.innerHTML = '<div class=\"card center\">'+esc(t('neterr'))+'<\/div>'; });\n})();\n<\/script>\n<\/body>\n<\/html>\n";
+
 function gruppiInfoGet(){ return DB.getObj('gruppiInfo', {}); }
 function gruppiInfoSalva(obj){ DB.setObj('gruppiInfo', obj); }
 
@@ -15283,6 +15501,7 @@ function renderGruppiEventi(){
           '<div>'+
             '<div style="font-weight:700;font-size:15px">'+titolo.replace(/</g,'&lt;')+(g.info.nomeEvento?' <span style="font-weight:400;color:var(--text3);font-size:12px">('+g.id+')</span>':'')+(g.isEvento?' <span style="background:#7c3aed;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;vertical-align:middle">🎉 EVENTO</span>':'')+'</div>'+
             '<div style="font-size:12px;color:var(--text3);margin-top:3px">🚪 '+g.camere+' camere · 👤 '+g.ospiti+' ospiti · '+fmtDate(g.checkinMin)+' → '+fmtDate(g.checkoutMax)+' · 💰 '+fmtCurrency(g.totale)+'</div>'+
+            '<div id="'+rlDomId(g.id)+'" style="margin-top:6px"></div>'+
             (g.info.referenteNome ? '<div style="font-size:12.5px;color:var(--text2);margin-top:8px">📇 Referente: <strong>'+g.info.referenteNome.replace(/</g,'&lt;')+'</strong>'+(g.info.referenteTelefono?' · 📞 '+g.info.referenteTelefono.replace(/</g,'&lt;'):'')+(g.info.referenteEmail?' · ✉ '+g.info.referenteEmail.replace(/</g,'&lt;'):'')+'</div>' : '<div style="font-size:12px;color:var(--amber,#d97706);margin-top:8px">⚠ Nessun referente impostato</div>')+
             (g.info.note ? '<div style="font-size:12px;color:var(--text3);margin-top:4px">📝 '+g.info.note.replace(/</g,'&lt;')+'</div>' : '')+
           '</div>'+
@@ -15291,7 +15510,8 @@ function renderGruppiEventi(){
             '<button class="btn btn-sm" onclick="apriGruppoCollegato(\''+g.id.replace(/'/g,"\\'")+'\')">🔗 Vedi/Modifica camere</button>'+
             '<button class="btn btn-sm" onclick="apriContoGruppo(\''+g.id.replace(/'/g,"\\'")+'\')">💰 Conto unico</button>'+
             '<button class="btn btn-sm" onclick="stampaSchedaGruppo(\''+g.id.replace(/'/g,"\\'")+'\')">🖨 Stampa scheda</button>'+
-            '<button class="btn btn-sm" style="background:#7c3aed;color:#fff;border-color:#7c3aed" onclick="stampaRoomingList(\''+g.id.replace(/'/g,"\\'")+'\')">📋 Rooming list (da inviare)</button>'+
+            '<button class="btn btn-sm" style="background:#7c3aed;color:#fff;border-color:#7c3aed" onclick="rlApri(\''+g.id.replace(/'/g,"\\'")+'\')">🔗 Rooming list online</button>'+
+            '<button class="btn btn-sm" onclick="stampaRoomingList(\''+g.id.replace(/'/g,"\\'")+'\')">🖨 Rooming list su carta</button>'+
           '</div>'+
           '</div></div>';
       }).join('') +
@@ -15299,6 +15519,7 @@ function renderGruppiEventi(){
   }
   html += '</div>';
   document.getElementById('page-gruppi').innerHTML = html;
+  rlCaricaStati(gruppi.map(function(g){ return g.id; }));
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -18036,15 +18257,6 @@ function onGuestSearchInput(value) {
   if (display) display.value = nome;
 }
 
-function syncGuestName() {
-  const sel = document.getElementById('f-guestId');
-  const disp = document.getElementById('f-guestNameDisplay');
-  if (!sel || !disp) return;
-  if (sel.value && sel.value !== '__new__') {
-    const g = DB.get('guests').find(x => x.id === sel.value);
-    if (g) disp.value = g.name; // precompila; l'utente può poi modificarlo liberamente
-  }
-}
 
 // Imposta automaticamente l'allestimento camera (Tipologia) in base al numero di adulti:
 // 2 pers. → M (Matrimoniale), 3 pers. → MX (Tripla), 4 pers. → MXX (Quad. 1 Matr.+2 Singoli).
@@ -20755,12 +20967,12 @@ function corrTransactionFromBooking(b, existing, methodOverride, tipoOverride) {
 
   if (methodOverride) {
     // Una modalità unica forzata (es. dal richiamo rapido su una singola prenotazione)
-    soggiorno[methodOverride] = Number(b.totalPrice)||0;
+    soggiorno[methodOverride] = contoParti(b).soggiornoOspite;
     tassa[methodOverride] = taxInfo.tax||0;
     extra[methodOverride] = extrasTotal;
   } else {
     // Pagamento diviso in più soluzioni (o singola modalità salvata su b.metodoPagamento come fallback)
-    const totali = { soggiorno: Number(b.totalPrice)||0, tassa: taxInfo.tax||0, extra: extrasTotal };
+    const totali = { soggiorno: contoParti(b).soggiornoOspite, tassa: taxInfo.tax||0, extra: extrasTotal };
     // BUG TROVATO E CORRETTO: la caparra incassata in anticipo (b.caparra) non veniva mai inclusa qui —
     // solo i pagamenti registrati al momento del Conto. Se il cliente aveva già versato una caparra
     // separatamente (es. con bonifico prima dell'arrivo) e alla cassa si registrava solo il saldo
@@ -21104,26 +21316,6 @@ function getCheckinEffFiltered() {
   });
 }
 
-var effettuatiMode = 'checkin';
-function renderEffettuati() {
-  var ci = document.getElementById('page-checkineffettuati');
-  var co = document.getElementById('page-checkouteffettuati');
-  var tabCi = document.getElementById('effettuati-tab-checkin');
-  var tabCo = document.getElementById('effettuati-tab-checkout');
-  if (effettuatiMode === 'checkout') {
-    if (ci) ci.style.display = 'none';
-    if (co) co.style.display = 'block';
-    if (tabCi) tabCi.classList.remove('btn-primary');
-    if (tabCo) tabCo.classList.add('btn-primary');
-    renderCheckoutEffettuati();
-  } else {
-    if (ci) ci.style.display = 'block';
-    if (co) co.style.display = 'none';
-    if (tabCo) tabCo.classList.remove('btn-primary');
-    if (tabCi) tabCi.classList.add('btn-primary');
-    renderCheckinEffettuati();
-  }
-}
 
 function renderCheckinEffettuati() {
   const filtered = getCheckinEffFiltered();
@@ -21304,7 +21496,7 @@ var saldareFilter = { search: '', from: '', to: '', stato: '' };
 
 function getContiDaSaldare() {
   return DB.get('bookings')
-    .filter(b => (b.status === 'check-in' || b.status === 'check-out') && (b.pagato||'no') !== 'si')
+    .filter(b => (b.status === 'check-in' || b.status === 'check-out') && ((b.pagato||'no') !== 'si' || contoDaSaldareInfo(b).otaDaIncassare > 0))
     .sort((a,b) => a.checkin.localeCompare(b.checkin));
 }
 
@@ -21354,9 +21546,9 @@ async function segnaContoComePagato(id) {
 function renderContiDaSaldare() {
   const filtered = getContiDaSaldareFiltrati();
   const hasFilters = saldareFilter.search || saldareFilter.from || saldareFilter.to || saldareFilter.stato;
-  const totDovuto = filtered.reduce((s,b) => s + (parseFloat(b.totalPrice)||0) + calcTassaSoggiorno(b).tax, 0);
+  const totDovuto = filtered.reduce((s,b) => s + contoDaSaldareInfo(b).dovuto, 0);
   const totCaparra = filtered.reduce((s,b) => s + (parseFloat(b.caparra)||0), 0);
-  const totDaIncassare = Math.max(0, totDovuto - totCaparra);
+  const totDaIncassare = filtered.reduce((s,b) => s + contoDaSaldareInfo(b).daSaldare, 0);
 
   document.getElementById('page-contidasaldare').innerHTML = `
     <div class="page-header">
@@ -21414,9 +21606,11 @@ function renderContiDaSaldare() {
               </thead>
               <tbody>
                 ${filtered.map(b => {
-                  const dovuto = (parseFloat(b.totalPrice)||0) + calcTassaSoggiorno(b).tax;
-                  const daSaldare = Math.max(0, dovuto - (parseFloat(b.caparra)||0));
-                  const pagBadge = b.pagato==='parziale' ? '<span class="badge badge-amber">~ Parziale</span>' : '<span class="badge badge-red">✗ Non pagato</span>';
+                  const _inf = contoDaSaldareInfo(b);
+                  const dovuto = _inf.dovuto;
+                  const daSaldare = _inf.daSaldare;
+                  const pagBadge = (b.pagato==='si' ? '' : (b.pagato==='parziale' ? '<span class="badge badge-amber">~ Parziale</span>' : '<span class="badge badge-red">✗ Non pagato</span>'))
+                    + (_inf.otaDaIncassare > 0 ? ' <span class="badge badge-blue" title="Pernottamento da incassare sulla carta virtuale del portale">💳 '+_inf.p.nomeOta+' '+fmtCurrency(_inf.otaDaIncassare)+'</span>' : '');
                   return `
                   <tr>
                     <td><strong>${b.roomName||'—'}</strong></td>
@@ -23761,68 +23955,6 @@ async function saveCheckinDataGruppo() {
   }
 }
 
-async function saveCheckinData(bookingId, nAdults) {
-  const bks = DB.get('bookings');
-  const idx = bks.findIndex(x=>x.id===bookingId);
-  if (idx<0) return;
-  const b = bks[idx];
-  const componenti = [];
-  for (let i=0; i<nAdults; i++) {
-    const cog = (document.getElementById('ci-cogn-'+i)?.value||'').trim();
-    const nom = (document.getElementById('ci-nome-'+i)?.value||'').trim();
-    componenti.push({
-      cognome:      cog,
-      nome:         nom,
-      sesso:        document.getElementById('ci-sesso-'+i)?.value||'M',
-      dataNascita:  document.getElementById('ci-nasc-'+i)?.value||'',
-      luogoNascita: document.getElementById('ci-luogo-nasc-'+i)?.value||'',
-      provNascita:  document.getElementById('ci-prov-'+i)?.value||'',
-      cittadinanza: document.getElementById('ci-naz-'+i)?.value||'Italia',
-      residenza:    document.getElementById('ci-res-'+i)?.value||'',
-      provResidenza: document.getElementById('ci-provres-'+i)?.value||'',
-      statoResidenza: document.getElementById('ci-stato-res-'+i)?.value||'',
-      indirizzo:    document.getElementById('ci-ind-'+i)?.value||'',
-      cap:          document.getElementById('ci-cap-'+i)?.value||'',
-      tipoDoc:      document.getElementById('ci-tdoc-'+i)?.value || (i===0 ? 'IDELE' : ''),
-      numDoc:       document.getElementById('ci-ndoc-'+i)?.value||'',
-      enteDoc:      document.getElementById('ci-ente-'+i)?.value||'',
-      luogoDoc:     document.getElementById('ci-ldoc-'+i)?.value||'',
-      fotoOspite:   document.getElementById('ci-foto-'+i)?.value||'',
-    });
-  }
-  bks[idx].status      = 'check-in';
-  bks[idx].componenti  = componenti;
-  bks[idx].checkinAt   = new Date().toISOString();
-  DB.set('bookings', bks);
-  registraModificaPrenotazione(bookingId, 'checkin', 'Check-in con dati ospite completato ('+componenti.length+' ospit'+(componenti.length===1?'e':'i')+')');
-  salvaInStoricoOspiti(componenti, bks[idx].checkin);
-  // Nota: DB.set sincronizza già con Supabase in background senza bloccare — il check-in resta salvato
-  // in locale anche se Supabase è lento o momentaneamente irraggiungibile.
-
-  // Aggiorna la scheda ospite solo se sono stati inseriti dei dati anagrafici
-  const mg = componenti[0] || {};
-  if (mg.nome || mg.cognome) {
-    const guests = DB.get('guests');
-    let gi = guests.findIndex(x=>x.id===b.guestId);
-    const gData = {
-      id: b.guestId||uid(), name: (mg.nome+' '+mg.cognome).trim() || b.guestName,
-      cognome:mg.cognome, nome:mg.nome, sesso:mg.sesso,
-      dataNascita:mg.dataNascita, luogoNascita:mg.luogoNascita,
-      provNascita:mg.provNascita, cittadinanza:mg.cittadinanza,
-      residenza:mg.residenza, indirizzo:mg.indirizzo, cap:mg.cap,
-      tipoDoc:mg.tipoDoc, numDoc:mg.numDoc, enteDoc:mg.enteDoc, luogoDoc:mg.luogoDoc,
-    };
-    if (gi>=0) Object.assign(guests[gi], gData); else guests.push(gData);
-    DB.set('guests', guests); invalidateGuestDatalistCache();
-  }
-  closeModal();
-  const mancanti = componenti.filter(c => !c.cognome || !c.nome).length;
-  showToast(mancanti>0
-    ? 'Check-in completato — ⚠ dati mancanti per '+mancanti+' ospit'+(mancanti===1?'e':'i')+', potrai completarli più tardi'
-    : 'Check-in completato — '+componenti.length+' component'+(componenti.length===1?'e':'i'));
-  renderPage(currentPage);
-  alloggiatiActionMenu(bookingId);
-}
 
 // Un check-in è "incompleto" se manca cognome o nome di almeno un ospite registrato
 // Mappa dei codici nazionalità (ISO2) più comuni verso il nome italiano usato nel programma
@@ -26028,8 +26160,6 @@ function renderReportPasti() {
 }
 
 var repFrom='';var repTo='';
-var cassaFilter = {from:'',to:'',type:'',cat:'',method:''};
-function repSetPreset(p){repPreset(p);}
 function repPreset(p){
   var n=new Date();n.setHours(0,0,0,0);
   function f(d){return (function(x){return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');})(d);}
@@ -26588,13 +26718,13 @@ function calPriceSaveCategoria(el) {
 
 function _parseLocalDate(s){ var p=s.split('-'); return new Date(parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2])); }
 function _fmtLocal(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
-function addDaysISO(ds, n){ return _fmtLocal(new Date(_parseLocalDate(ds).getTime() + n*86400000)); }
+// Somma n giorni a una data aaaa-mm-gg. Usa setDate (non +n*24 ore), così non sbaglia nei giorni del cambio ora legale/solare.
+function addDaysISO(ds, n){ var d=_parseLocalDate(ds); d.setDate(d.getDate()+n); return _fmtLocal(d); }
 
 function calNavWeek(d){ var dt=_parseLocalDate(globalDate||today()); dt.setDate(dt.getDate()+d*1); globalDate=_fmtLocal(dt); renderCalendario(); }
 
 function calNavMonth(d){ var dt=_parseLocalDate(globalDate||today()); dt.setDate(dt.getDate()+d*30); globalDate=_fmtLocal(dt); renderCalendario(); }
 
-function calNavDay(d){ var dt=_parseLocalDate(globalDate||today()); dt.setDate(dt.getDate()+d); globalDate=_fmtLocal(dt); renderCalendario(); }
 
 // ============================================================
 // CAMERE
@@ -27774,15 +27904,6 @@ function livApplicaAlListino(id) {
 
 // ── Mappa data → livello applicato, e cambio livello direttamente dalla griglia del Listino ──
 function livGetMappaGiorni() { return DB.get('listinoLivelli') || []; }
-function livGiornoDi(ds) {
-  var e = livGetMappaGiorni().find(function(x){ return x.data===ds; });
-  return e ? e.livelloId : '';
-}
-function livNomeById(id) {
-  if (!id) return '';
-  var l = livGetLivelli().find(function(x){return x.id===id;});
-  return l ? l.nome : '';
-}
 // Segna nella mappa quale livello è attivo per ogni giorno da dal ad al (o lo toglie se livelloId è vuoto)
 function livSegnaGiorni(dal, al, livelloId) {
   var mappa = livGetMappaGiorni();
@@ -28507,9 +28628,6 @@ function onLstDateFromChange(el, toFieldId) {
     toInput.value = y + '-' + m + '-' + dd;
   }
 }
-function lstNav(d){lstScrollDays(d);}function lstToday(){lstScrollToToday();}
-function lstJumpMonth(m){globalDate=new Date(listinoYear,parseInt(m),1).toISOString().split('T')[0];renderListino();}
-function lstPrevMonth(){lstScrollDays(-30);}function lstNextMonth(){lstScrollDays(30);}function lstThisMonth(){lstScrollToToday();}
 
 // Le camere della stessa tipologia condividono lo stesso prezzo: dopo ogni salvataggio nel Listino,
 // copia gli stessi dati sulle altre camere della stessa tipologia (se ce ne fosse più di una), così
@@ -28737,10 +28855,8 @@ function lstBaseSave(el){var rId=el.dataset.room,pk=el.dataset.trat||'PAX1';if(!
 
 function lstSaveAll(){document.querySelectorAll('#page-listino input[data-trat]').forEach(function(el){if(el.dataset.dal)lstPeriodSave(el);else lstBaseSave(el);});showToast('Listino salvato');renderListino();}
 
-function lstLoadPeriod(dal,al){lstSelFrom=dal;lstSelTo=al;globalDate=dal;listinoYear=parseLD(dal).getFullYear();renderListino();}
 
 function lstOnInput(el){var v=parseFloat(el.value)||0;el.style.fontWeight=v?'700':'400';el.style.color=v?'var(--accent)':'var(--text3)';}
-function lstAutoSave(el){var rId=el.dataset.room,pk=el.dataset.trat||'PAX1';if(!rId)return;var v=parseFloat(el.value)||0,lst=DB.get('listino')||[];var e=lst.find(function(l){return l.roomId===rId;});if(!e){e={roomId:rId,prezzi:{},periodi:[]};lst.push(e);}if(!e.periodi)e.periodi=[];if(v>0)e.prezzi[pk]=v;else delete e.prezzi[pk];DB.set('listino',lst);}
 
 // ══════════════════════════════════════════════════════════════════════════
 // SPOT PUGLIA (DMS) — generazione del file XML da caricare su SPOT ONLINE
@@ -31871,6 +31987,19 @@ function renderImpostazioni() {
               <textarea id="s-checkinOnlineMsg" rows="3" placeholder="Ciao {{nome}}! Per velocizzare il tuo arrivo puoi completare il check-in online da qui: {{link}}">${s.checkinOnlineMessage||''}</textarea>
             </div>
             <div class="form-group full" style="border-top:.5px solid var(--border2);padding-top:12px;margin-top:2px">
+              <label>URL pagina Rooming list (gruppi)</label>
+              <input type="text" id="s-roomingListUrl" value="${s.roomingListUrl||''}" placeholder="${(s.checkinOnlineUrl||'https://tuosito.it/checkin-online.html').replace(/[^\/]*$/,'rooming-list.html')}">
+              <div class="sub" style="font-size:11.5px;color:var(--text3);margin-top:4px">Se lo lasci vuoto si usa la stessa cartella del check-in online. La pagina si scarica qui sotto già collegata a questa struttura: caricala sul sito accanto a checkin-online.html.</div>
+            </div>
+            <div class="form-group full">
+              <label>Messaggio rooming list (usa {{nome}}, {{gruppo}} e {{link}})</label>
+              <textarea id="s-roomingListMsg" rows="3" placeholder="Lascia vuoto per il testo standard">${s.roomingListMessage||''}</textarea>
+            </div>
+            <div class="form-group full" style="display:flex;gap:8px;flex-wrap:wrap">
+              <button type="button" class="btn btn-sm" onclick="rlScaricaPagina()">⬇ Scarica pagina rooming-list.html</button>
+              <button type="button" class="btn btn-sm" onclick="navigator.clipboard.writeText(RL_SQL).then(function(){showToast('Istruzioni copiate — incollale in Supabase → SQL Editor → Run')})">📋 Copia istruzioni database</button>
+            </div>
+            <div class="form-group full" style="border-top:.5px solid var(--border2);padding-top:12px;margin-top:2px">
               <label style="display:flex;align-items:center;gap:6px;text-transform:none;font-weight:600">
                 <input type="checkbox" id="s-checkinAutoAttivo" ${s.checkinAutoAttivo?'checked':''} style="width:auto">
                 Invia automaticamente il check-in online prima dell'arrivo
@@ -32434,6 +32563,8 @@ function saveImpostazioni() {
   s.comuneFiscale  = document.getElementById('s-comune-fiscale')?.value.trim() || '';
   s.supabaseUrl     = document.getElementById('s-supaUrl')?.value.trim() || '';
   s.checkinOnlineUrl = document.getElementById('s-checkinOnlineUrl')?.value.trim() || '';
+  if (document.getElementById('s-roomingListUrl')) s.roomingListUrl = document.getElementById('s-roomingListUrl').value.trim();
+  if (document.getElementById('s-roomingListMsg')) s.roomingListMessage = document.getElementById('s-roomingListMsg').value.trim();
   s.scegliPreventivoUrl = document.getElementById('s-scegliPreventivoUrl')?.value.trim() || '';
   s.supabaseKey     = document.getElementById('s-supaKey')?.value.trim() || '';
   s.awUser        = document.getElementById('s-awUser').value;
@@ -33037,7 +33168,6 @@ var manutenzioneFiltroStato = 'aperto_in_corso'; // vista di default: solo quell
 function manutenzioneGetLista(){ return DB.get('manutenzione') || []; }
 function manutenzioneSalvaLista(lista){ DB.set('manutenzione', lista); }
 function manutenzionePrioritaInfo(v){ return MANUTENZIONE_PRIORITA.find(function(p){return p.v===v;}) || MANUTENZIONE_PRIORITA[2]; }
-function manutenzioneStatoLabel(v){ return (MANUTENZIONE_STATI.find(function(s){return s.v===v;})||{}).l || v; }
 
 function manutenzioneApriModaleNuovo(){
   var rooms = DB.get('rooms') || [];
@@ -33276,7 +33406,6 @@ function renderDashboardAlerts() {
 }
 
 
-function lstSavePeriodo(){var rooms=DB.get('rooms')||[],lst=DB.get('listino')||[];rooms.forEach(function(r){var el=document.getElementById('lp-'+r.id);if(!el)return;var v=parseFloat(el.value)||0;var e=lst.find(function(l){return l.roomId===r.id;});if(!e){e={roomId:r.id,prezzi:{},periodi:[]};lst.push(e);}if(!e.periodi)e.periodi=[];var p=e.periodi.find(function(pp){return pp.dal===lstSelFrom&&pp.al===lstSelTo;});if(!p){p={dal:lstSelFrom,al:lstSelTo,prezzi:{}};e.periodi.push(p);}if(v>0)p.prezzi.BASE=v;else delete p.prezzi.BASE;});DB.set('listino',lst);closeModal();showToast('Prezzi salvati');renderListino();}
 function backupXLSX() {
   try {
     var wb = XLSX.utils.book_new();
@@ -33805,9 +33934,11 @@ function apriContoGruppo(groupId) {
   const caparraTotale = bookings.reduce((s,b)=>s+parseFloat(b.caparra||0), 0);
   const daPagare = Math.max(0, totaleDovuto - caparraTotale);
   const tipoAttuale = bookings[0].tipoDocumentoConto || 'S';
+  const _otaCam = bookings.filter(x => contoParti(x).otaAttivo).map(x => x.roomName);
 
   showModal('Conto unico di gruppo — '+groupId,
     '<div style="font-size:13px">'+
+      (_otaCam.length ? '<div style="background:#fff7e6;border:1px solid #f0c36d;border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:12.5px">⚠ Camere con pernottamento pagato dall\'OTA ('+_otaCam.join(', ')+'): qui il soggiorno è contato per intero. Per queste usa il conto della singola camera.</div>' : '')+
       '<div style="font-weight:700;color:var(--accent);margin-bottom:6px;text-transform:uppercase;font-size:11px;letter-spacing:.5px">Dettaglio camere del gruppo ('+bookings.length+')</div>'+
       '<div style="font-size:11px;color:var(--text3);margin-bottom:8px">✏️ Soggiorno e Tassa sono modificabili: se alzi un importo, il nuovo valore diventa quello vero della prenotazione. Se lo abbassi, la prenotazione mantiene il valore originale — la differenza resta visibile come rimanenza nel Registro modifiche della prenotazione, così non si perde traccia dello sconto fatto qui.</div>'+
       '<table id="conto-gruppo-tabella" style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:12.5px">'+
@@ -34183,6 +34314,8 @@ function apriConto(bookingId) {
   const extrasTotal = (b.extras||[]).reduce((s,ex)=>s+(Number(ex.totale)||0),0);
   const totaleDovuto = parseFloat(b.totalPrice||0) + taxInfo.tax + extrasTotal;
   const daPagare = Math.max(0, totaleDovuto - parseFloat(b.caparra||0));
+  const _ota = contoParti(b); // conto diviso OTA/ospite: se attivo, qui si paga solo la parte dell'ospite
+  const daPagareConto = _ota.otaAttivo ? Math.max(0, _ota.totOspite - parseFloat(b.caparra||0)) : daPagare;
   const metodiOptions = ['Contanti','Carta di credito','POS','Bonifico','Altro'];
   const corrTx = (DB.getObj('corrispettivi',{transactions:[]}).transactions||[]).find(t=>t.bookingRef===b.id);
   const giaRegistrato = !!corrTx;
@@ -34197,7 +34330,7 @@ function apriConto(bookingId) {
         '<tr><td style="padding:5px 0;color:var(--text2)">Check-in → Check-out</td><td>'+fmtDate(b.checkin)+' → '+fmtDate(b.checkout)+' ('+n+' nott'+(n===1?'e':'i')+')</td></tr>'+
         '<tr><td style="padding:5px 0;color:var(--text2)">Ospiti</td><td>'+(b.adults||1)+' adulti'+(b.children?' + '+b.children+' bambini':'')+'</td></tr>'+
       '</table>'+
-      '<div style="font-weight:700;color:var(--accent);margin-bottom:6px;text-transform:uppercase;font-size:11px;letter-spacing:.5px">Conteggi</div>'+
+      contoOtaPanelHTML(b,_ota)+(_ota.otaAttivo ? contoOtaConteggiHTML(b,_ota) : ('<div style="font-weight:700;color:var(--accent);margin-bottom:6px;text-transform:uppercase;font-size:11px;letter-spacing:.5px">Conteggi</div>'+
       '<table style="width:100%;border-collapse:collapse;margin-bottom:16px">'+
         '<tr><td style="padding:5px 0;color:var(--text2)">Soggiorno</td><td>'+fmtCurrency(b.totalPrice)+'</td></tr>'+
         '<tr><td style="padding:5px 0;color:var(--text2)">Tassa di soggiorno</td><td>'+fmtCurrency(taxInfo.tax)+(taxInfo.etaBasata?' <span class="badge badge-green" style="font-size:9px" title="Calcolata dalle date di nascita inserite in check-in, non dai conteggi manuali della prenotazione">🎂 in base all\'età</span>':'')+'</td></tr>'+
@@ -34205,7 +34338,7 @@ function apriConto(bookingId) {
         '<tr><td style="padding:10px 0;font-weight:800;font-size:15px;border-top:1.5px solid var(--border)">TOTALE DOVUTO</td><td style="padding:10px 0;font-weight:800;font-size:15px;border-top:1.5px solid var(--border)">'+fmtCurrency(totaleDovuto)+'</td></tr>'+
         '<tr><td style="padding:5px 0;color:var(--text2)">Caparra già incassata</td><td>'+fmtCurrency(b.caparra||0)+'</td></tr>'+
         (b.pagato==='si' ? '<tr><td style="padding:8px 0;font-weight:700;color:var(--green)">✓ Pagato</td><td style="padding:8px 0;font-weight:700;color:var(--green)">'+fmtCurrency(totaleDovuto)+'</td></tr>' : '<tr><td style="padding:8px 0;font-weight:700;color:var(--amber)">Da pagare</td><td style="padding:8px 0;font-weight:700;color:var(--amber)">'+fmtCurrency(daPagare)+'</td></tr>')+
-      '</table>'+
+      '</table>'))+
       '<div style="font-weight:700;color:var(--accent);margin-bottom:6px;text-transform:uppercase;font-size:11px;letter-spacing:.5px">Documento</div>'+
       '<div class="form-grid">'+
         '<div class="form-group"><label>Tipo documento</label>'+
@@ -34260,7 +34393,7 @@ function apriConto(bookingId) {
     '<button class="btn" onclick="closeModal()">Chiudi</button>'+
     '<button class="btn btn-primary" onclick="contoStampaEDeposita(\''+b.id+'\')">💾 Registra pagamento</button>'
   );
-  initRigheConto(b, daPagare);
+  initRigheConto(b, daPagareConto);
 }
 
 function salvaFatturazioneInAnagrafica(bookingId) {
@@ -34447,43 +34580,6 @@ function aggiornaTotalePagamenti() {
   el.textContent = txt;
 }
 
-function contoSalvaPagamento(bookingId) {
-  const bookings = DB.get('bookings');
-  const b = bookings.find(x => x.id === bookingId);
-  if (!b) return;
-  const pagamenti = leggiPagamentiForm();
-  const stato = document.getElementById('conto-stato')?.value || 'no';
-  const tipoDoc = document.getElementById('conto-tipo')?.value || 'S';
-  const incassato = stato === 'si' || stato === 'parziale';
-  if (incassato && pagamenti.length === 0) { showToast('Inserisci almeno una modalità di pagamento con importo prima di registrare'); return; }
-  b.pagamenti = pagamenti;
-  b.metodoPagamento = pagamenti.map(p=>p.metodo).join(' + ');
-  b.pagato = stato;
-  b.tipoDocumentoConto = tipoDoc;
-  if (tipoDoc === 'F') {
-    const f = leggiDatiFatturazioneForm();
-    if (f) {
-      if (!f.intestatario) { showToast('Inserisci almeno l\'intestatario della fattura'); return; }
-      b.fattura = f;
-    }
-  }
-  DB.set('bookings', bookings);
-  {
-    const riepilogoLog = pagamenti.length ? pagamenti.map(p=>p.metodo+' '+fmtCurrency(p.importo)).join(' + ') : 'nessun pagamento';
-    registraModificaPrenotazione(bookingId, 'pagamento', 'Pagamento registrato ('+stato+') — '+riepilogoLog);
-  }
-  if (incassato) {
-    // Un incasso è stato effettivamente ricevuto: registra/aggiorna il movimento nei Corrispettivi,
-    // così compare subito il numero di scontrino/fattura — prima questo pulsante lo saltava, ed era
-    // necessario passare da "Stampa conto" per ottenere un numero.
-    corrSyncBookingToRegister(bookingId, true, null, tipoDoc);
-    const riepilogo = pagamenti.map(p=>p.metodo+' '+fmtCurrency(p.importo)).join(' + ');
-    showToast('Pagamento registrato — conto nei Corrispettivi come '+(tipoDoc==='F'?'Fattura':'Scontrino')+' — '+riepilogo);
-  } else {
-    showToast('Pagamento registrato sulla prenotazione');
-  }
-  apriConto(bookingId);
-}
 
 // Salva il pagamento, aggiorna/crea il movimento nel registro Corrispettivi (Scontrini o Fatture in base alla scelta), poi stampa il conto
 function contoStampaEDeposita(bookingId) {
@@ -34526,10 +34622,19 @@ function contoStampaEDeposita(bookingId) {
   stampaConto(bookingId);
 }
 
-function costruisciContoHTML(bid) {
+function costruisciContoHTML(bid, parte) {
   var bookings = DB.get('bookings');
   var b = bookings.find(function(x){return x.id===bid;});
   if(!b){showToast('Prenotazione non trovata','error');return;}
+  var _p = contoParti(b), _nomeOtaStampa = _p.nomeOta;
+  if (parte === 'ota') {
+    if (!_p.otaAttivo) { showToast('Il conto diviso OTA non è attivo su questa prenotazione'); return; }
+    // Documento del solo pernottamento pagato dall'OTA con carta virtuale
+    b = Object.assign({}, b, { totalPrice:_p.importoOta, extras:[], tassaManuale:true, tassaSoggiornoOverride:0, caparra:0,
+      pagamenti: _p.incassataOta ? [{metodo:'Carta virtuale '+_p.nomeOta, importo:_p.importoOta}] : [],
+      metodoPagamento:'Carta virtuale '+_p.nomeOta, pagato:_p.incassataOta?'si':'no', tipoDocumentoConto:_p.tipoDocOta, contoOta:null });
+    _p = contoParti(b);
+  }
   var cfg = DB.getObj('settings',{propertyName:'La mia struttura',currency:'€',cityTax:0});
   var room = DB.get('rooms').find(function(r){return r.id===b.roomId;});
   var roomType = room ? room.type : '';
@@ -34537,9 +34642,10 @@ function costruisciContoHTML(bid) {
   var taxInfo = calcTassaSoggiorno(b);
   var tax = taxInfo.tax;
   var extrasTotal = (b.extras||[]).reduce(function(s,ex){return s+(Number(ex.totale)||0);},0);
-  var corrTxPre = (typeof corrState !== 'undefined' && corrState && corrState.transactions) ? corrState.transactions.find(function(t){ return t.bookingRef === bid; }) : null;
+  var corrTxPre = (typeof corrState !== 'undefined' && corrState && corrState.transactions) ? corrState.transactions.find(function(t){ return parte === 'ota' ? t.otaRef === bid : t.bookingRef === bid; }) : null;
   var serviziCustomTotal = (corrTxPre && corrTxPre.serviziCustom) ? corrTxPre.serviziCustom.reduce(function(s,v){return s+(Number(v.importo)||0);},0) : 0;
   var totaleDovuto = parseFloat(b.totalPrice||0) + tax + extrasTotal + serviziCustomTotal;
+  if (_p.otaAttivo) totaleDovuto = _p.totOspite + serviziCustomTotal; // pernottamento già pagato dall'OTA
   // Rimanenza da pagare: va sottratto sia l'eventuale caparra incassata in anticipo, sia quanto già
   // registrato in questo Conto tramite le modalità di pagamento (b.pagamenti) — prima si sottraeva
   // solo la caparra, quindi un pagamento parziale registrato qui non faceva scendere la rimanenza.
@@ -34549,7 +34655,7 @@ function costruisciContoHTML(bid) {
   var isPagato = b.pagato === 'si';
   // Numero scontrino/fattura, nome cliente personalizzato e servizi aggiuntivi: recuperati dalla
   // registrazione collegata nel registro Corrispettivi, se esiste e se sono stati personalizzati
-  var corrTx = (typeof corrState !== 'undefined' && corrState && corrState.transactions) ? corrState.transactions.find(function(t){ return t.bookingRef === bid; }) : null;
+  var corrTx = (typeof corrState !== 'undefined' && corrState && corrState.transactions) ? corrState.transactions.find(function(t){ return parte === 'ota' ? t.otaRef === bid : t.bookingRef === bid; }) : null;
   var numeroDocRiga = corrTx && corrTx.numero ? ('N. '+corrTx.numero+(corrTx.date?(' del '+fmtDate(corrTx.date)):'')) : '';
   var nomeClienteRicevuta = (corrTx && corrTx.clienteNome) ? corrTx.clienteNome : b.guestName;
   var serviziAggiuntiviHTML = (corrTx && corrTx.serviziCustom && corrTx.serviziCustom.length)
@@ -34601,7 +34707,7 @@ function costruisciContoHTML(bid) {
         (contattiCliente ? '<div class="fatt-line">'+contattiCliente+'</div>' : '') +
         '</div>';
     })() +
-    '<p style="color:#888;margin-top:0">Ricevuta di soggiorno</p>' +
+    '<p style="color:#888;margin-top:0">'+(parte === 'ota' ? 'Ricevuta di soggiorno — pernottamento pagato tramite '+_nomeOtaStampa+' (carta virtuale)' : 'Ricevuta di soggiorno')+'</p>' +
     '<div class="row"><span>Ospite</span><span>'+nomeClienteRicevuta+'</span></div>' +
     '<div class="row"><span>Camera</span><span>'+b.roomName+'</span></div>' +
     (roomType ? '<div class="row"><span>Tipologia</span><span>'+roomType+'</span></div>' : '') +
@@ -34609,10 +34715,13 @@ function costruisciContoHTML(bid) {
     '<div class="row"><span>Check-out</span><span>'+fmtDate(b.checkout)+'</span></div>' +
     '<div class="row"><span>Notti</span><span>'+n+'</span></div>' +
     '<div class="row"><span>Persone</span><span>'+(b.adults||1)+' adulti'+(b.children?' + '+b.children+' bambini':'')+'</span></div>' +
-    '<div class="row" style="margin-top:8px"><span>Soggiorno</span><span>'+fmtCurrency(parseFloat(b.totalPrice||0))+'</span></div>' +
-    (extrasTotal>0 ? (b.extras||[]).map(function(ex){return '<div class="row"><span>Extra — '+ex.nome+' ×'+ex.qty+'</span><span>'+fmtCurrency(parseFloat(ex.totale||0))+'</span></div>';}).join('') : '<div class="row"><span>Extra</span><span>'+(cfg.currency||'€')+' 0.00</span></div>') +
+    (_p.otaAttivo
+      ? '<div class="row" style="margin-top:8px"><span>Soggiorno ('+fmtCurrency(_p.importoOta)+') — pagato da '+_p.nomeOta+'</span><span>—</span></div>' +
+        (_p.differenza > 0 ? '<div class="row"><span>Differenza tariffa / cambio camera</span><span>'+fmtCurrency(_p.differenza)+'</span></div>' : '')
+      : '<div class="row" style="margin-top:8px"><span>Soggiorno</span><span>'+fmtCurrency(parseFloat(b.totalPrice||0))+'</span></div>') +
+    (extrasTotal>0 ? (b.extras||[]).map(function(ex){return '<div class="row"><span>Extra — '+ex.nome+' ×'+ex.qty+'</span><span>'+fmtCurrency(parseFloat(ex.totale||0))+'</span></div>';}).join('') : (parte === 'ota' ? '' : '<div class="row"><span>Extra</span><span>'+fmtCurrency(0)+'</span></div>')) +
     serviziAggiuntiviHTML +
-    '<div class="row"><span>Tassa di soggiorno</span><span>'+fmtCurrency(tax)+'</span></div>' +
+    (parte === 'ota' ? '' : '<div class="row"><span>Tassa di soggiorno</span><span>'+fmtCurrency(tax)+'</span></div>') +
     (tax > 0 ? '<div class="sub">'+taxDetail+' × '+taxInfo.n+' nott'+(taxInfo.n===1?'e':'i')+(taxInfo.maxNights>0 && taxInfo.nReali>taxInfo.maxNights ? ' (tetto massimo di '+taxInfo.maxNights+' notti applicato)' : '')+'</div>' : '') +
     '<div class="row total" style="margin-top:5px;font-size:15px"><span>TOTALE DOVUTO</span><span>'+fmtCurrency(totaleDovuto)+'</span></div>' +
     '<div class="row"><span>Caparra</span><span>'+fmtCurrency(parseFloat(b.caparra||0))+'</span></div>' +
@@ -34625,8 +34734,8 @@ function costruisciContoHTML(bid) {
   return {contoHTML: contoHTML, cfg: cfg, corrTx: corrTx, b: b, numeroDocRiga: numeroDocRiga};
 }
 
-function stampaConto(bid) {
-  var r = costruisciContoHTML(bid);
+function stampaConto(bid, parte) {
+  var r = costruisciContoHTML(bid, parte);
   if (!r) { return; }
   var contoHTML = r.contoHTML, cfg = r.cfg, b = r.b;
 
@@ -35046,6 +35155,7 @@ function corrRegistraContiMancanti() {
 function corrRistampaRicevuta(txId) {
   const t = corrState.transactions.find(x => x.id === txId);
   if (!t) { showToast('Registrazione non trovata'); return; }
+  if (t.otaRef)     { stampaConto(t.otaRef, 'ota'); return; }
   if (t.bookingRef) { stampaConto(t.bookingRef); return; }
   if (t.groupRef)   { stampaContoGruppo(t.groupRef); return; }
 
@@ -36232,107 +36342,8 @@ function corrBuildMonthMatrix(mk, tipo){
   return {rows, totals};
 }
 
-function corrSectionToAOA(title, data){
-  const aoa = [];
-  aoa.push([title]);
-  aoa.push(['Giorno','Soggiorno','','','','Tassa soggiorno','','','','Extra','','','','Sospesi','Totale']);
-  aoa.push(['','Contanti','Carta','Assegno','Bonifico','Contanti','Carta','Assegno','Bonifico','Contanti','Carta','Assegno','Bonifico','','']);
-  data.rows.forEach(r=>{
-    aoa.push([
-      corrItDate(r.iso),
-      r.agg.soggiorno.cash, r.agg.soggiorno.carta, r.agg.soggiorno.ass, r.agg.soggiorno.bon,
-      r.agg.tassa.cash, r.agg.tassa.carta, r.agg.tassa.ass, r.agg.tassa.bon,
-      r.agg.extra.cash, r.agg.extra.carta, r.agg.extra.ass, r.agg.extra.bon,
-      r.agg.sospesi, r.tot
-    ]);
-  });
-  aoa.push([
-    'Totale',
-    data.totals.soggiorno.cash, data.totals.soggiorno.carta, data.totals.soggiorno.ass, data.totals.soggiorno.bon,
-    data.totals.tassa.cash, data.totals.tassa.carta, data.totals.tassa.ass, data.totals.tassa.bon,
-    data.totals.extra.cash, data.totals.extra.carta, data.totals.extra.ass, data.totals.extra.bon,
-    data.totals.sospesi, data.totals.tot
-  ]);
-  aoa.push([]);
-  return aoa;
-}
 
-// Esporta il Registro per un intervallo di date libero (usato quando è attivo il filtro Dal/Al)
-function corrExportRangeXlsx(dal, al){
-  if(typeof XLSX === 'undefined'){
-    alert('Libreria di esportazione non disponibile al momento. Verifica la connessione e riprova.');
-    return;
-  }
-  const regHeader = ['Data','Tipo','Numero','Soggiorno Contanti','Soggiorno Carta','Soggiorno Assegno','Soggiorno Bonifico','Tassa Contanti','Tassa Carta','Tassa Assegno','Tassa Bonifico','Extra Contanti','Extra Carta','Extra Assegno','Extra Bonifico','Sospesi','Totale','Note'];
-  const list = corrState.transactions.filter(t=>t.date>=dal && t.date<=al).sort((a,b)=> a.date===b.date ? a.numero-b.numero : a.date.localeCompare(b.date));
-  const regRows = list.map(t=>[
-    corrItDate(t.date), t.tipo==='S'?'Scontrino':'Fattura', t.numero,
-    t.soggiorno.cash,t.soggiorno.carta,t.soggiorno.ass,t.soggiorno.bon,
-    t.tassa.cash,t.tassa.carta,t.tassa.ass,t.tassa.bon,
-    t.extra.cash,t.extra.carta,t.extra.ass,t.extra.bon,
-    t.sospesi, corrRowTotal(t), t.note||''
-  ]);
-  const totRow = list.reduce((a,t)=>a+corrRowTotal(t),0);
-  const aoa = [[`${corrState.hotelName} - Registro dal ${corrItDate(dal)} al ${corrItDate(al)}`], [], regHeader, ...regRows, [], ['Totale periodo','','','','','','','','','','','','','','','',totRow,'']];
-  const ws1 = XLSX.utils.aoa_to_sheet(aoa);
-  ws1['!cols'] = [{wch:11},{wch:10},{wch:8}].concat(Array(13).fill({wch:11})).concat([{wch:24}]);
-  corrForceTextColumn(ws1, 0);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws1, 'Registro');
-  XLSX.writeFile(wb, `corrispettivi_registro_${dal}_${al}.xlsx`);
-}
 
-function corrExportMonthXlsx(mk){
-  if(typeof XLSX === 'undefined'){
-    alert('Libreria di esportazione non disponibile al momento. Verifica la connessione e riprova.');
-    return;
-  }
-  const scontrini = corrBuildMonthMatrix(mk, 'S');
-  const fatture = corrBuildMonthMatrix(mk, 'F');
-
-  const wb = XLSX.utils.book_new();
-
-  // Sheet 1: Corrispettivi (stessa impostazione del foglio Excel originale)
-  const aoa = [[`${corrState.hotelName} - Corrispettivi ${mk}`], []];
-  aoa.push(...corrSectionToAOA('SCONTRINI', scontrini));
-  aoa.push(...corrSectionToAOA('FATTURE', fatture));
-  aoa.push(['Totale fatturato mese', '', '', '', '', '', '', '', '', '', '', '', '', '', scontrini.totals.tot + fatture.totals.tot]);
-  const ws1 = XLSX.utils.aoa_to_sheet(aoa);
-  ws1['!cols'] = [{wch:14}].concat(Array(13).fill({wch:11})).concat([{wch:13}]);
-  corrForceTextColumn(ws1, 0);
-  XLSX.utils.book_append_sheet(wb, ws1, 'Corrispettivi');
-
-  // Sheet 2: Registro movimenti (prima nota di dettaglio)
-  const regHeader = ['Data','Tipo','Numero','Soggiorno Contanti','Soggiorno Carta','Soggiorno Assegno','Soggiorno Bonifico','Tassa Contanti','Tassa Carta','Tassa Assegno','Tassa Bonifico','Extra Contanti','Extra Carta','Extra Assegno','Extra Bonifico','Sospesi','Totale','Note'];
-  const regRows = corrState.transactions.filter(t=>corrMonthKey(t.date)===mk).sort((a,b)=> a.date===b.date ? a.numero-b.numero : a.date.localeCompare(b.date)).map(t=>[
-    corrItDate(t.date), t.tipo==='S'?'Scontrino':'Fattura', t.numero,
-    t.soggiorno.cash,t.soggiorno.carta,t.soggiorno.ass,t.soggiorno.bon,
-    t.tassa.cash,t.tassa.carta,t.tassa.ass,t.tassa.bon,
-    t.extra.cash,t.extra.carta,t.extra.ass,t.extra.bon,
-    t.sospesi, corrRowTotal(t), t.note||''
-  ]);
-  const ws2 = XLSX.utils.aoa_to_sheet([regHeader, ...regRows]);
-  ws2['!cols'] = [{wch:11},{wch:10},{wch:8}].concat(Array(13).fill({wch:11})).concat([{wch:24}]);
-  corrForceTextColumn(ws2, 0);
-  XLSX.utils.book_append_sheet(wb, ws2, 'Registro');
-
-  // Sheet 3: Chiusure di cassa del mese
-  const chHeader = ['Data','Fondo iniziale','Contanti incassati (calc.)','Uscite (calc.)','Totale contato','Fondo finale'];
-  const chRows = Object.keys(corrState.chiusure).filter(d=>corrMonthKey(d)===mk).sort().map(d=>{
-    const c = corrState.chiusure[d];
-    const dayTx = corrState.transactions.filter(t=>t.date===d);
-    let cash=0; dayTx.forEach(t=>CORR_CATS.forEach(cc=>CORR_METHODS.forEach(mm=>{ if(mm.key==='cash') cash+=Number(t[cc.key][mm.key])||0; })));
-    const uscite = corrState.uscite.filter(u=>u.date===d).reduce((a,u)=>a+(Number(u.importo)||0),0);
-    const totContato = CORR_DENOMS.reduce((a,dd)=>a+(Number(c.counts[dd])||0)*dd,0);
-    return [corrItDate(d), c.fondoIniziale||0, cash, uscite, totContato, c.fondoFinale||0];
-  });
-  const ws3 = XLSX.utils.aoa_to_sheet([chHeader, ...chRows]);
-  ws3['!cols'] = Array(6).fill({wch:18});
-  corrForceTextColumn(ws3, 0);
-  XLSX.utils.book_append_sheet(wb, ws3, 'Chiusure cassa');
-
-  XLSX.writeFile(wb, `corrispettivi_${mk}.xlsx`);
-}
 
 // ---------- Export Excel FORMATTATO (stessa impaginazione dei file Corrispettivi / Prima nota fatti a mano) ----------
 // La libreria SheetJS gratuita non salva bordi, celle unite, formato € né impostazioni di stampa:
