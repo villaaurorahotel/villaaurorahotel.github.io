@@ -164,6 +164,9 @@
       <input type="text" id="g-telefono" placeholder="+39 333 1234567">
       <label>Note (facoltativo)</label>
       <textarea id="g-note" rows="3" placeholder="Richieste particolari, orario di arrivo previsto…"></textarea>
+      <label>Codice sconto (facoltativo)</label>
+      <div style="display:flex;gap:8px"><input type="text" id="g-codice" style="text-transform:uppercase" placeholder="es. BENTORNATO10"><button type="button" class="btn-secondary" onclick="applicaCodiceSconto()">Applica</button></div>
+      <div id="g-sconto-msg" style="font-size:13px;margin-top:6px"></div>
       <div class="form-err" id="modal-err"></div>
       <div class="modal-actions">
         <button class="btn-secondary" onclick="chiudiModale()">Annulla</button>
@@ -199,6 +202,8 @@ const HOTEL_NOTIFY_EMAIL  = 'villaaurorahoteldolomiti@gmail.com';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let camereSelezionabili = []; // ultimo risultato di ricerca, per tipologia
 let cameraScelta = null;
+let impostazioniSito = {};
+let scontoApplicato = null;
 
 function today(){ const n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); }
 function addDays(s,n){ const p=s.split('-'); const d=new Date(+p[0],+p[1]-1,+p[2]+n); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
@@ -256,6 +261,8 @@ async function cercaDisponibilita() {
       sb.from('listino').select('*')
     ]);
     if (e1) throw e1; if (e2) throw e2; if (e3) throw e3;
+    // impostazioni della struttura (codice sconto "bentornato" e periodi decisi in DeskFlow)
+    try { const rs = await sb.from('app_blobs').select('data').eq('key','settings').maybeSingle(); impostazioniSito = (rs.data && rs.data.data) || {}; } catch(e) { impostazioniSito = {}; }
 
     const occupateIds = new Set((occ||[]).map(r => r.room_id));
     const nn = nights(checkin, checkout);
@@ -297,7 +304,31 @@ async function cercaDisponibilita() {
   }
 }
 
+// ===== Codice sconto "bentornato" — vale solo per le notti dentro i periodi impostati in DeskFlow =====
+function fmtIt(iso){ const p=iso.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
+function aggiornaTotaleModale(){
+  const c = cameraScelta, tot = c.prezzoNotte*c.notti;
+  document.getElementById('modal-sub').textContent =
+    c.tipo+' · '+c.checkin+' → '+c.checkout+' · '+c.adults+' adulti'+(c.children?(' + '+c.children+' bambini'):'')+' · Totale stimato €'+(tot-(scontoApplicato?scontoApplicato.sconto:0)).toFixed(0)+(scontoApplicato?' (invece di €'+tot.toFixed(0)+')':'');
+}
+function applicaCodiceSconto(){
+  const box = document.getElementById('g-sconto-msg');
+  const cod = (document.getElementById('g-codice').value||'').trim().toUpperCase();
+  const s = impostazioniSito || {}, valido = (s.codiceBentornato||'').trim().toUpperCase(), pct = parseFloat(s.bentornatoPercento)||0;
+  const periodi = (s.bentornatoPeriodi||[]).filter(p => p && p.dal && p.al);
+  scontoApplicato = null;
+  if (!cod) { box.textContent=''; aggiornaTotaleModale(); return; }
+  if (!valido || cod !== valido || pct <= 0 || !periodi.length) { box.style.color='var(--glow-deep)'; box.textContent='Codice non valido.'; aggiornaTotaleModale(); return; }
+  const c = cameraScelta; let nn = 0;
+  for (let i=0;i<c.notti;i++){ const ds=addDays(c.checkin,i); if (periodi.some(p => p.dal<=ds && p.al>=ds)) nn++; }
+  if (!nn) { box.style.color='var(--glow-deep)'; box.textContent='Il codice vale solo per soggiorni '+periodi.map(p=>'dal '+fmtIt(p.dal)+' al '+fmtIt(p.al)).join(', ')+'.'; aggiornaTotaleModale(); return; }
+  scontoApplicato = { codice: valido, pct, notti: nn, sconto: Math.round(c.prezzoNotte*nn*pct)/100 };
+  box.style.color='var(--pine-light)'; box.textContent='🎁 Sconto '+pct+'% applicato'+(nn<c.notti?' su '+nn+' notti di '+c.notti:'')+': -€'+scontoApplicato.sconto.toFixed(0)+' (confermato da noi insieme alla prenotazione)';
+  aggiornaTotaleModale();
+}
+
 function apriModale(idx, checkin, checkout, adults, children) {
+  scontoApplicato = null;
   const c = camereSelezionabili[idx];
   cameraScelta = Object.assign({}, c, {checkin, checkout, adults, children, notti: nights(checkin,checkout)});
   document.getElementById('modal-sub').textContent =
@@ -309,6 +340,8 @@ function apriModale(idx, checkin, checkout, adults, children) {
   document.getElementById('g-email').value = '';
   document.getElementById('g-telefono').value = '';
   document.getElementById('g-note').value = '';
+  document.getElementById('g-codice').value = '';
+  document.getElementById('g-sconto-msg').textContent = '';
   document.getElementById('modal-bg').classList.add('show');
 }
 function chiudiModale() { document.getElementById('modal-bg').classList.remove('show'); }
@@ -327,7 +360,9 @@ async function inviaRichiesta() {
   btn.disabled = true; btn.textContent = 'Invio in corso…';
   try {
     const c = cameraScelta;
-    const totale = c.prezzoNotte * c.notti;
+    if ((document.getElementById('g-codice').value||'').trim() && !scontoApplicato) { applicaCodiceSconto(); if (!scontoApplicato) { btn.disabled = false; btn.textContent = 'Invia richiesta'; return; } }
+    const totale = c.prezzoNotte * c.notti - (scontoApplicato ? scontoApplicato.sconto : 0);
+    const notaSconto = scontoApplicato ? ('\nCodice sconto '+scontoApplicato.codice+' (-'+scontoApplicato.pct+'% su '+scontoApplicato.notti+' notti): -€'+scontoApplicato.sconto.toFixed(0)) : '';
 
     // La richiesta viene registrata come "richiesta di preventivo" (non blocca subito la camera):
     // lo staff la vede in SmartPMS → Preventivi → Richieste ricevute e la trasforma in preventivo
@@ -343,7 +378,7 @@ async function inviaRichiesta() {
       children: c.children,
       roomTypeWanted: c.tipo,
       fonte: 'Sito web',
-      message: note ? note + '\n\n(Prezzo stimato sul sito: €' + totale.toFixed(0) + ' per ' + c.notti + ' nott' + (c.notti===1?'e':'i') + ')' : ('Prezzo stimato sul sito: €' + totale.toFixed(0) + ' per ' + c.notti + ' nott' + (c.notti===1?'e':'i')),
+      message: (note ? note + '\n\n(Prezzo stimato sul sito: €' + totale.toFixed(0) + ' per ' + c.notti + ' nott' + (c.notti===1?'e':'i') + ')' : ('Prezzo stimato sul sito: €' + totale.toFixed(0) + ' per ' + c.notti + ' nott' + (c.notti===1?'e':'i'))) + notaSconto,
       status: 'nuova',
       createdAt: new Date().toISOString(),
     };
@@ -361,7 +396,7 @@ async function inviaRichiesta() {
           message: 'Nuova richiesta dal sito web:\n\nOspite: '+nome+'\nEmail: '+email+'\nTelefono: '+(telefono||'—')+
                    '\n\nCamera: '+c.tipo+' ('+c.room.name+')\nCheck-in: '+c.checkin+'\nCheck-out: '+c.checkout+
                    '\nOspiti: '+c.adults+' adulti'+(c.children?' + '+c.children+' bambini':'')+
-                   '\nTotale stimato: €'+totale.toFixed(0)+
+                   '\nTotale stimato: €'+totale.toFixed(0)+notaSconto+
                    (note?'\n\nNote: '+note:'')+
                    '\n\nVai su SmartPMS → Preventivi → Richieste ricevute per gestirla.',
           from_name: 'Sito Hotel Villa Aurora'
