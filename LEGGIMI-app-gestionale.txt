@@ -1,0 +1,8 @@
+APP DEL GESTIONALE — Hotel Villa Aurora
+
+1) Estrai lo zip.
+2) Su GitHub, nella STESSA cartella dove c'è il file del gestionale (DeskFlow_Villa_Aurora.html),
+   carica tutti i file (manifest.json e le tre icone) → Commit changes.
+3) Sul telefono/iPad apri il gestionale in Safari (Android: Chrome) → Condividi → "Aggiungi alla schermata Home".
+4) La prima volta che apri l'icona: Impostazioni → "⬆ Importa configurazione" (l'app installata conserva
+   le impostazioni separate da Safari, quindi va fatto una volta anche lì).

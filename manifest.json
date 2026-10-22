@@ -1,24 +1,32 @@
 {
-  "name": "DeskFlow Villa Aurora",
-  "short_name": "Villa Aurora",
-  "description": "Gestionale per Hotel Villa Aurora",
-  "start_url": "deskflow.html",
+  "id": "deskflow-gestionale",
+  "name": "DeskFlow Hotel Villa Aurora",
+  "short_name": "DF Villa",
+  "description": "Gestionale di Hotel Villa Aurora",
+  "start_url": "DeskFlow_Villa_Aurora.html",
+  "scope": "./",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#f8f9fa",
   "theme_color": "#1a73e8",
   "icons": [
     {
-      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='40' fill='%231a73e8'/%3E%3Ctext x='96' y='128' font-size='100' text-anchor='middle'%3E%F0%9F%8F%A8%3C/text%3E%3C/svg%3E",
+      "src": "icona-deskflow-192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='105' fill='%231a73e8'/%3E%3Ctext x='256' y='340' font-size='270' text-anchor='middle'%3E%F0%9F%8F%A8%3C/text%3E%3C/svg%3E",
+      "src": "icona-deskflow-512.png",
       "sizes": "512x512",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icona-deskflow-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
