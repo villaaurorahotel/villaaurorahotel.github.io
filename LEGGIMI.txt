@@ -1,0 +1,10 @@
+APP OSPITI — Greta's House
+
+1) Estrai questo file .zip (tasto destro → Estrai tutto).
+2) Su GitHub apri il repository del sito, nella stessa cartella di checkin-online.html,
+   premi "Add file" → "Upload files" e trascina TUTTI i file estratti
+   (area-ospite.html, manifest-ospite.json, sw-ospite.js e le due icone).
+3) Premi "Commit changes" e attendi un paio di minuti.
+
+Il cliente apre il link che gli mandi da DeskFlow (📱 Area ospite) e può aggiungerlo alla schermata Home.
+Senza link personale (es. da un QR in camera) l'app mostra solo guida, dintorni e contatti.
