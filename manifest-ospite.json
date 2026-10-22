@@ -1,7 +1,7 @@
 {
-  "name": "Greta's House",
-  "short_name": "Greta's House",
-  "description": "La tua guida e il tuo soggiorno da Greta's House",
+  "name": "Hotel Villa Aurora",
+  "short_name": "Hotel Villa",
+  "description": "La tua guida e il tuo soggiorno da Hotel Villa Aurora",
   "start_url": "area-ospite.html",
   "scope": "./",
   "display": "standalone",

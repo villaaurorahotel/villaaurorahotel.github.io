@@ -1,4 +1,4 @@
-APP OSPITI — Greta's House
+APP OSPITI — Hotel Villa Aurora
 
 1) Estrai questo file .zip (tasto destro → Estrai tutto).
 2) Su GitHub apri il repository del sito, nella stessa cartella di checkin-online.html,
