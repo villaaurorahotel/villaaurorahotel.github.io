@@ -17,7 +17,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="DeskFlow">
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='38' fill='%231a73e8'/%3E%3Ctext x='90' y='125' font-size='95' text-anchor='middle'%3E%F0%9F%8F%A8%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="icona-deskflow-180.png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DeskFlow</title>
 <style>
@@ -345,7 +345,7 @@ tr:hover td{background:var(--surface2)}
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
       <span id="utente-corrente-badge" style="display:none;font-size:10.5px;font-weight:700;color:var(--accent);margin-top:2px"></span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 22/10/2026 · 20:30</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 22/10/2026 · 21:15</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -15801,6 +15801,44 @@ function aoPeriodiLeggi(){
     if (dal && al) out.push(dal <= al ? {dal:dal, al:al} : {dal:al, al:dal});
   });
   return out.sort(function(a,b){ return a.dal.localeCompare(b.dal); });
+}
+
+// ══ APP DEL GESTIONALE (per Gian/staff) ══ pacchetto per installare DeskFlow sul telefono/iPad come app:
+// manifest.json con l'indirizzo GIUSTO di questo file + icone PNG vere (iPhone non usa le icone SVG).
+function dfIconaPng(size, accent, sigla){
+  return new Promise(function(resolve){
+    var cv=document.createElement('canvas'); cv.width=cv.height=size; var x=cv.getContext('2d');
+    var g=x.createLinearGradient(0,0,size,size); g.addColorStop(0,accent); g.addColorStop(1,'#111827');
+    x.fillStyle=g; x.fillRect(0,0,size,size);
+    x.fillStyle='#fff'; x.textAlign='center'; x.textBaseline='middle';
+    x.font='800 '+Math.round(size*0.40)+'px -apple-system,Segoe UI,Arial,sans-serif'; x.fillText('DF', size/2, size*0.44);
+    x.font='600 '+Math.round(size*0.12)+'px -apple-system,Segoe UI,Arial,sans-serif'; x.globalAlpha=.85; x.fillText(sigla, size/2, size*0.76);
+    cv.toBlob(function(bl){ bl.arrayBuffer().then(function(ab){ resolve(new Uint8Array(ab)); }); }, 'image/png');
+  });
+}
+async function dfScaricaAppGestionale(){
+  var file = decodeURIComponent((location.pathname||'').split('/').pop() || '');
+  if (!/\.html?$/i.test(file)) file = 'deskflow.html';
+  var s = DB.getObj('settings', {});
+  var nome = s.propertyName || 'La mia struttura';
+  var accent = /^#[0-9a-f]{6}$/i.test(s.coloreSito||'') ? s.coloreSito : '#4f46e5';
+  var sigla = nome.replace(/^(hotel|b&b|bed and breakfast|casa vacanze)\s+/i,'').split(/\s+/)[0].replace(/[^A-Za-zÀ-ÿ']/g,'').slice(0,10) || 'PMS';
+  var manifest = JSON.stringify({ id: 'deskflow-gestionale', name: 'DeskFlow '+nome, short_name: ('DF '+sigla).slice(0,12),
+    description: 'Gestionale di '+nome, start_url: file, scope: './', display: 'standalone', orientation: 'any',
+    background_color: '#f8f9fa', theme_color: accent,
+    icons: [{src:'icona-deskflow-192.png',sizes:'192x192',type:'image/png',purpose:'any'},{src:'icona-deskflow-512.png',sizes:'512x512',type:'image/png',purpose:'any'},{src:'icona-deskflow-512.png',sizes:'512x512',type:'image/png',purpose:'maskable'}] }, null, 2);
+  var leggimi = 'APP DEL GESTIONALE — '+nome+'\r\n\r\n'+
+    '1) Estrai lo zip.\r\n2) Su GitHub, nella STESSA cartella dove c\'è il file del gestionale ('+file+'),\r\n   carica tutti i file (manifest.json e le tre icone) → Commit changes.\r\n'+
+    '3) Sul telefono/iPad apri il gestionale in Safari (Android: Chrome) → Condividi → "Aggiungi alla schermata Home".\r\n'+
+    '4) La prima volta che apri l\'icona: Impostazioni → "⬆ Importa configurazione" (l\'app installata conserva\r\n   le impostazioni separate da Safari, quindi va fatto una volta anche lì).\r\n';
+  var files = [{name:'manifest.json', data:manifest}, {name:'LEGGIMI-app-gestionale.txt', data:leggimi},
+    {name:'icona-deskflow-180.png', data: await dfIconaPng(180, accent, sigla)},
+    {name:'icona-deskflow-192.png', data: await dfIconaPng(192, accent, sigla)},
+    {name:'icona-deskflow-512.png', data: await dfIconaPng(512, accent, sigla)}];
+  var a = document.createElement('a'); a.href = URL.createObjectURL(aoZip(files));
+  a.download = 'app-gestionale-'+nome.replace(/[^a-z0-9]+/gi,'-').replace(/^-|-$/g,'').toLowerCase()+'.zip';
+  document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  showToast('⬇ App del gestionale scaricata — carica i file accanto a '+file);
 }
 
 // Aggancia le decorazioni alle pagine esistenti senza toccarne il codice interno
@@ -32551,6 +32589,10 @@ function renderImpostazioni() {
                 : (getLocalSupabaseConn().url && getLocalSupabaseConn().key ? '🔴 Configurato ma non connesso — salva e ricarica la pagina' : '⚪ Non ancora configurato — il programma funziona offline come sempre')}
             </div>
             <button type="button" class="btn btn-sm full" onclick="verificaConnessioneSupabase()">🔍 Verifica connessione (diagnostica)</button>
+            <div class="form-group full" style="border-top:.5px solid var(--border2);padding-top:12px;margin-top:4px">
+              <button type="button" class="btn btn-sm full" onclick="dfScaricaAppGestionale()">📲 Scarica app del gestionale (telefono / iPad)</button>
+              <div class="sub" style="font-size:11.5px;color:var(--text3);margin-top:4px">Pacchetto con icona e impostazioni per aprire DeskFlow da un'icona sulla schermata Home, a schermo intero e senza barra del browser. Carica i file sul sito accanto a questo file del gestionale.</div>
+            </div>
             <div id="supabase-diagnostica" style="font-size:12.5px;line-height:1.7"></div>
             ${s.supabaseUrl && s.supabaseKey ? '<button type="button" class="btn btn-sm full" onclick="migraDatiSuSupabase()">⬆ Carica su Supabase i dati già presenti in questo browser</button>' : ''}
           </div>
