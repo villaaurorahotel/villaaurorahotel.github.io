@@ -345,7 +345,7 @@ tr:hover td{background:var(--surface2)}
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
       <span id="utente-corrente-badge" style="display:none;font-size:10.5px;font-weight:700;color:var(--accent);margin-top:2px"></span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 04/11/2026 · 09:50</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 04/11/2026 · 17:30</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -361,7 +361,7 @@ tr:hover td{background:var(--surface2)}
   <div class="nav-item active" onclick="navigate('dashboard')" data-page="dashboard">📊 Dashboard</div>
   <div class="nav-item" onclick="navigate('planner')" data-page="planner">📅 Planner</div>
   <div class="nav-item" onclick="navigate('calendario')" data-page="calendario">📅 Calendario</div>
-  <div class="nav-item" onclick="navigate('prenotazioni')" data-page="prenotazioni">📋 Prenotazioni</div>
+  <div class="nav-item" onclick="apriPrenotazioniDalMenu()" data-page="prenotazioni">📋 Prenotazioni <span id="nav-badge-pren" class="badge badge-red" style="margin-left:auto;display:none"></span></div>
   <div class="nav-item" onclick="navigate('gruppi')" data-page="gruppi">👥 Gruppi &amp; Eventi</div>
   <div class="nav-item" onclick="navigate('fatture')" data-page="fatture">🧾 Fatture</div>
   <div class="nav-item" onclick="navigate('recensioni')" data-page="recensioni">⭐ Recensioni</div>
@@ -401,6 +401,7 @@ tr:hover td{background:var(--surface2)}
   <div class="nav-item" onclick="navigate('ical')" data-page="ical">🔗 iCal/Portali</div>
   <div class="nav-item" onclick="navigate('impostazioni')" data-page="impostazioni">⚙ Impostazioni</div>
   <div class="nav-item" onclick="navigate('utenti')" data-page="utenti">🔐 Utenti &amp; Permessi</div>
+  <div class="nav-item" onclick="navigate('registro')" data-page="registro">🕵 Registro attività</div>
   <div class="nav-item" onclick="navigate('salvataggio')" data-page="salvataggio">💾 Salvataggio</div>
 </nav>
 
@@ -475,6 +476,7 @@ tr:hover td{background:var(--surface2)}
   <div id="page-ical" class="page"></div>
   <div id="page-impostazioni" class="page"></div>
   <div id="page-utenti" class="page"></div>
+  <div id="page-registro" class="page"></div>
   <div id="page-salvataggio" class="page"></div>
 </div>
 <div id="modal-container"></div>
@@ -562,6 +564,248 @@ const DB = {
     localStorage.setItem('pms_'+k,JSON.stringify(v));
   }
 };
+
+// ============================================================
+// REGISTRO ATTIVITÀ — chi ha fatto cosa e quando (visibile solo all'amministratore)
+// Ogni creazione, modifica o eliminazione di prenotazioni, ospiti, camere, preventivi, richieste,
+// listino, tariffe, fatture, corrispettivi, impostazioni e utenti viene scritta nella tabella
+// "registro_attivita" di Supabase, con l'email di chi era collegato. La tabella accetta solo nuove
+// righe (nessuno può modificarle o cancellarle) e gli utenti con permessi limitati non possono leggerla.
+// ============================================================
+const AUDIT_TABELLE = {
+  bookings:            { mappa:'bookings',            pronto:()=>supabaseReady,              a:b=>bookingToSupabase(b),  chiave:b=>b.id, nome:'Prenotazione' },
+  guests:              { mappa:'guests',              pronto:()=>supabaseReady&&_guestsReady,  a:g=>guestToSupabase(g),    chiave:g=>g.id, nome:'Ospite' },
+  rooms:               { mappa:'rooms',               pronto:()=>supabaseReady,              a:r=>roomToSupabase(r),     chiave:r=>r.id, nome:'Camera' },
+  quotes:              { mappa:'quotes',              pronto:()=>supabaseReady&&_quotesReady,  a:q=>quoteToSupabase(q),    chiave:q=>q.id, nome:'Preventivo' },
+  richiestePreventivo: { mappa:'richieste_preventivo',pronto:()=>supabaseReady&&_richiestePreventivoReady, a:r=>richiestaToSupabase(r), chiave:r=>r.id, nome:'Richiesta preventivo' },
+  listino:             { mappa:'listino',             pronto:()=>supabaseReady&&_listinoReady, a:l=>listinoToSupabase(l),  chiave:l=>l.roomId+'|'+(l.tariffaId||'standard'), nome:'Listino prezzi' },
+  tariffe:             { mappa:'tariffe',             pronto:()=>supabaseReady&&_tariffeReady, a:t=>tariffaToSupabase(t),  chiave:t=>t.id, nome:'Tariffa' }
+};
+const AUDIT_BLOB = { settings:'Impostazioni', fatture:'Fatture', corrispettivi:'Corrispettivi', utentiPermessi:'Utenti e permessi', extras:'Extra', movimenti:'Movimenti', messageTemplates:'Modelli messaggi', listinoAggiustamenti:'Variazioni prezzo', otaCanali:'Canali OTA' };
+const AUDIT_IGNORA = ['modified_at','registro_modifiche','comunicazioni','created_at','checkin_token','modifiedAt','registroModifiche'];
+const AUDIT_ETICHETTE = { status:'Stato', checkin:'Check-in', checkout:'Check-out', room_name:'Camera', room_id:'Camera', guest_name:'Ospite', adults:'Adulti', children:'Bambini', total_price:'Totale', pagato:'Pagato', metodo_pagamento:'Metodo pagamento', caparra:'Caparra', notes:'Note', source:'Fonte', trattamento:'Trattamento', pagamenti:'Pagamenti', extras:'Extra', fattura:'Fattura', componenti:'Dati ospiti', checkin_at:'Check-in effettuato', checkout_at:'Check-out effettuato', cancelled_at:'Cancellata il', name:'Nome', email:'Email', phone:'Telefono', price:'Prezzo', capacity:'Capacità', nome:'Nome', valore:'Valore', prezzi:'Prezzi', periodi:'Periodi' };
+const AUDIT_SEGRETO = /pass|pwd|token|secret|apikey|api_key|chiave/i;
+let _auditUltimo = {};      // ultima versione già registrata per ogni riga (evita doppioni)
+let _auditBlobSnap = {};    // copia "prima della modifica" dei dati generali
+let _auditCoda = [];
+let _auditTimer = null;
+let _auditAvvisato = false;
+try { _auditCoda = JSON.parse(localStorage.getItem('pms_audit_coda')) || []; } catch (e) { _auditCoda = []; }
+
+function _auditCorto(v) {
+  if (v === null || v === undefined || v === '') return '—';
+  if (Array.isArray(v)) return v.length + ' elementi';
+  if (typeof v === 'object') return '(dati)';
+  const s = String(v);
+  return s.length > 80 ? s.slice(0, 80) + '…' : s;
+}
+function _auditDiff(vecchio, nuovo, segreti) {
+  const cambi = [];
+  const chiavi = new Set([...Object.keys(vecchio || {}), ...Object.keys(nuovo || {})]);
+  chiavi.forEach(k => {
+    if (AUDIT_IGNORA.indexOf(k) >= 0) return;
+    const a = vecchio ? vecchio[k] : undefined, b = nuovo ? nuovo[k] : undefined;
+    if (JSON.stringify(a) === JSON.stringify(b)) return;
+    const nascondi = AUDIT_SEGRETO.test(k);
+    let prima = _auditCorto(a), dopo = _auditCorto(b);
+    if (Array.isArray(a) && Array.isArray(b)) { prima = a.length + ' elementi'; dopo = b.length + ' elementi'; }
+    if (nascondi) { prima = '(nascosto)'; dopo = '(modificato)'; }
+    cambi.push({ campo: AUDIT_ETICHETTE[k] || k, prima: prima, dopo: dopo });
+  });
+  return cambi;
+}
+function _auditEtichettaRiga(tab, o) {
+  const d = (o && o.data) ? o.data : (o || {});
+  if (tab === 'bookings') return (o.guest_name || '—') + ' · ' + (o.room_name || '') + ' · ' + (o.checkin || '') + '→' + (o.checkout || '');
+  if (tab === 'guests') return o.name || o.id;
+  if (tab === 'rooms') return o.name || o.id;
+  if (tab === 'quotes') return (d.clientName || '—') + (d.num ? ' #' + d.num : '');
+  if (tab === 'richiestePreventivo') return (d.clientName || '—') + (d.checkin ? ' · ' + d.checkin : '');
+  if (tab === 'listino') { let nm = o.room_id; try { const r = (DB.get('rooms') || []).find(x => x.id === o.room_id); if (r) nm = r.name; } catch (e) {} return nm + ' / ' + (o.tariffa_id || ''); }
+  if (tab === 'tariffe') return o.nome || o.id;
+  return o.id || '';
+}
+function auditLog(e) {
+  try {
+    e.id = 'lg_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    e.quando = new Date().toISOString();
+    e.utente = window.currentUserEmail || '(amministratore)';
+    if (!e.pagina) e.pagina = (typeof currentPage !== 'undefined' ? currentPage : '') || '';
+    _auditCoda.push(e);
+    try { localStorage.setItem('pms_audit_coda', JSON.stringify(_auditCoda.slice(-500))); } catch (x) {}
+    if (!_auditTimer) _auditTimer = setTimeout(auditInvia, 1500);
+  } catch (err) { console.warn('Registro attività:', err); }
+}
+async function auditInvia() {
+  _auditTimer = null;
+  if (!_auditCoda.length) return;
+  if (!supabaseClient || !supabaseReady) { _auditTimer = setTimeout(auditInvia, 15000); return; }
+  const lotto = _auditCoda.slice(0, 100);
+  const righe = lotto.map(x => ({ id: x.id, quando: x.quando, utente: x.utente, azione: x.azione, entita: x.entita || '', entita_id: x.entita_id || '', descrizione: x.descrizione || '', dettagli: x.dettagli || null, pagina: x.pagina || '' }));
+  try {
+    const { error } = await supabaseClient.from('registro_attivita').insert(righe);
+    if (error) throw error;
+    _auditCoda = _auditCoda.slice(lotto.length);
+    try { localStorage.setItem('pms_audit_coda', JSON.stringify(_auditCoda.slice(-500))); } catch (x) {}
+    if (_auditCoda.length) _auditTimer = setTimeout(auditInvia, 500);
+  } catch (err) {
+    console.warn('Registro attività non salvato (riprovo tra poco):', err);
+    if (!_auditAvvisato) { _auditAvvisato = true; try { showToast('⚠️ Registro attività non attivo: serve lo script SQL "registro-attivita.sql" su Supabase'); } catch (x) {} }
+    _auditTimer = setTimeout(auditInvia, 60000);
+  }
+}
+function _auditRegistraTabella(k, nuovoArr) {
+  const cfg = AUDIT_TABELLE[k];
+  if (!cfg || !cfg.pronto() || typeof _syncedMaps === 'undefined') return;
+  const mappa = _syncedMaps[cfg.mappa];
+  if (!mappa || !Array.isArray(nuovoArr)) return;
+  const creati = [], modificati = [], eliminati = [];
+  const visti = new Set();
+  nuovoArr.forEach(r => {
+    if (!r) return;
+    const id = cfg.chiave(r);
+    visti.add(id);
+    const nuovaStr = JSON.stringify(cfg.a(r));
+    const vecchiaStr = mappa.get(id);
+    if (vecchiaStr === nuovaStr) return;
+    if (_auditUltimo[k + '|' + id] === nuovaStr) return; // già registrato, in attesa di sincronizzazione
+    _auditUltimo[k + '|' + id] = nuovaStr;
+    if (vecchiaStr === undefined) creati.push({ id, nuova: JSON.parse(nuovaStr) });
+    else modificati.push({ id, vecchia: JSON.parse(vecchiaStr), nuova: JSON.parse(nuovaStr) });
+  });
+  mappa.forEach((vecchiaStr, id) => {
+    if (!visti.has(id)) {
+      if (_auditUltimo[k + '|' + id] === '__eliminato__') return;
+      _auditUltimo[k + '|' + id] = '__eliminato__';
+      eliminati.push({ id, vecchia: JSON.parse(vecchiaStr) });
+    }
+  });
+  const tot = creati.length + modificati.length + eliminati.length;
+  if (!tot) return;
+  if (tot > 25) {
+    auditLog({ azione: 'modifica', entita: cfg.nome, descrizione: 'Modifica di massa su «' + cfg.nome + '»: ' + creati.length + ' create, ' + modificati.length + ' modificate, ' + eliminati.length + ' eliminate', dettagli: [{ campo: 'Esempi', prima: '', dopo: creati.concat(modificati, eliminati).slice(0, 8).map(x => _auditEtichettaRiga(k, x.nuova || x.vecchia)).join(' | ') }] });
+    return;
+  }
+  creati.forEach(x => auditLog({ azione: 'creazione', entita: cfg.nome, entita_id: x.id, descrizione: 'Creata ' + cfg.nome.toLowerCase() + ': ' + _auditEtichettaRiga(k, x.nuova) }));
+  eliminati.forEach(x => auditLog({ azione: 'eliminazione', entita: cfg.nome, entita_id: x.id, descrizione: 'ELIMINATA ' + cfg.nome.toLowerCase() + ': ' + _auditEtichettaRiga(k, x.vecchia), dettagli: [{ campo: 'Contenuto prima dell\'eliminazione', prima: _auditEtichettaRiga(k, x.vecchia), dopo: '' }] }));
+  modificati.forEach(x => {
+    const a = (x.vecchia && x.vecchia.data) ? x.vecchia.data : x.vecchia;
+    const b = (x.nuova && x.nuova.data) ? x.nuova.data : x.nuova;
+    const cambi = _auditDiff(a, b);
+    if (!cambi.length) return;
+    let azione = 'modifica', verbo = 'Modificata ';
+    const sA = a && a.status, sB = b && b.status;
+    if (sA !== sB && sB === 'cancellata') { azione = 'annullamento'; verbo = 'ANNULLATA '; }
+    else if (sA === 'cancellata' && sB && sB !== 'cancellata') { azione = 'ripristino'; verbo = 'Ripristinata '; }
+    const riassunto = cambi.slice(0, 4).map(c => c.campo + ': ' + c.prima + ' → ' + c.dopo).join('; ') + (cambi.length > 4 ? ' (+' + (cambi.length - 4) + ')' : '');
+    auditLog({ azione, entita: cfg.nome, entita_id: x.id, descrizione: verbo + cfg.nome.toLowerCase() + ' ' + _auditEtichettaRiga(k, x.nuova) + ' — ' + riassunto, dettagli: cambi });
+  });
+}
+function _auditRegistraBlob(k, nuovo) {
+  const nome = AUDIT_BLOB[k];
+  if (!nome || !(typeof supabaseReady !== 'undefined' && supabaseReady) || !_blobsReady[k]) return;
+  const nuovaStr = JSON.stringify(nuovo);
+  if (_auditBlobSnap[k] === undefined) { _auditBlobSnap[k] = nuovaStr; return; }
+  if (_auditBlobSnap[k] === nuovaStr) return;
+  let vecchio; try { vecchio = JSON.parse(_auditBlobSnap[k]); } catch (e) { vecchio = null; }
+  _auditBlobSnap[k] = nuovaStr;
+  let cambi = [];
+  if (Array.isArray(nuovo) && Array.isArray(vecchio)) {
+    const conId = x => x && typeof x === 'object' && x.id !== undefined;
+    if (nuovo.every(conId) && vecchio.every(conId)) {
+      const mv = new Map(vecchio.map(x => [x.id, JSON.stringify(x)])), mn = new Map(nuovo.map(x => [x.id, JSON.stringify(x)]));
+      const lab = x => String(x.numero || x.num || x.nome || x.name || x.descrizione || x.title || x.id).slice(0, 60);
+      nuovo.forEach(x => { if (!mv.has(x.id)) cambi.push({ campo: 'Aggiunto', prima: '', dopo: lab(x) }); else if (mv.get(x.id) !== mn.get(x.id)) cambi.push({ campo: 'Modificato ' + lab(x), prima: '', dopo: '(cambiato)' }); });
+      vecchio.forEach(x => { if (!mn.has(x.id)) cambi.push({ campo: 'ELIMINATO', prima: lab(x), dopo: '' }); });
+    } else cambi.push({ campo: 'Elenco', prima: vecchio.length + ' elementi', dopo: nuovo.length + ' elementi' });
+  } else if (nuovo && typeof nuovo === 'object' && vecchio && typeof vecchio === 'object') {
+    cambi = _auditDiff(vecchio, nuovo);
+  } else cambi.push({ campo: 'Contenuto', prima: '', dopo: '(cambiato)' });
+  if (!cambi.length) return;
+  const elim = cambi.some(c => c.campo === 'ELIMINATO');
+  auditLog({ azione: elim ? 'eliminazione' : 'modifica', entita: nome, descrizione: (elim ? 'Eliminazione in «' : 'Modificato «') + nome + '»: ' + cambi.slice(0, 4).map(c => c.campo + (c.prima || c.dopo ? ': ' + c.prima + (c.dopo ? ' → ' + c.dopo : '') : '')).join('; ') + (cambi.length > 4 ? ' (+' + (cambi.length - 4) + ')' : ''), dettagli: cambi.slice(0, 60) });
+}
+(function () {
+  const _set = DB.set.bind(DB), _setObj = DB.setObj.bind(DB), _get = DB.get.bind(DB), _getObj = DB.getObj.bind(DB);
+  function _snapPrimaLettura(k, r) {
+    try { if (AUDIT_BLOB[k] && _auditBlobSnap[k] === undefined && typeof supabaseReady !== 'undefined' && supabaseReady && _blobsReady[k]) _auditBlobSnap[k] = JSON.stringify(r); } catch (e) {}
+  }
+  DB.get = function (k) { const r = _get(k); _snapPrimaLettura(k, r); return r; };
+  DB.getObj = function (k, d) { const r = _getObj(k, d); _snapPrimaLettura(k, r); return r; };
+  DB.set = function (k, v) {
+    try { if (AUDIT_TABELLE[k]) _auditRegistraTabella(k, v); else if (AUDIT_BLOB[k]) _auditRegistraBlob(k, v); } catch (e) { console.warn('Registro attività:', e); }
+    return _set(k, v);
+  };
+  DB.setObj = function (k, v) {
+    try { if (AUDIT_BLOB[k]) _auditRegistraBlob(k, v); } catch (e) { console.warn('Registro attività:', e); }
+    return _setObj(k, v);
+  };
+})();
+window.addEventListener('beforeunload', function () { try { localStorage.setItem('pms_audit_coda', JSON.stringify(_auditCoda.slice(-500))); } catch (e) {} });
+setTimeout(auditInvia, 8000); // invia eventuali righe rimaste in coda dalla volta scorsa
+
+// ── Pagina "Registro attività" (solo amministratore) ──
+var _regPagina = 0, _regFiltri = { utente: '', entita: '', azione: '', da: '', a: '', testo: '' };
+function _regEsc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+async function renderRegistro() {
+  const box = document.getElementById('page-registro');
+  if (window.currentUserPermessi) { showToast('Solo l\'amministratore può vedere il registro'); navigate('dashboard'); return; }
+  const utenti = Object.keys(DB.getObj('utentiPermessi', {}) || {});
+  const entita = ['Prenotazione','Ospite','Camera','Preventivo','Richiesta preventivo','Listino prezzi','Tariffa','Impostazioni','Fatture','Corrispettivi','Utenti e permessi','Extra','Movimenti','Accesso'];
+  const f = _regFiltri;
+  box.innerHTML = '<div class="page-header"><div><div class="page-title">🕵 Registro attività</div><div class="page-subtitle">Chi ha fatto cosa e quando — non modificabile</div></div>'
+    + '<button class="btn" onclick="_regPagina=0;caricaRegistro()">↻ Aggiorna</button></div>'
+    + '<div class="page-content"><div class="card" style="padding:12px 16px;margin-bottom:12px"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">'
+    + '<div><label style="font-size:11px;display:block">Utente</label><select id="reg-utente" style="min-width:160px"><option value="">Tutti</option>' + utenti.map(u => '<option value="' + _regEsc(u) + '"' + (f.utente === u ? ' selected' : '') + '>' + _regEsc(u) + '</option>').join('') + '</select></div>'
+    + '<div><label style="font-size:11px;display:block">Cosa</label><select id="reg-entita"><option value="">Tutto</option>' + entita.map(e => '<option' + (f.entita === e ? ' selected' : '') + '>' + e + '</option>').join('') + '</select></div>'
+    + '<div><label style="font-size:11px;display:block">Azione</label><select id="reg-azione"><option value="">Tutte</option>' + [['creazione','Creazione'],['modifica','Modifica'],['annullamento','Annullamento'],['ripristino','Ripristino'],['eliminazione','Eliminazione'],['accesso','Accesso'],['uscita','Uscita']].map(a => '<option value="' + a[0] + '"' + (f.azione === a[0] ? ' selected' : '') + '>' + a[1] + '</option>').join('') + '</select></div>'
+    + '<div><label style="font-size:11px;display:block">Dal</label><input type="date" id="reg-da" value="' + _regEsc(f.da) + '"></div>'
+    + '<div><label style="font-size:11px;display:block">Al</label><input type="date" id="reg-a" value="' + _regEsc(f.a) + '"></div>'
+    + '<div><label style="font-size:11px;display:block">Cerca (es. nome ospite)</label><input type="text" id="reg-testo" value="' + _regEsc(f.testo) + '" placeholder="Rossi…" onkeydown="if(event.key===\'Enter\')applicaFiltriRegistro()"></div>'
+    + '<button class="btn btn-primary" onclick="applicaFiltriRegistro()">Filtra</button>'
+    + '<button class="btn" onclick="_regFiltri={utente:\'\',entita:\'\',azione:\'\',da:\'\',a:\'\',testo:\'\'};_regPagina=0;renderRegistro()">Azzera</button>'
+    + '</div></div><div class="card" id="reg-lista"><div class="empty-state"><p>Caricamento…</p></div></div></div>';
+  _regPagina = 0;
+  caricaRegistro();
+}
+function applicaFiltriRegistro() {
+  _regFiltri = { utente: document.getElementById('reg-utente').value, entita: document.getElementById('reg-entita').value, azione: document.getElementById('reg-azione').value, da: document.getElementById('reg-da').value, a: document.getElementById('reg-a').value, testo: document.getElementById('reg-testo').value.trim() };
+  _regPagina = 0;
+  caricaRegistro();
+}
+async function caricaRegistro() {
+  const lista = document.getElementById('reg-lista');
+  if (!lista) return;
+  const PAG = 100, f = _regFiltri;
+  try {
+    await auditInvia();
+    let q = supabaseClient.from('registro_attivita').select('*').order('quando', { ascending: false }).range(_regPagina * PAG, _regPagina * PAG + PAG - 1);
+    if (f.utente) q = q.eq('utente_auth', f.utente);
+    if (f.entita) q = q.eq('entita', f.entita);
+    if (f.azione) q = q.eq('azione', f.azione);
+    if (f.da) q = q.gte('quando', f.da + 'T00:00:00');
+    if (f.a) q = q.lte('quando', f.a + 'T23:59:59');
+    if (f.testo) q = q.ilike('descrizione', '%' + f.testo.replace(/[%,]/g, ' ') + '%');
+    const { data, error } = await q;
+    if (error) throw error;
+    const colori = { creazione: 'badge-green', modifica: 'badge-blue', annullamento: 'badge-red', eliminazione: 'badge-red', ripristino: 'badge-amber', accesso: 'badge-gray', uscita: 'badge-gray' };
+    const nomi = { creazione: 'Creata', modifica: 'Modifica', annullamento: 'Annullata', eliminazione: 'ELIMINATA', ripristino: 'Ripristinata', accesso: 'Accesso', uscita: 'Uscita' };
+    if (!data.length && _regPagina === 0) { lista.innerHTML = '<div class="empty-state"><p>Nessuna attività registrata con questi filtri.</p></div>'; return; }
+    lista.innerHTML = '<table><thead><tr><th>Data e ora</th><th>Utente</th><th>Azione</th><th>Cosa è successo</th></tr></thead><tbody>'
+      + data.map((r, i) => {
+        const d = new Date(r.quando);
+        const dt = d.toLocaleDateString('it-IT') + ' ' + d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const det = (r.dettagli && r.dettagli.length) ? '<div style="margin-top:4px;font-size:11.5px;color:var(--text2)">' + r.dettagli.map(c => '• ' + _regEsc(c.campo) + (c.prima || c.dopo ? ': ' + _regEsc(c.prima) + (c.dopo ? ' → <strong>' + _regEsc(c.dopo) + '</strong>' : '') : '')).join('<br>') + '</div>' : '';
+        return '<tr><td style="white-space:nowrap;font-size:12px">' + dt + '</td><td style="font-size:12px">' + _regEsc(r.utente_auth || r.utente) + (r.utente_auth && r.utente && r.utente !== r.utente_auth && r.utente !== '(amministratore)' ? '<br><span style="color:var(--red);font-size:10.5px">dichiarato: ' + _regEsc(r.utente) + '</span>' : '') + '</td><td><span class="badge ' + (colori[r.azione] || 'badge-gray') + '">' + (nomi[r.azione] || _regEsc(r.azione)) + '</span></td><td style="font-size:12.5px">' + _regEsc(r.descrizione) + det + '</td></tr>';
+      }).join('') + '</tbody></table>'
+      + '<div style="padding:10px 16px;display:flex;gap:8px;justify-content:center">'
+      + (_regPagina > 0 ? '<button class="btn btn-sm" onclick="_regPagina--;caricaRegistro()">← Più recenti</button>' : '')
+      + (data.length === PAG ? '<button class="btn btn-sm" onclick="_regPagina++;caricaRegistro()">Più vecchie →</button>' : '') + '</div>';
+  } catch (err) {
+    console.error('Registro attività:', err);
+    lista.innerHTML = '<div class="empty-state"><p>Non riesco a leggere il registro. Probabilmente manca lo script SQL "registro-attivita.sql" su Supabase, oppure questo utente non ha il permesso.<br><span style="font-size:11px;color:var(--text3)">' + _regEsc(err.message || '') + '</span></p></div>';
+  }
+}
 
 // ============================================================
 // SUPABASE — collegamento condiviso per Camere e Prenotazioni (Fase 1)
@@ -1154,7 +1398,7 @@ function handleBlobRealtimeChange(payload) {
   const key = payload.eventType === 'DELETE' ? payload.old.key : payload.new.key;
   if (['settings','corrispettivi','storicoOspiti','messageTemplates','listinoAggiustamenti','listinoPromozioni','listinoScostamenti','revenueConfig','competitorStrutture','competitorPrices','blacklist','extras','movimenti','tassaSoggiornoLog','categoryOrder','groupColors','hkData','regoleTipo','tassaSoggiornoDettaglio','ical_portals','guidaOspiti','livelliTariffari','listinoLivelli','listinoRegistro','otaCanali','manutenzione','fatture','utentiPermessi','gruppiInfo'].indexOf(key) < 0) return;
   if (payload.eventType === 'DELETE') { delete _blobsCache[key]; }
-  else { _blobsCache[key] = payload.new.data; }
+  else { _blobsCache[key] = payload.new.data; try { if (typeof AUDIT_BLOB !== 'undefined' && AUDIT_BLOB[key]) _auditBlobSnap[key] = JSON.stringify(payload.new.data); } catch (e) {} }
   if (key === 'settings') {
     var lbl = document.getElementById('prop-name');
     if (lbl && _blobsCache.settings) lbl.textContent = _blobsCache.settings.propertyName || 'La tua struttura';
@@ -1183,9 +1427,13 @@ function handleBookingRealtimeChange(payload) {
   } else {
     const booking = bookingFromSupabase(payload.new);
     const idx = _bookingsCache.findIndex(b => b.id === booking.id);
-    if (idx >= 0) _bookingsCache[idx] = booking; else _bookingsCache.push(booking);
+    if (idx >= 0) _bookingsCache[idx] = booking; else {
+      _bookingsCache.push(booking);
+      if (booking.source === 'Sito web' && booking.status !== 'cancellata') { try { showToast('🛎 Nuova prenotazione dal sito: ' + (booking.guestName||'')); } catch (e) {} }
+    }
     _syncedMaps.bookings.set(payload.new.id, JSON.stringify(bookingToSupabase(bookingFromSupabase(payload.new))));
   }
+  try { aggiornaBadgePrenotazioni(); } catch (e) {}
   if (isSupabaseSyncing()) return;
   if (typeof currentPage !== 'undefined') { showToast('📡 Dati aggiornati da un altro PC'); renderPage(currentPage); }
 }
@@ -12721,12 +12969,48 @@ function renderPreventivi() {
 // Tiene traccia delle richieste già viste, per distinguere quelle nuove (utile per futuri usi,
 // es. badge "nuova"). L'email di avviso parte direttamente da prenota.html al momento dell'invio,
 // quindi qui NON mandiamo una seconda mail (eviteremmo un doppio avviso per la stessa richiesta).
+// ── Prenotazioni arrivate dal sito e non ancora guardate (numero rosso nel menu) ──
+// "Viste" = elenco salvato in questo browser: aprendo Prenotazioni dal menu, quelle presenti diventano viste.
+function _prenotazioniVisteSet() {
+  try { const raw = localStorage.getItem('pms_prenotazioni_viste'); if (raw === null) return null; return new Set(JSON.parse(raw) || []); } catch (e) { return null; }
+}
+function prenotazioniWebNuove() {
+  const tutte = DB.get('bookings') || [];
+  const web = tutte.filter(b => b && b.source === 'Sito web' && b.status !== 'cancellata');
+  const viste = _prenotazioniVisteSet();
+  if (viste === null) {
+    // Prima volta su questo browser: quelle già presenti contano come già viste
+    if (tutte.length) { try { localStorage.setItem('pms_prenotazioni_viste', JSON.stringify(tutte.filter(b => b && b.source === 'Sito web').map(b => b.id))); } catch (e) {} }
+    return [];
+  }
+  return web.filter(b => !viste.has(b.id));
+}
+function aggiornaBadgePrenotazioni() {
+  const el = document.getElementById('nav-badge-pren');
+  if (!el) return;
+  const n = prenotazioniWebNuove().length;
+  el.textContent = n;
+  el.style.display = n > 0 ? '' : 'none';
+}
+function apriPrenotazioniDalMenu() {
+  const nuove = prenotazioniWebNuove();
+  window._prenotazioniNuoveIds = new Set(nuove.map(b => b.id));
+  try {
+    const gia = _prenotazioniVisteSet() || new Set();
+    (DB.get('bookings') || []).forEach(b => { if (b && b.source === 'Sito web') gia.add(b.id); });
+    localStorage.setItem('pms_prenotazioni_viste', JSON.stringify([...gia]));
+  } catch (e) {}
+  aggiornaBadgePrenotazioni();
+  navigate('prenotazioni');
+}
+
 // Quante richieste di preventivo sono arrivate e non ancora evase (stato "nuova")
 function contaRichiesteNuove() {
   try { return (DB.get('richiestePreventivo')||[]).filter(r=>r && r.status==='nuova').length; } catch(e) { return 0; }
 }
 // Numero rosso accanto a "Preventivi" nel menu a sinistra
 function aggiornaBadgePreventivi() {
+  try { aggiornaBadgePrenotazioni(); } catch (e) {}
   const el = document.getElementById('nav-badge-prev');
   if (!el) return;
   const n = contaRichiesteNuove();
@@ -16232,6 +16516,7 @@ async function applicaPermessiUtenteCorrente(){
       window.currentUserPermessi = lista[email].permessi || {};
     }
   } catch (err) { console.warn('Permessi utente non applicati:', err); }
+  try { auditLog({ azione: 'accesso', entita: 'Accesso', descrizione: 'Accesso al PMS' + (window.currentUserPermessi ? ' (utente con permessi limitati)' : ' (amministratore)') }); } catch (e) {}
   aggiornaVisibilitaMenuPermessi();
 }
 function aggiornaVisibilitaMenuPermessi(){
@@ -16244,6 +16529,8 @@ function aggiornaVisibilitaMenuPermessi(){
   });
   var voceUtenti = document.querySelector('.nav-item[data-page="utenti"]');
   if (voceUtenti) voceUtenti.style.display = window.currentUserPermessi ? 'none' : '';
+  var voceRegistro = document.querySelector('.nav-item[data-page="registro"]');
+  if (voceRegistro) voceRegistro.style.display = window.currentUserPermessi ? 'none' : '';
   var btnHub = document.getElementById('btn-torna-hub');
   if (btnHub) btnHub.style.display = window.currentUserPermessi ? 'none' : 'block';
   // Etichetta con chi è collegato in questo momento, sotto il nome della struttura — utile per
@@ -16541,7 +16828,7 @@ function renderPrenotazioni() {
                     <td>${fmtDate(b.checkout)}</td>
                     <td style="font-size:11.5px;color:var(--text2)">${b.createdAt?fmtDate(b.createdAt.split('T')[0]):'—'}</td>
                     <td><strong>${b.roomName}</strong>${isOverb ? ' <span title="Camera prenotata più volte in date sovrapposte" style="background:#7c3aed;color:#fff;font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:4px;white-space:nowrap">⚠ OVERBOOKING</span>' : ''}${b.nonRimborsabile ? ' <span title="Tariffa non rimborsabile" style="background:#9a3412;color:#fff;font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:4px;white-space:nowrap">🔒 NON RIMBORSABILE</span>' : ''}</td>
-                    <td>${b.guestName}${b.garanzia&&b.garanzia.tipo==='carta' ? ` <span title="Garanzia: carta di credito che termina con ${b.garanzia.ultime4||'????'}" style="background:#1e40af;color:#fff;font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:4px;white-space:nowrap">💳 •${b.garanzia.ultime4||'----'}</span>` : ''}${b.garanzia&&b.garanzia.tipo==='bonifico' ? ` <span title="Garanzia: bonifico — ${(b.garanzia.bonificoRif||'').replace(/"/g,'&quot;')}" style="background:#065f46;color:#fff;font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:4px;white-space:nowrap">🏦 BONIFICO</span>` : ''}</td>
+                    <td>${b.guestName}${(window._prenotazioniNuoveIds && window._prenotazioniNuoveIds.has(b.id)) ? ' <span class="badge badge-red" style="font-size:9.5px">NUOVA</span>' : ''}${b.garanzia&&b.garanzia.tipo==='carta' ? ` <span title="Garanzia: carta di credito che termina con ${b.garanzia.ultime4||'????'}" style="background:#1e40af;color:#fff;font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:4px;white-space:nowrap">💳 •${b.garanzia.ultime4||'----'}</span>` : ''}${b.garanzia&&b.garanzia.tipo==='bonifico' ? ` <span title="Garanzia: bonifico — ${(b.garanzia.bonificoRif||'').replace(/"/g,'&quot;')}" style="background:#065f46;color:#fff;font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:4px;white-space:nowrap">🏦 BONIFICO</span>` : ''}</td>
                     <td style="white-space:nowrap;font-size:12px">👤${b.adults||1}${b.children?` · 🧒${b.children}`:''}</td>
                     <td style="text-align:center">${nights(b.checkin,b.checkout)}</td>
                     <td>${b.trattamento ? `<span class="badge badge-blue" style="font-size:10px">${b.trattamento}</span>` : '—'}</td>
@@ -19379,6 +19666,17 @@ function eliminaPrenotazioneDefinitivamente(id) {
   if (!confirm('Eliminare DEFINITIVAMENTE questa prenotazione? Non sarà più recuperabile in nessun modo.')) return false;
   const bookings = DB.get('bookings').filter(b => b.id !== id);
   DB.set('bookings', bookings);
+  // BUG TROVATO E CORRETTO ("cancello le prenotazioni e dopo un po' le ritrovo"): la sincronizzazione
+  // non cancella mai nulla dal database (scelta voluta, dopo l'incidente di Villa Aurora), quindi
+  // l'eliminazione definitiva toglieva la prenotazione solo da questo browser: al ricaricamento o al
+  // ritorno sulla scheda tornava dal database. Ora la cancellazione viene chiesta anche al database.
+  if (typeof supabaseReady !== 'undefined' && supabaseReady && supabaseClient) {
+    supabaseClient.from('bookings').delete().eq('id', id).select('id').then(function(r){
+      if (r.error) { console.error('Eliminazione prenotazione dal database non riuscita:', r.error); showToast('⚠️ Eliminata solo su questo PC: il database ha risposto con un errore (' + (r.error.message||'') + ')'); }
+      else if (!r.data || !r.data.length) { showToast('⚠️ La prenotazione non risulta eliminata dal database: potrebbe ricomparire'); }
+      else { try { _syncedMaps.bookings.delete(id); } catch (e) {} }
+    });
+  }
   showToast('Prenotazione eliminata definitivamente');
   renderPage(currentPage);
   return true;
@@ -32592,6 +32890,7 @@ function initDemoData() {
         if (currentPage === 'preventivi') renderPreventivi();
       }).catch(function(){});
     }
+    try { aggiornaBadgePrenotazioni(); } catch (e) {}
   }, 60000);
   window.addEventListener('beforeunload', function(e){
     localStorage.setItem('pms_last_save', new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}));
@@ -32608,7 +32907,7 @@ function renderPage(page) {
     prenotazioni: renderPrenotazioni, checkin: renderCheckin, checkout: renderCheckout,
     camere: renderCamere, ospiti: renderOspiti, archivioospiti: renderArchivioOspiti, guidaospiti: renderGuidaOspiti, report: renderReport,
     impostazioni: renderImpostazioni, listino: renderListino, tassasoggiorno: renderTassaSoggiorno,
-    housekeeping: renderHousekeeping, puliziamobile: renderPuliziaMobile, preventivi: renderPreventivi, addebitiextra: renderAddebitiExtra,
+    housekeeping: renderHousekeeping, puliziamobile: renderPuliziaMobile, preventivi: renderPreventivi, registro: renderRegistro, addebitiextra: renderAddebitiExtra,
     previsionale: renderPrevisionale, esporta: renderEsporta,
     extra: renderExtra,
     ical: renderIcal,
@@ -32742,6 +33041,7 @@ async function doLogin() {
 }
 async function doLogout() {
   if (!confirm('Uscire da DeskFlow?')) return;
+  try { auditLog({ azione: 'uscita', entita: 'Accesso', descrizione: 'Uscita dal PMS' }); await auditInvia(); } catch (e) {}
   if (supabaseClient) { try { await supabaseClient.auth.signOut(); } catch(e) {} }
   location.reload();
 }
