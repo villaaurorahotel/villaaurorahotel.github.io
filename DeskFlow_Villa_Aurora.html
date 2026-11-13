@@ -345,7 +345,7 @@ tr:hover td{background:var(--surface2)}
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
       <span id="utente-corrente-badge" style="display:none;font-size:10.5px;font-weight:700;color:var(--accent);margin-top:2px"></span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 04/11/2026 · 21:00</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 13/11/2026 · 15:40</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -14558,6 +14558,7 @@ function forzaAggiornamentoApp() {
     if (!confirm('C\'è ancora un salvataggio in corso verso Supabase — se ricarichi ora rischi di perderlo. Vuoi ricaricare comunque?')) return;
   }
   var url = new URL(window.location.href);
+  url.searchParams.delete('autologin_email'); url.searchParams.delete('autologin_password');
   url.searchParams.set('_agg', Date.now());
   window.location.href = url.toString();
 }
@@ -33032,7 +33033,7 @@ async function doLogin() {
     fixPrezziPrenotazioniEsistenti();
     seedCondizioniDefault(); seedCanaliOTADefault();
     await applicaPermessiUtenteCorrente();
-    navigate('dashboard');
+    navigate(window._paginaIniziale || 'dashboard'); window._paginaIniziale = '';
   } catch (err) {
     errBox.textContent = err.message === 'Invalid login credentials' ? 'Email o password errati' : ('Errore: '+err.message);
     errBox.style.display = 'block';
@@ -33119,6 +33120,23 @@ document.addEventListener('DOMContentLoaded', async function() {
       // diversi (Amministratore/Reception) — era stato tolto il 13/08/2026 per entrare sempre
       // diretti, ma senza un login il PMS non può sapere CHI sta usando il programma in un dato
       // momento, quindi non può applicare permessi diversi a persone diverse.
+      // Email/password arrivate dall'Hub nell'indirizzo: le tengo da parte e le tolgo SUBITO dalla barra
+      // degli indirizzi, anche quando si è già collegati (prima restavano visibili e finivano nella cronologia).
+      var _autoMail = '', _autoPass = '';
+      try {
+        var _pAuto = new URLSearchParams(location.search);
+        // Pagina richiesta dall'Hub (es. apri_pagina=statistichesito): solo pagine dell'elenco sicuro
+        var _ap = _pAuto.get('apri_pagina') || '';
+        window._paginaIniziale = ['statistichesito','preventivi','prenotazioni','registro','planner','dashboard'].indexOf(_ap) >= 0 ? _ap : '';
+        if (_pAuto.has('apri_pagina')) { _pAuto.delete('apri_pagina'); }
+        _autoMail = _pAuto.get('autologin_email') || ''; _autoPass = _pAuto.get('autologin_password') || '';
+        if (_pAuto.has('autologin_email') || _pAuto.has('autologin_password')) {
+          _pAuto.delete('autologin_email'); _pAuto.delete('autologin_password');
+          var _resto = _pAuto.toString();
+          history.replaceState(null, '', location.pathname + (_resto ? '?' + _resto : '') + location.hash);
+        }
+        else if (window._paginaIniziale) { var _r2=_pAuto.toString(); history.replaceState(null, '', location.pathname + (_r2 ? '?' + _r2 : '') + location.hash); }
+      } catch (e) {}
       const { data: { session } } = await supabaseClient.auth.getSession();
       if (!session) {
         // Prova prima un accesso automatico — o da un "Cambia struttura" fatto da dentro questo
@@ -33130,8 +33148,8 @@ document.addEventListener('DOMContentLoaded', async function() {
           var autologin = JSON.parse(localStorage.getItem('pms_autologin_pending') || 'null');
           localStorage.removeItem('pms_autologin_pending');
           var paramsUrl = new URLSearchParams(location.search);
-          if (!autologin && paramsUrl.get('autologin_email') && paramsUrl.get('autologin_password')) {
-            autologin = { email: paramsUrl.get('autologin_email'), password: paramsUrl.get('autologin_password'), ts: Date.now() };
+          if (!autologin && _autoMail && _autoPass) {
+            autologin = { email: _autoMail, password: _autoPass, ts: Date.now() };
             // Toglie subito email/password dalla barra degli indirizzi, prima ancora di provare il
             // login — non deve restare visibile né nella cronologia del browser.
             history.replaceState(null, '', location.pathname + location.hash);
@@ -33180,7 +33198,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     seedCondizioniDefault(); seedCanaliOTADefault();
   }
 
-  navigate('dashboard');
+  navigate(window._paginaIniziale || 'dashboard'); window._paginaIniziale = '';
   aggiornaBottoneStopVendite();
 
   // Backup automatico periodico sul PC — in aggiunta al salvataggio su Supabase, per sicurezza extra.
