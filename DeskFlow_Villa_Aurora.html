@@ -345,7 +345,7 @@ tr:hover td{background:var(--surface2)}
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
       <span id="utente-corrente-badge" style="display:none;font-size:10.5px;font-weight:700;color:var(--accent);margin-top:2px"></span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 13/11/2026 · 15:40</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 15/11/2026 · 22:50</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -27318,6 +27318,8 @@ async function _ssCaricaERendi() {
     window._ssUltimeRicerche = ricerche;
 
     body.innerHTML = _ssRenderHTML(visite, periodo, ricerche);
+    var _boxChi = document.createElement('div'); _boxChi.id = 'ss-chi'; body.appendChild(_boxChi);
+    _ssCaricaChiHaCercato(visite, ricerche);
   } catch (e) {
     body.innerHTML = '<div class="card"><div class="modal-body" style="color:var(--danger)">' +
       'Errore nel caricare le statistiche: ' + (e && e.message ? e.message : e) +
@@ -36981,6 +36983,104 @@ async function renderCorrispettiviPage(){
     await corrLoadData();
   }
   corrRender();
+}
+
+// ════ STATISTICHE SITO — "CHI HA CERCATO": elenco dei visitatori (anonimi) con le loro ricerche ════
+// I visitatori non hanno nome: sono riconosciuti solo da un codice casuale di sessione. Se però un
+// visitatore invia poi una richiesta di preventivo dal sito, la sua ricerca viene collegata al suo nome.
+var _SS_TZ_PAESI = {
+  'Europe/Rome':'Italia','Europe/Berlin':'Germania','Europe/London':'Regno Unito','Europe/Paris':'Francia','Europe/Madrid':'Spagna',
+  'Europe/Amsterdam':'Paesi Bassi','Europe/Zurich':'Svizzera','Europe/Vienna':'Austria','Europe/Brussels':'Belgio','Europe/Warsaw':'Polonia',
+  'Europe/Prague':'Rep. Ceca','Europe/Stockholm':'Svezia','Europe/Copenhagen':'Danimarca','Europe/Oslo':'Norvegia','Europe/Helsinki':'Finlandia',
+  'Europe/Dublin':'Irlanda','Europe/Lisbon':'Portogallo','Europe/Athens':'Grecia','Europe/Budapest':'Ungheria','Europe/Bucharest':'Romania',
+  'Europe/Kiev':'Ucraina','Europe/Kyiv':'Ucraina','Europe/Moscow':'Russia','Europe/Belgrade':'Serbia','Europe/Zagreb':'Croazia','Europe/Luxembourg':'Lussemburgo',
+  'America/New_York':'USA (Est)','America/Chicago':'USA (Centro)','America/Denver':'USA (Montagne)','America/Los_Angeles':'USA (Ovest)','America/Toronto':'Canada',
+  'America/Sao_Paulo':'Brasile','America/Argentina/Buenos_Aires':'Argentina','America/Mexico_City':'Messico',
+  'Australia/Sydney':'Australia','Australia/Melbourne':'Australia','Asia/Tokyo':'Giappone','Asia/Seoul':'Corea del Sud','Asia/Shanghai':'Cina',
+  'Asia/Dubai':'Emirati Arabi','Asia/Jerusalem':'Israele','Asia/Kolkata':'India','Asia/Singapore':'Singapore','Africa/Johannesburg':'Sudafrica'
+};
+function _ssPaese(tz){ return !tz ? '—' : (_SS_TZ_PAESI[tz] || tz); }
+function _ssProvenienza(ref){
+  if (!ref) return 'Diretto / sconosciuto';
+  var h = ''; try { h = new URL(ref).hostname.toLowerCase(); } catch(e) { return 'Altro'; }
+  if (h.indexOf('gretashouse') >= 0) return null; // navigazione interna al sito
+  if (h.indexOf('google') >= 0) return 'Google';
+  if (h.indexOf('instagram') >= 0 || h.indexOf('l.instagram') >= 0) return 'Instagram';
+  if (h.indexOf('facebook') >= 0 || h.indexOf('fb.') >= 0) return 'Facebook';
+  if (h.indexOf('booking') >= 0) return 'Booking.com';
+  if (h.indexOf('airbnb') >= 0) return 'Airbnb';
+  if (h.indexOf('tripadvisor') >= 0) return 'Tripadvisor';
+  if (h.indexOf('bing') >= 0) return 'Bing';
+  if (h.indexOf('chatgpt') >= 0 || h.indexOf('openai') >= 0 || h.indexOf('perplexity') >= 0) return 'Assistente IA';
+  return h.replace(/^www\./, '');
+}
+async function _ssCaricaChiHaCercato(visite, ricerche) {
+  var box = document.getElementById('ss-chi');
+  if (!box) return;
+  function esc(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  var richieste = [];
+  try {
+    var rr = await supabaseClient.from('richieste_preventivo').select('id,data').limit(2000);
+    if (!rr.error) richieste = rr.data || [];
+  } catch (e) {}
+  var richPerSessione = {};
+  richieste.forEach(function(r){ var d = r.data || {}; if (d.sessionId) richPerSessione[d.sessionId] = d; });
+
+  var sess = {};
+  function S(id){ return sess[id] || (sess[id] = { id:id, visite:[], ricerche:[] }); }
+  visite.forEach(function(v){ if (v.session_id) S(v.session_id).visite.push(v); });
+  ricerche.forEach(function(r){ if (r.session_id) S(r.session_id).ricerche.push(r); });
+
+  var lista = Object.keys(sess).map(function(k){ return sess[k]; }).filter(function(s){ return s.ricerche.length > 0; });
+  lista.forEach(function(s){
+    s.visite.sort(function(a,b){ return (a.ts||'').localeCompare(b.ts||''); });
+    s.ricerche.sort(function(a,b){ return (a.ts||'').localeCompare(b.ts||''); });
+    var ultimo = s.ricerche[s.ricerche.length-1].ts || '';
+    var v0 = s.visite[0] || {};
+    s.ultimo = ultimo;
+    s.device = v0.device || '—';
+    s.lingua = (v0.blang || v0.lang || '—');
+    s.paese = _ssPaese(v0.tz);
+    s.prov = 'Diretto / sconosciuto';
+    for (var i = 0; i < s.visite.length; i++) { var p = _ssProvenienza(s.visite[i].referrer); if (p) { s.prov = p; break; } }
+    if (v0.utm) s.prov += ' (' + v0.utm + ')';
+    s.pagine = s.visite.length;
+    s.richiesta = richPerSessione[s.id] || null;
+  });
+  lista.sort(function(a,b){ return b.ultimo.localeCompare(a.ultimo); });
+  var tot = lista.length;
+  lista = lista.slice(0, 100);
+
+  var con = lista.filter(function(s){ return s.richiesta; }).length;
+  var righe = lista.map(function(s){
+    var d = new Date(s.ultimo);
+    var quando = isNaN(d) ? '—' : d.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit'}) + ' ' + d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
+    var cerche = s.ricerche.map(function(r){
+      var ok = r.esito === 'non_disponibile' ? '<span style="color:#dc2626">non disp.</span>' : '<span style="color:#16a34a">disp.</span>';
+      return esc((r.checkin||'').slice(5).split('-').reverse().join('/')) + '→' + esc((r.checkout||'').slice(5).split('-').reverse().join('/')) + ' · ' + (r.adults||0) + ' ad.' + (r.children ? '+' + r.children + ' bamb.' : '') + ' · ' + ok;
+    }).join('<br>');
+    var esito = s.richiesta
+      ? '<span style="background:#dcfce7;color:#166534;border-radius:5px;padding:2px 6px;font-weight:700;font-size:11px">Ha chiesto un preventivo</span><div style="font-size:11.5px;margin-top:3px"><b>' + esc(s.richiesta.clientName||'') + '</b><br>' + esc(s.richiesta.clientEmail||'') + '</div>'
+      : '<span style="color:var(--text3)">solo ricerca</span>';
+    return '<tr>' +
+      '<td style="white-space:nowrap">' + quando + '</td>' +
+      '<td>' + esc(s.paese) + '<div style="font-size:11px;color:var(--text3)">lingua: ' + esc(s.lingua) + '</div></td>' +
+      '<td>' + esc(s.device) + '</td>' +
+      '<td>' + esc(s.prov) + '</td>' +
+      '<td style="text-align:center">' + s.pagine + '</td>' +
+      '<td style="font-size:12px">' + cerche + '</td>' +
+      '<td>' + esito + '</td></tr>';
+  }).join('');
+
+  box.innerHTML =
+    '<div class="card" style="margin-top:14px"><div class="card-header"><span class="card-title">👤 Chi ha cercato</span></div>' +
+    '<div class="modal-body" style="padding-top:0">' +
+    '<div style="font-size:12px;color:var(--text3);margin-bottom:10px">' + tot + ' visitatori hanno fatto almeno una ricerca nel periodo' + (tot > 100 ? ' (mostrati i 100 più recenti)' : '') +
+      ' · ' + con + ' hanno poi inviato una richiesta di preventivo. I visitatori sono anonimi: il nome compare solo se hanno inviato una richiesta. Il paese è una stima (dal fuso orario del loro dispositivo).</div>' +
+    (lista.length
+      ? '<div style="overflow-x:auto"><table><thead><tr><th>Ultima ricerca</th><th>Paese / lingua</th><th>Dispositivo</th><th>Arrivato da</th><th>Pagine</th><th>Cosa ha cercato</th><th>Esito</th></tr></thead><tbody>' + righe + '</tbody></table></div>'
+      : '<div class="empty-state" style="padding:20px"><span>🔎</span><p>Nessuna ricerca registrata in questo periodo</p></div>') +
+    '</div></div>';
 }
 
 </script>
