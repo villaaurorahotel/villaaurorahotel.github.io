@@ -346,7 +346,7 @@ tr:hover td{background:var(--surface2)}
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
       <span id="utente-corrente-badge" style="display:none;font-size:10.5px;font-weight:700;color:var(--accent);margin-top:2px"></span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 20/11/2026 · 17:00</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 20/11/2026 · 18:30</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -28662,7 +28662,7 @@ if(lstSelFrom&&lstSelTo){
     '<button class="btn btn-sm" onclick="lstScrollDays(30)">+30gg &gt;|</button>'+
     '<select onchange="lstJumpYear(this.value)" style="font-size:11px;padding:2px 4px;border-radius:4px;border:.5px solid var(--border2);background:var(--surface);width:62px">'+[...Array(4)].map(function(_,i){var yy=new Date().getFullYear()-1+i;return '<option value="'+yy+'"'+(yy===startD.getFullYear()?' selected':'')+'>'+yy+'</option>';}).join('')+'</select>'+
     (lstIsDerivata ? '' : '<button class="btn btn-primary btn-sm" onclick="lstSaveAll()">Salva</button>')+
-    '<button class="btn btn-sm" style="background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700" onclick="lstApplyPeriodo()">🚀 Aggiornamento Massivo</button>'+
+    '<button class="btn btn-sm" style="background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700" onclick="cpApri()">📅 Calendario prezzi</button>'+
     '<button class="btn btn-sm" style="background:#e11d48;color:#fff;border-color:#e11d48;font-weight:700" onclick="promoApriModal()" title="Applica uno sconto % a un periodo di giorni scelto da te — chi prenota in quei giorni lo riceve automaticamente">🎉 Promo periodo</button>'+
     '<label class="btn btn-sm" style="cursor:pointer" title="Carica un file Excel con colonne Tipologia, Data, Prezzo per aggiornare tante date insieme">⬆ Importa da Excel<input type="file" accept=".xlsx,.csv" onchange="importaListinoXLSX(event)" style="display:none"></label>'+
     '<button class="btn btn-sm" onclick="esportaListinoXLSX()" title="Scarica i prezzi del periodo visualizzato in un file Excel — stesse colonne richieste dall\'importazione">⬇ Esporta Excel</button>'+
@@ -37156,6 +37156,406 @@ async function _ssCaricaChiHaCercato(visite, ricerche) {
       ? '<div style="overflow-x:auto"><table><thead><tr><th>Ultima ricerca</th><th>Paese / lingua</th><th>Dispositivo</th><th>Arrivato da</th><th>Pagine</th><th>Cosa ha cercato</th><th>Esito</th></tr></thead><tbody>' + righe + '</tbody></table></div>'
       : '<div class="empty-state" style="padding:20px"><span>🔎</span><p>Nessuna ricerca registrata in questo periodo</p></div>') +
     '</div></div>';
+}
+
+// ════════════════════════════════════════════════════════════════════════════════════════════
+// CALENDARIO PREZZI — sostituisce la vecchia maschera "Aggiornamento Massivo": si scelgono i giorni
+// su un calendario (clic, trascinamento, pulsanti rapidi come "Fine settimana") e si cambiano prezzo,
+// soggiorno minimo e chiusure solo in quei giorni, con anteprima prima/dopo, storico e "Annulla".
+// Il prezzo si imposta sempre su Standard 2 persone: le altre tipologie/fasce si ricalcolano con la
+// stessa catena e gli stessi scostamenti di sempre (lstCalcolaRiferimentiCelle + listinoScostamenti).
+// ════════════════════════════════════════════════════════════════════════════════════════════
+var cp = { mese:'', tipo:'', tariffa:'standard', sel:{}, ancora:'', trascina:false, modoAdd:true, master:'', tipi:[] };
+var CP_GIORNI = ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'];
+var CP_MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+
+function cpApri() {
+  var rooms = DB.get('rooms') || [];
+  if (!rooms.length) { showToast('Non ci sono ancora camere'); return; }
+  var info = lstCalcolaRiferimentiCelle(rooms);
+  cp.tipi = info.types; cp.master = info.masterType;
+  if (cp.tipi.indexOf(cp.tipo) < 0) cp.tipo = info.masterType;
+  cp.tariffa = 'standard';
+  var base = (typeof lstSelFrom === 'string' && lstSelFrom) ? lstSelFrom : today();
+  cp.mese = base.slice(0, 7);
+  cp.sel = {}; cp.ancora = '';
+  showModal('📅 Calendario prezzi',
+    '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">' +
+      '<div style="flex:1 1 560px;min-width:0">' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">' +
+          '<label style="font-size:12px;font-weight:700">Tariffa</label>' +
+          '<select id="cp-tariffa" onchange="cp.tariffa=this.value;cpRinfresca()" style="padding:5px 8px;font-weight:600;border-radius:6px;border:1px solid var(--border2)">' +
+            getTariffe().map(function(t){ return '<option value="'+t.id+'"'+(t.id===cp.tariffa?' selected':'')+'>'+t.nome+'</option>'; }).join('') +
+          '</select>' +
+          '<label style="font-size:12px;font-weight:700;margin-left:6px">Tipologia mostrata</label>' +
+          '<select id="cp-tipo" onchange="cp.tipo=this.value;cpRinfresca()" style="padding:5px 8px;font-weight:600;border-radius:6px;border:1px solid var(--border2)">' +
+            cp.tipi.map(function(t){ return '<option value="'+t+'"'+(t===cp.tipo?' selected':'')+'>'+t+'</option>'; }).join('') +
+          '</select>' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">' +
+          '<button class="btn btn-sm" onclick="cpMeseVai(-1)">◀</button>' +
+          '<div id="cp-titolo-mese" style="font-weight:800;font-size:16px;min-width:150px;text-align:center"></div>' +
+          '<button class="btn btn-sm" onclick="cpMeseVai(1)">▶</button>' +
+          '<span style="flex:1"></span>' +
+        '</div>' +
+        '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">' +
+          '<button class="btn btn-sm btn-primary" onclick="cpSelRapido(\'weekend\')">Fine settimana (Ven-Sab-Dom)</button>' +
+          '<button class="btn btn-sm" onclick="cpSelRapido(\'lungio\')">Lun-Gio</button>' +
+          '<button class="btn btn-sm" onclick="cpSelRapido(\'mese\')">Tutto il mese</button>' +
+          '<button class="btn btn-sm" onclick="cpSelRapido(\'svuota\')">Svuota selezione</button>' +
+        '</div>' +
+        '<div id="cp-cal" onmouseleave="cp.trascina=false"></div>' +
+        '<div style="font-size:11.5px;color:var(--text3);margin-top:6px">Clic su un giorno per sceglierlo, trascina per sceglierne più di fila, Maiusc+clic per un intervallo. ✎ = modificato di recente · 🔒 = chiuso.</div>' +
+      '</div>' +
+      '<div style="flex:0 1 340px;min-width:290px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:14px">' +
+        '<div id="cp-count" style="font-weight:800;font-size:14px;margin-bottom:10px"></div>' +
+        '<div id="cp-nota-derivata" style="display:none;font-size:12px;background:#fff3cd;color:#856404;border-radius:6px;padding:7px 9px;margin-bottom:8px">Questa tariffa si calcola dalla Standard: i prezzi si cambiano scegliendo la tariffa Standard. Qui puoi cambiare soggiorno minimo e chiusure.</div>' +
+        '<div style="font-size:12px;font-weight:700;margin-bottom:4px">Prezzo (Standard 2 persone)</div>' +
+        '<div style="display:flex;gap:6px;margin-bottom:10px">' +
+          '<select id="cp-az" onchange="cpAzCambiata()" style="padding:5px;border-radius:6px;border:1px solid var(--border2);font-size:13px">' +
+            '<option value="imposta">Imposta</option><option value="aumenta">Aumenta di</option><option value="diminuisci">Diminuisci di</option>' +
+          '</select>' +
+          '<input type="number" step="0.5" id="cp-val" placeholder="es. 130" oninput="cpAnteprima()" style="width:90px;padding:5px;font-size:13px">' +
+          '<select id="cp-unit" onchange="cpAnteprima()" style="padding:5px;border-radius:6px;border:1px solid var(--border2);font-size:13px"><option value="€">€</option><option value="%">%</option></select>' +
+        '</div>' +
+        '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px">' +
+          '<div><div style="font-size:12px;font-weight:700;margin-bottom:4px">Minimo notti</div><input type="number" min="1" id="cp-min" placeholder="—" style="width:70px;padding:5px;font-size:13px;text-align:center"></div>' +
+          '<div><div style="font-size:12px;font-weight:700;margin-bottom:4px">Chiusura</div><select id="cp-chiusura" style="padding:5px;border-radius:6px;border:1px solid var(--border2);font-size:13px"><option value="">—</option><option value="open">APRI 🔓</option><option value="closed">CHIUDI 🔒</option></select></div>' +
+        '</div>' +
+        '<label style="display:flex;gap:6px;align-items:center;font-size:12px;margin-bottom:10px"><input type="checkbox" id="cp-tutti" checked style="width:auto;margin:0"> Minimo notti e chiusura per tutte le tipologie</label>' +
+        '<div style="font-size:12px;font-weight:700;margin-bottom:4px">Anteprima (prima → dopo)</div>' +
+        '<div id="cp-prev" style="max-height:170px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;margin-bottom:10px"></div>' +
+        '<button class="btn btn-primary" id="cp-applica" onclick="cpApplica()" style="width:100%;font-weight:800">Applica ai giorni scelti</button>' +
+      '</div>' +
+    '</div>' +
+    '<div style="margin-top:16px"><div style="font-weight:800;font-size:14px;margin-bottom:6px">🕘 Storico modifiche</div><div id="cp-storia"></div></div>',
+    '<button class="btn" onclick="closeModal()">Chiudi</button>' +
+    '<button class="btn btn-sm" style="margin-right:auto" onclick="closeModal();lstApplyPeriodo()" title="La maschera di prima, con tutte le fasce e gli scostamenti">Maschera classica (avanzata)</button>',
+    '1180px');
+  if (!window._cpMouseUpBound) { window._cpMouseUpBound = true; document.addEventListener('mouseup', function(){ cp.trascina = false; }); }
+  cpRinfresca();
+}
+
+function cpEDerivata() { var t = cp.tariffa; return t !== 'standard' && !!(getTariffaObj(t) || {}).modalita; }
+function cpFmt(n) { return (n && n > 0) ? (Math.round(n * 100) / 100).toLocaleString('it-IT') : '—'; }
+function cpDow(ds) { return (parseLD(ds).getDay() + 6) % 7; } // 0 = Lunedì
+
+function cpRoomsDi(tipo) { return (DB.get('rooms') || []).filter(function(r){ return normCatType(r.type) === tipo; }); }
+function cpPaxPrim(tipo) { return lstPaxPrimario(tipo, DB.get('rooms') || []); }
+function cpPrezzo(ds, tipo, tid) {
+  var rs = cpRoomsDi(tipo); if (!rs.length) return 0;
+  var pk = cpPaxPrim(tipo), pax = parseInt(pk.replace('PAX', ''));
+  var tar = getTariffaObj(tid) || {};
+  if (tid !== 'standard' && tar.modalita) {
+    var b = getPrezzoListinoDiretto(rs[0].id, pax, ds, 'standard'); if (!b) return 0;
+    var v = parseFloat(tar.valore) || 0;
+    return Math.max(0, Math.round((tar.modalita === 'percento' ? b * (1 + v / 100) : b + v) * 100) / 100);
+  }
+  return getPrezzoListinoDiretto(rs[0].id, pax, ds, tid) || 0;
+}
+// Regole (minimo notti / chiusure) per tipologia e tariffa ('' = tutte le tariffe)
+function cpRegTid() { return cp.tariffa === 'standard' ? '' : cp.tariffa; }
+function cpRegGet(reg, kind, t, tid, ds) {
+  var v;
+  if (kind === 'min') v = tid ? (((reg.minNottiPerTariffa || {})[tid] || {})[t] || {})[ds] : (((reg.minNotti || {})[t]) || {})[ds];
+  else v = tid ? ((reg.chiusurePerTariffa || {})[tid] || {})[ds] : (((reg.chiusure || {})[t]) || {})[ds];
+  return (v === undefined || v === null) ? null : v;
+}
+function cpRegSet(reg, kind, t, tid, ds, val) {
+  if (kind === 'min') {
+    if (tid) {
+      if (!reg.minNottiPerTariffa) reg.minNottiPerTariffa = {};
+      if (!reg.minNottiPerTariffa[tid]) reg.minNottiPerTariffa[tid] = {};
+      if (!reg.minNottiPerTariffa[tid][t]) reg.minNottiPerTariffa[tid][t] = {};
+      if (val === null) delete reg.minNottiPerTariffa[tid][t][ds]; else reg.minNottiPerTariffa[tid][t][ds] = val;
+    } else {
+      if (!reg.minNotti[t]) reg.minNotti[t] = {};
+      if (val === null) delete reg.minNotti[t][ds]; else reg.minNotti[t][ds] = val;
+    }
+  } else {
+    if (tid) {
+      if (!reg.chiusurePerTariffa) reg.chiusurePerTariffa = {};
+      if (!reg.chiusurePerTariffa[tid]) reg.chiusurePerTariffa[tid] = {};
+      if (val === null || val === false) delete reg.chiusurePerTariffa[tid][ds]; else reg.chiusurePerTariffa[tid][ds] = true;
+    } else {
+      if (!reg.chiusure[t]) reg.chiusure[t] = {};
+      if (val === null) delete reg.chiusure[t][ds]; else reg.chiusure[t][ds] = !!val;
+    }
+  }
+}
+
+function cpRecenti() {
+  var log = DB.get('listinoRegistro') || [], out = {}, limite = Date.now() - 30 * 86400000;
+  log.forEach(function(e) {
+    if (!e.cp || e.annullata || !e.cp.giorni) return;
+    if (new Date(e.data).getTime() < limite) return;
+    Object.keys(e.cp.giorni).forEach(function(ds) { if (!out[ds]) out[ds] = { a: e.cp.giorni[ds][0], b: e.cp.giorni[ds][1], data: e.data }; });
+  });
+  return out;
+}
+
+function cpRinfresca() {
+  var der = cpEDerivata();
+  var n = document.getElementById('cp-nota-derivata'); if (n) n.style.display = der ? 'block' : 'none';
+  ['cp-az', 'cp-val', 'cp-unit'].forEach(function(id) { var e = document.getElementById(id); if (e) e.disabled = der; });
+  cpDisegna(); cpPanel(); cpStoria();
+}
+
+function cpDisegna() {
+  var box = document.getElementById('cp-cal'); if (!box) return;
+  var p = cp.mese.split('-'), anno = +p[0], mese = +p[1];
+  document.getElementById('cp-titolo-mese').textContent = CP_MESI[mese - 1] + ' ' + anno;
+  var primo = cp.mese + '-01', nGiorni = new Date(anno, mese, 0).getDate();
+  var rec = cpRecenti(), reg = getRegoleTipo(), tid = cpRegTid(), t = cp.tipo, oggi = today();
+  var h = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;user-select:none">';
+  CP_GIORNI.forEach(function(g, i) { h += '<div style="text-align:center;font-size:11px;font-weight:700;color:' + (i >= 4 ? 'var(--accent)' : 'var(--text3)') + '">' + g + '</div>'; });
+  for (var i = 0; i < cpDow(primo); i++) h += '<div></div>';
+  for (var d = 1; d <= nGiorni; d++) {
+    var ds = cp.mese + '-' + String(d).padStart(2, '0');
+    var sel = !!cp.sel[ds], prezzo = cpPrezzo(ds, t, cp.tariffa);
+    var chiuso = !!(cpRegGet(reg, 'chiuso', t, '', ds) || (tid && cpRegGet(reg, 'chiuso', t, tid, ds)));
+    var minN = cpRegGet(reg, 'min', t, tid, ds); if (minN === null && tid) minN = cpRegGet(reg, 'min', t, '', ds);
+    var rc = rec[ds], we = cpDow(ds) >= 4;
+    var bg = sel ? 'var(--accent)' : chiuso ? '#fde2e2' : we ? 'var(--accent-light)' : 'var(--surface)';
+    var col = sel ? '#fff' : 'var(--text1)';
+    h += '<div onmousedown="cpGiu(event,\'' + ds + '\')" onmouseover="cpSopra(\'' + ds + '\')" ' +
+      'title="' + (rc ? 'Modificato il ' + new Date(rc.data).toLocaleDateString('it-IT') + ': ' + cpFmt(rc.a) + ' → ' + cpFmt(rc.b) + ' €' : '') + '" ' +
+      'style="cursor:pointer;border:1.5px solid ' + (sel ? 'var(--accent)' : ds === oggi ? 'var(--text2)' : 'var(--border2)') + ';border-radius:8px;padding:5px 4px;min-height:62px;background:' + bg + ';color:' + col + ';position:relative">' +
+      '<div style="font-size:11px;opacity:.8;font-weight:700">' + d + (chiuso ? ' 🔒' : '') + '</div>' +
+      '<div style="font-size:15px;font-weight:800;text-align:center;margin-top:4px">' + cpFmt(prezzo) + '</div>' +
+      '<div style="font-size:10px;text-align:center;opacity:.85;min-height:12px">' + (minN ? 'min ' + minN + ' n.' : '') + '</div>' +
+      (rc ? '<span style="position:absolute;top:2px;right:4px;font-size:10px">✎</span>' : '') +
+      '</div>';
+  }
+  box.innerHTML = h + '</div>';
+}
+
+function cpMeseVai(delta) {
+  var p = cp.mese.split('-'), d = new Date(+p[0], +p[1] - 1 + delta, 1);
+  cp.mese = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); cpDisegna();
+}
+function cpGiu(ev, ds) {
+  if (ev.shiftKey && cp.ancora) {
+    var a = cp.ancora < ds ? cp.ancora : ds, b = cp.ancora < ds ? ds : cp.ancora;
+    getDatesInRange(a, b).forEach(function(x) { cp.sel[x] = true; });
+  } else {
+    cp.trascina = true; cp.modoAdd = !cp.sel[ds];
+    if (cp.modoAdd) cp.sel[ds] = true; else delete cp.sel[ds];
+    cp.ancora = ds;
+  }
+  cpDisegna(); cpPanel();
+}
+function cpSopra(ds) {
+  if (!cp.trascina) return;
+  if (cp.modoAdd) cp.sel[ds] = true; else delete cp.sel[ds];
+  cpDisegna(); cpPanel();
+}
+function cpSelRapido(tipo) {
+  var p = cp.mese.split('-'), n = new Date(+p[0], +p[1], 0).getDate();
+  if (tipo === 'svuota') { cp.sel = {}; }
+  else {
+    cp.sel = {};
+    for (var d = 1; d <= n; d++) {
+      var ds = cp.mese + '-' + String(d).padStart(2, '0'), w = cpDow(ds);
+      if (tipo === 'mese' || (tipo === 'weekend' && w >= 4) || (tipo === 'lungio' && w <= 3)) cp.sel[ds] = true;
+    }
+  }
+  cpDisegna(); cpPanel();
+}
+function cpGiorniScelti() { return Object.keys(cp.sel).sort(); }
+function cpAzCambiata() { var im = document.getElementById('cp-az').value === 'imposta'; var u = document.getElementById('cp-unit'); if (im) u.value = '€'; u.disabled = im || cpEDerivata(); cpAnteprima(); }
+
+// Nuovo prezzo base (Standard 2p) per un giorno, in base all'azione scelta; null = non calcolabile
+function cpNuovoBase(p0) {
+  var az = document.getElementById('cp-az').value, v = parseFloat(document.getElementById('cp-val').value), u = document.getElementById('cp-unit').value;
+  if (isNaN(v)) return null;
+  if (az === 'imposta') return Math.max(0, v);
+  if (!p0) return null;
+  var segno = az === 'aumenta' ? 1 : -1;
+  return Math.max(0, Math.round((u === '%' ? p0 * (1 + segno * v / 100) : p0 + segno * v) * 100) / 100);
+}
+// Catena: dato il nuovo prezzo base, valori di tutte le celle (solo quelle con scostamento salvato verranno poi scritte)
+function cpCatena(baseNuova) {
+  var rooms = DB.get('rooms') || [], info = lstCalcolaRiferimentiCelle(rooms), sc = DB.get('listinoScostamenti') || [];
+  var valore = {}; valore[info.masterType + '|PAX2'] = baseNuova;
+  function off(t, pk) { var s = sc.find(function(x) { return x.tipo === t && x.pax === pk; }); return s ? { valore: s.valore, unita: s.unita || '€', salvato: true } : { valore: 0, unita: '€', salvato: false }; }
+  var cambiato = true, giri = 0;
+  while (cambiato && giri < 12) {
+    cambiato = false; giri++;
+    Object.keys(info.cellRef).forEach(function(k) {
+      if (valore[k] != null) return;
+      var c = info.cellRef[k], r = c.refType + '|' + c.refPax; if (valore[r] == null) return;
+      var o = off(c.t, c.pk);
+      valore[k] = Math.max(0, Math.round(o.unita === '%' ? valore[r] * (1 + o.valore / 100) : valore[r] + o.valore)); cambiato = true;
+    });
+  }
+  return { valore: valore, info: info, off: off };
+}
+
+function cpPanel() {
+  var gg = cpGiorniScelti(), c = document.getElementById('cp-count'); if (!c) return;
+  c.textContent = gg.length ? (gg.length + (gg.length === 1 ? ' giorno scelto' : ' giorni scelti')) : 'Scegli i giorni sul calendario';
+  var b = document.getElementById('cp-applica'); if (b) b.textContent = gg.length ? 'Applica ai ' + gg.length + ' giorni scelti' : 'Applica ai giorni scelti';
+  cpAnteprima(); cpStoria();
+}
+function cpAnteprima() {
+  var box = document.getElementById('cp-prev'); if (!box) return;
+  var gg = cpGiorniScelti();
+  if (!gg.length) { box.innerHTML = '<div style="padding:8px;color:var(--text3)">Nessun giorno scelto</div>'; return; }
+  var haPrezzo = !cpEDerivata() && document.getElementById('cp-val').value !== '';
+  if (!haPrezzo) { box.innerHTML = '<div style="padding:8px;color:var(--text3)">Scrivi un prezzo per vedere l\'anteprima (oppure cambia solo minimo notti / chiusura).</div>'; return; }
+  var t = cp.tipo, pkP = cpPaxPrim(t), cell = t + '|' + pkP, rooms = DB.get('rooms') || [];
+  var info = lstCalcolaRiferimentiCelle(rooms), rm = cpRoomsDi(info.masterType)[0];
+  box.innerHTML = gg.slice(0, 80).map(function(ds, i) {
+    var p0m = rm ? getPrezzoListinoDiretto(rm.id, 2, ds, cp.tariffa) : 0, nb = cpNuovoBase(p0m);
+    var prima = cpPrezzo(ds, t, cp.tariffa), dopo = null;
+    if (nb !== null) { var cat = cpCatena(nb); dopo = (t === info.masterType) ? nb : cat.valore[cell]; if (dopo == null) dopo = prima; }
+    return '<div style="display:flex;justify-content:space-between;padding:4px 8px;' + (i ? 'border-top:1px solid var(--border);' : '') + '"><span>' + fmtDate(ds) + ' <span style="color:var(--text3)">' + CP_GIORNI[cpDow(ds)] + '</span></span>' +
+      '<span>' + cpFmt(prima) + ' → ' + (dopo === null ? '<span style="color:var(--red)">senza prezzo</span>' : '<b>' + cpFmt(dopo) + '</b>') + '</span></div>';
+  }).join('') + (gg.length > 80 ? '<div style="padding:6px 8px;color:var(--text3)">… e altri ' + (gg.length - 80) + ' giorni</div>' : '');
+}
+
+// ── Storico ──
+function cpRegistra(testo, payload) {
+  var log = DB.get('listinoRegistro') || [];
+  var e = { data: new Date().toISOString(), testo: testo }; if (payload) e.cp = payload;
+  log.unshift(e);
+  for (var i = 25; i < log.length; i++) { if (log[i].cp) { delete log[i].cp.celle; delete log[i].cp.reg; } } // solo le ultime 25 restano annullabili
+  if (log.length > 300) log = log.slice(0, 300);
+  DB.set('listinoRegistro', log);
+}
+function cpStoria() {
+  var box = document.getElementById('cp-storia'); if (!box) return;
+  var log = DB.get('listinoRegistro') || [], gg = cpGiorniScelti(), un = gg.length === 1 ? gg[0] : '';
+  var righe = [];
+  if (un) {
+    var del = log.filter(function(e) { return e.cp && e.cp.giorni && e.cp.giorni[un] && !e.annullata; });
+    righe.push('<div style="font-size:12px;font-weight:700;margin-bottom:4px">Storia del ' + fmtDate(un) + '</div>' + (del.length ? del.slice(0, 8).map(function(e) {
+      var g = e.cp.giorni[un]; return '<div style="font-size:12px;padding:3px 0;border-bottom:1px solid var(--border)">' + new Date(e.data).toLocaleDateString('it-IT') + ' · ' + cpFmt(g[0]) + ' → <b>' + cpFmt(g[1]) + '</b> €</div>';
+    }).join('') : '<div style="font-size:12px;color:var(--text3)">Nessuna modifica registrata per questo giorno.</div>') + '<div style="height:10px"></div>');
+  }
+  var ult = log.filter(function(e) { return e.cp; }).slice(0, 12);
+  righe.push(ult.length ? '<div style="max-height:220px;overflow-y:auto;border:.5px solid var(--border2);border-radius:8px">' + ult.map(function(e, i) {
+    var idx = log.indexOf(e), ok = !e.annullata && e.cp.celle;
+    return '<div style="padding:7px 12px;' + (i ? 'border-top:1px solid var(--border);' : '') + 'font-size:12.5px;display:flex;gap:10px;align-items:baseline;' + (e.annullata ? 'opacity:.5;text-decoration:line-through;' : '') + '">' +
+      '<span style="color:var(--text3);white-space:nowrap;font-size:11px">' + new Date(e.data).toLocaleDateString('it-IT') + ' ' + new Date(e.data).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) + '</span>' +
+      '<span style="flex:1">' + e.testo + '</span>' +
+      (ok ? '<button class="btn btn-sm" onclick="cpAnnulla(' + idx + ')">↩ Annulla</button>' : '') + '</div>';
+  }).join('') + '</div>' : '<div style="font-size:12px;color:var(--text3)">Le modifiche fatte da questo calendario compariranno qui, con la possibilità di annullarle.</div>');
+  box.innerHTML = righe.join('');
+}
+
+// ── Applica ──
+async function cpApplica() {
+  var gg = cpGiorniScelti();
+  if (!gg.length) { showToast('Scegli prima almeno un giorno sul calendario'); return; }
+  var der = cpEDerivata(), tid = cp.tariffa, valTxt = document.getElementById('cp-val').value;
+  var vuolePrezzo = !der && valTxt !== '';
+  var minV = document.getElementById('cp-min').value, chiV = document.getElementById('cp-chiusura').value;
+  var vuoleMin = minV !== '', vuoleChi = chiV !== '';
+  if (!vuolePrezzo && !vuoleMin && !vuoleChi) { showToast('Scrivi un prezzo, un minimo di notti o scegli una chiusura'); return; }
+
+  var rooms = DB.get('rooms') || [], listino = DB.get('listino') || [], info = lstCalcolaRiferimentiCelle(rooms);
+  var masterRooms = cpRoomsDi(info.masterType), regole = getRegoleTipo();
+  var payload = { tid: tid, giorni: {}, celle: [], reg: [] };
+  var saltati = 0, toccati = 0;
+
+  function scrivi(room, ds, pk, nuovo) {
+    var e = listino.find(function(l) { return l.roomId === room.id && (l.tariffaId || 'standard') === tid; });
+    if (!e) { e = { roomId: room.id, tariffaId: tid, prezzi: {}, periodi: [] }; listino.push(e); }
+    if (!e.periodi) e.periodi = [];
+    var pd = e.periodi.find(function(p) { return p.dal === ds && p.al === ds; });
+    if (!pd) { pd = { dal: ds, al: ds, prezzi: {} }; e.periodi.push(pd); }
+    var vecchio = (pd.prezzi[pk] !== undefined && pd.prezzi[pk] !== '') ? pd.prezzi[pk] : null;
+    pd.prezzi[pk] = nuovo;
+    payload.celle.push([room.id, ds, pk, vecchio, nuovo]);
+  }
+
+  if (vuolePrezzo && masterRooms.length) {
+    gg.forEach(function(ds) {
+      var p0 = getPrezzoListinoDiretto(masterRooms[0].id, 2, ds, tid), nb = cpNuovoBase(p0);
+      if (nb === null) { saltati++; return; }
+      var cat = cpCatena(nb);
+      masterRooms.forEach(function(r) { scrivi(r, ds, 'PAX2', nb); });
+      Object.keys(cat.info.cellRef).forEach(function(k) {
+        var c = cat.info.cellRef[k]; if (cat.valore[k] == null || !cat.off(c.t, c.pk).salvato) return; // solo celle con scostamento già impostato
+        cpRoomsDi(c.t).forEach(function(r) { scrivi(r, ds, c.pk, cat.valore[k]); });
+      });
+      payload.giorni[ds] = [cpPrezzo(ds, cp.tipo, tid) && cp.tipo === info.masterType ? p0 : (p0 || 0), nb];
+      toccati++;
+    });
+    // per le tipologie diverse dalla master "prima" = prezzo prima della modifica della tipologia mostrata
+  }
+
+  var tipiReg = document.getElementById('cp-tutti').checked ? cp.tipi : [cp.tipo], tidReg = cpRegTid();
+  if (vuoleMin || vuoleChi) {
+    gg.forEach(function(ds) {
+      tipiReg.forEach(function(t) {
+        if (vuoleMin) { var o = cpRegGet(regole, 'min', t, tidReg, ds), n = parseInt(minV); payload.reg.push([t, tidReg, ds, 'min', o, n]); cpRegSet(regole, 'min', t, tidReg, ds, n); }
+        if (vuoleChi) {
+          var oc = cpRegGet(regole, 'chiuso', t, tidReg, ds), nc = (chiV === 'closed');
+          payload.reg.push([t, tidReg, ds, 'chiuso', oc, nc]);
+          if (tidReg) cpRegSet(regole, 'chiuso', t, tidReg, ds, nc ? true : null); else cpRegSet(regole, 'chiuso', t, '', ds, nc);
+        }
+      });
+    });
+    // "APRI" su tutte le tariffe libera anche i blocchi manuali giorno per giorno del Calendario
+    if (!tidReg && chiV === 'open' && supabaseReady && supabaseClient) {
+      tipiReg.forEach(function(t) { cpRoomsDi(t).forEach(function(room) {
+        supabaseClient.from('room_blocks').delete().eq('room_id', room.id).in('block_date', gg).then(function(){}).catch(function(err){ console.warn('Blocchi non rimossi per', room.name, err); });
+      }); });
+    }
+  }
+
+  if (!payload.celle.length && !payload.reg.length) { showToast(saltati ? 'Nessun prezzo calcolabile: in quei giorni non c\'è ancora un prezzo (usa "Imposta")' : 'Niente da modificare'); return; }
+  if (payload.celle.length > 3000) { delete payload.celle; delete payload.reg; }
+
+  if (payload.reg.length) await saveRegoleTipo(regole);
+  DB.set('listino', listino);
+  avvisaHostexSubito(); avvisaHostexRestrizioniSubito();
+  if (typeof avvisaHostexPrezziSubito === 'function') avvisaHostexPrezziSubito();
+
+  var pezzi = [];
+  if (vuolePrezzo) { var az = document.getElementById('cp-az').value, u = document.getElementById('cp-unit').value; pezzi.push('prezzo ' + (az === 'imposta' ? 'impostato a ' + valTxt + ' €' : (az === 'aumenta' ? '+' : '−') + valTxt + u) + ' (' + toccati + ' giorni)'); }
+  if (vuoleMin) pezzi.push('soggiorno minimo → ' + minV + ' notti');
+  if (vuoleChi) pezzi.push(chiV === 'closed' ? 'chiuso alla vendita' : 'riaperto alla vendita');
+  var tarNome = (getTariffaObj(tid) || {}).nome || tid;
+  var primo = gg[0], ultimo = gg[gg.length - 1];
+  cpRegistra('📅 <strong>' + tarNome + '</strong> · ' + gg.length + ' giorni (' + fmtDate(primo) + (gg.length > 1 ? ' → ' + fmtDate(ultimo) : '') + '): ' + pezzi.join(', '), payload);
+
+  cp.sel = {};
+  showToast('Modifiche applicate' + (saltati ? ' — ' + saltati + ' giorni senza prezzo saltati' : ''));
+  document.getElementById('cp-val').value = ''; document.getElementById('cp-min').value = ''; document.getElementById('cp-chiusura').value = '';
+  cpRinfresca();
+  if (typeof renderListino === 'function') renderListino();
+}
+
+async function cpAnnulla(idx) {
+  var log = DB.get('listinoRegistro') || [], e = log[idx];
+  if (!e || !e.cp || !e.cp.celle || e.annullata) return;
+  if (!confirm('Annullare questa modifica? I prezzi e le regole di quei giorni tornano come erano PRIMA, anche se nel frattempo li hai cambiati di nuovo.')) return;
+  var listino = DB.get('listino') || [], regole = getRegoleTipo(), tid = e.cp.tid || 'standard';
+  (e.cp.celle || []).slice().reverse().forEach(function(c) {
+    var en = listino.find(function(l) { return l.roomId === c[0] && (l.tariffaId || 'standard') === tid; }); if (!en) return;
+    var pd = (en.periodi || []).find(function(p) { return p.dal === c[1] && p.al === c[1]; }); if (!pd) return;
+    if (c[3] === null) delete pd.prezzi[c[2]]; else pd.prezzi[c[2]] = c[3];
+    if (!Object.keys(pd.prezzi).length) en.periodi.splice(en.periodi.indexOf(pd), 1);
+  });
+  (e.cp.reg || []).slice().reverse().forEach(function(r) {
+    // r = [tipo, tariffaRegola, giorno, 'min'|'chiuso', prima, dopo]
+    if (r[3] === 'min') cpRegSet(regole, 'min', r[0], r[1], r[2], r[4]);
+    else if (r[1]) cpRegSet(regole, 'chiuso', r[0], r[1], r[2], r[4] ? true : null);
+    else cpRegSet(regole, 'chiuso', r[0], '', r[2], r[4]);
+  });
+  if ((e.cp.reg || []).length) await saveRegoleTipo(regole);
+  DB.set('listino', listino);
+  avvisaHostexSubito(); avvisaHostexRestrizioniSubito();
+  if (typeof avvisaHostexPrezziSubito === 'function') avvisaHostexPrezziSubito();
+  log = DB.get('listinoRegistro') || []; if (log[idx]) { log[idx].annullata = true; DB.set('listinoRegistro', log); }
+  cpRegistra('↩ Annullata la modifica del ' + new Date(e.data).toLocaleDateString('it-IT') + ' ' + new Date(e.data).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }), null);
+  showToast('Modifica annullata');
+  cpRinfresca();
+  if (typeof renderListino === 'function') renderListino();
 }
 
 </script>
