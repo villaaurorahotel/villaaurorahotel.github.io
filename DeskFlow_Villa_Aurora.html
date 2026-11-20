@@ -346,7 +346,7 @@ tr:hover td{background:var(--surface2)}
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
       <span id="utente-corrente-badge" style="display:none;font-size:10.5px;font-weight:700;color:var(--accent);margin-top:2px"></span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 18/11/2026 · 10:00</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 20/11/2026 · 16:10</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -2061,6 +2061,34 @@ function inviaLinkPuliziaWhatsApp() {
 }
 
 // Salva il margine percentuale da applicare ai prezzi mostrati come riferimento per i portali (OTA)
+
+// ── Margini OTA per canale: ogni canale (Booking.com, Airbnb...) può avere il suo margine %, altrimenti vale quello generale ──
+function otaMargini() {
+  var gen = Number((DB.getObj('settings', {}) || {}).markupOTA) || 0;
+  var lista = [];
+  try { lista = otaCanaliGetLista() || []; } catch (e) {}
+  var out = [], visti = {};
+  lista.forEach(function(c) {
+    var pct = (c.markupPct !== null && c.markupPct !== undefined && c.markupPct !== '') ? Number(c.markupPct) : gen;
+    if (isNaN(pct)) pct = gen;
+    var nome = (c.nome || c.channelType || 'Portale').trim();
+    var k = nome.toLowerCase() + '|' + pct;
+    if (!visti[k]) { visti[k] = 1; out.push({ nome: nome, pct: pct }); }
+  });
+  if (!out.length && gen) out.push({ nome: 'Portali', pct: gen });
+  return out;
+}
+function otaMarginiAttivi() { return otaMargini().filter(function(m) { return m.pct > 0; }); }
+function otaFmtPct(p) { return (p > 0 ? '+' : '') + String(Math.round(p * 100) / 100).replace('.', ',') + '%'; }
+function otaPrezziTesto(val, valuta, arrotonda) {
+  var v = parseFloat(val); if (!v) return '';
+  var m = otaMarginiAttivi();
+  return m.map(function(x) {
+    var p = v * (1 + x.pct / 100);
+    return x.nome + ' (' + otaFmtPct(x.pct) + '): ' + (valuta || '€') + ' ' + (arrotonda ? Math.round(p) : p.toFixed(2));
+  }).join(' · ');
+}
+
 function salvaMarkupOTA() {
   const v = Math.max(0, Math.min(100, parseFloat(document.getElementById('s-markupOTA')?.value) || 0));
   const s = DB.getObj('settings', {});
@@ -24834,20 +24862,20 @@ function camUpdatePriceRows(roomId) {
 function camPriceRows(capMin, capMax, listinoEntry, cfg) {
   // Genera righe tariffe da capMin a capMax
   let rows = '';
-  const markupOTA = DB.getObj('settings',{}).markupOTA || 0;
+  const markupOTA = otaMarginiAttivi().length ? 1 : 0;
   for (let p = capMin; p <= capMax; p++) {
     const pk = 'PAX'+p;
     const val = (listinoEntry && listinoEntry.prezzi && listinoEntry.prezzi[pk]) || '';
-    const otaVal = val ? (parseFloat(val) * (1 + markupOTA/100)).toFixed(2) : '';
+    const otaVal = val ? otaPrezziTesto(val, cfg.currency||'€', false) : '';
     rows += `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:.5px solid var(--border)">
       <div style="width:90px;font-size:12px;font-weight:600;color:var(--text2)">${p} pers.</div>
       <div style="flex:1;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
         <span style="font-size:12px;color:var(--text3)">${cfg.currency||'€'}</span>
         <input type="number" id="c-pax${p}" value="${val}" min="0" step="0.50" placeholder="—"
-          oninput="document.getElementById('c-pax${p}-ota').textContent = this.value ? ('OTA: '+fmtCurrency((parseFloat(this.value)*(1+${markupOTA}/100)))) : '';"
+          oninput="document.getElementById('c-pax${p}-ota').textContent = this.value ? ('OTA → ' + otaPrezziTesto(this.value, '€', false)) : '';"
           style="width:90px;padding:5px 8px;font-size:13px;font-weight:600;border:.5px solid var(--border2);border-radius:6px;text-align:right">
         <span style="font-size:11px;color:var(--text3)">/notte (tariffa base)</span>
-        ${markupOTA ? `<span id="c-pax${p}-ota" style="font-size:11px;color:var(--accent);font-weight:700;margin-left:4px" title="Prezzo suggerito per Booking.com/Airbnb, con margine +${markupOTA}%">${otaVal?('OTA: '+(cfg.currency||'€')+' '+otaVal):''}</span>` : `<span id="c-pax${p}-ota"></span>`}
+        ${markupOTA ? `<span id="c-pax${p}-ota" style="font-size:11px;color:var(--accent);font-weight:700;margin-left:4px" title="Prezzo suggerito per ogni portale, con il suo margine">${otaVal?('OTA → '+otaVal):''}</span>` : `<span id="c-pax${p}-ota"></span>`}
       </div>
     </div>`;
   }
@@ -28282,7 +28310,7 @@ function renderListino() {
   var rooms=getRoomsSortedByCategory();
   var listino=(DB.get('listino')||[]).filter(function(l){return (l.tariffaId||'standard')===lstTariffaId;});
   var cfg=DB.getObj('settings',{currency:'€'});
-  var lstMarkupOTA = cfg.markupOTA || 0;
+  var lstMarkupOTA = otaMarginiAttivi().length ? 1 : 0; // si usa solo come "c'è almeno un margine"; i valori veri sono per canale
   var lstTarObj=getTariffaObj(lstTariffaId);
   var lstIsDerivata=lstTariffaId!=='standard' && !!lstTarObj.modalita;
   var lstMasterType = lstCalcolaRiferimentiCelle(rooms).masterType; // per mostrare la riga Livello solo qui
@@ -28491,7 +28519,7 @@ function renderListino() {
         var hasVal=val!==''&&Number(val)>0;
         var fw=hasVal?'700':'400';
         var col=isPeriodo?'#1a73e8':hasVal?'var(--accent)':'var(--text3)';
-        var otaTip = (hasVal && lstMarkupOTA) ? (' — OTA (+' +lstMarkupOTA+ '%): '+(cfg.currency||'€')+' '+Math.round(Number(val)*(1+lstMarkupOTA/100))) : '';
+        var otaTip = (hasVal && lstMarkupOTA) ? (' — OTA → ' + otaPrezziTesto(val, cfg.currency||'€', true)) : '';
         var aggG=aggGiornoDi(ds);
         var evG=getEventBoostGiorno(ds);
         var occCella=calcolaOccupazionePerTipologia(ds, r.type||'Senza tipologia');
@@ -28577,7 +28605,7 @@ if(lstSelFrom&&lstSelTo){
     '</div>'+
     '<div class="page-subtitle" style="margin-bottom:6px">'+rangeLabel+' · Tariffa: <strong>'+getTariffaNome(lstTariffaId)+'</strong>'+(lstIsDerivata?' <span style="color:#7c3aed;font-weight:700">— calcolata automaticamente: Standard '+(lstTarObj.valore>=0?'+':'')+lstTarObj.valore+(lstTarObj.modalita==='percento'?'%':(cfg.currency||'€'))+'</span>':'')+'</div>'+
     avvisoNoStandard+
-    (lstMarkupOTA ? '<div style="background:var(--accent-light);color:var(--accent);padding:8px 14px;border-radius:8px;font-size:12.5px;margin-bottom:10px">💡 Margine OTA attivo: <strong>+'+lstMarkupOTA+'%</strong> — passa il mouse su un prezzo per vedere quanto mettere su Booking.com/Airbnb</div>' : '')+
+    (lstMarkupOTA ? '<div style="background:var(--accent-light);color:var(--accent);padding:8px 14px;border-radius:8px;font-size:12.5px;margin-bottom:10px">💡 Margine OTA attivo: <strong>'+otaMarginiAttivi().map(function(m){return m.nome+' '+otaFmtPct(m.pct);}).join(' · ')+'</strong> — passa il mouse su un prezzo per vedere quanto mettere su ogni portale</div>' : '')+
     tariffaTabs+
     '<div style="display:flex;flex-direction:column;gap:6px">'+
     '<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">'+
