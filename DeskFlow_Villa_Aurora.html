@@ -346,7 +346,7 @@ tr:hover td{background:var(--surface2)}
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
       <span id="utente-corrente-badge" style="display:none;font-size:10.5px;font-weight:700;color:var(--accent);margin-top:2px"></span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 20/11/2026 · 16:10</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 20/11/2026 · 17:00</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -17453,6 +17453,21 @@ function lstApplyPeriodo() {
         <div style="grid-column:1/-1;font-size:12px;color:var(--text3);margin-top:6px">
           * Lascia i campi vuoti per non modificare i valori esistenti.
         </div>
+        <div style="grid-column:1/-1;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border2)">
+          <div style="font-size:12px;font-weight:700;margin-bottom:6px">Applica solo a questi giorni della settimana</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+            ${[['1','Lun'],['2','Mar'],['3','Mer'],['4','Gio'],['5','Ven'],['6','Sab'],['0','Dom']].map(function(g){ return '<label style="display:flex;align-items:center;gap:4px;font-size:13px;font-weight:600;padding:4px 9px;border:1px solid var(--border2);border-radius:6px;background:var(--surface);cursor:pointer"><input type="checkbox" class="mass-giorno" value="'+g[0]+'" checked style="width:auto;margin:0"> '+g[1]+'</label>'; }).join('')}
+            <button type="button" class="btn btn-sm" onclick="massGiorni([1,2,3,4,5,6,0])">Tutti</button>
+            <button type="button" class="btn btn-sm btn-primary" onclick="massGiorni([5,6,0])">Fine settimana (Ven-Sab-Dom)</button>
+            <button type="button" class="btn btn-sm" onclick="massGiorni([1,2,3,4])">Lun-Gio</button>
+          </div>
+          <div style="font-size:12px;font-weight:700;margin:12px 0 6px">Maggiorazione sul prezzo base già presente <span style="font-weight:400;color:var(--text3)">(facoltativa)</span></div>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <input type="number" step="0.5" id="mass-magg-val" placeholder="es. 20" style="width:100px;padding:5px;font-size:13px">
+            <select id="mass-magg-unit" style="font-size:13px;padding:5px 3px;border-radius:5px;border:1px solid var(--border2)"><option value="%">%</option><option value="€">€</option></select>
+            <span style="font-size:12px;color:var(--text3)">Si aggiunge al prezzo Standard 2 Pax di ogni giorno scelto (anche negativo per uno sconto) e le altre tipologie si ricalcolano. Se riapplichi, si somma di nuovo. Se scrivi un prezzo base qui sotto, questo campo viene ignorato.</span>
+          </div>
+        </div>
       </div>
       <div style="font-size:13.5px;color:var(--text2);background:var(--accent-light);border-radius:8px;padding:12px 14px;margin-bottom:18px">
         💡 Imposta il <strong>prezzo base</strong> su <strong>${masterType} 2 Pax</strong>. Da lì parte una catena: <strong>Superior</strong> prende il prezzo da Standard 2p, <strong>Deluxe</strong> da Superior 2p, <strong>Family</strong> da Deluxe 2p, <strong>Singola</strong> da Standard 2p — ognuna come scostamento (€ o %) dalla precedente. Le fasce 1 e 3 Pax di ogni camera scostano dalla <strong>propria</strong> fascia 2 Pax; la fascia <strong>4 Pax</strong> scosta invece dalla propria fascia <strong>3 Pax</strong> — pensate per restare a 0 e farci aggiungere il supplemento a te in un secondo momento.
@@ -17545,6 +17560,12 @@ function renderRegistroListinoHTML() {
   '</div>';
 }
 
+
+// Aggiornamento massivo: seleziona rapidamente i giorni della settimana (0=Dom ... 6=Sab)
+function massGiorni(lista) {
+  document.querySelectorAll('.mass-giorno').forEach(function(cb){ cb.checked = lista.indexOf(parseInt(cb.value)) >= 0; });
+}
+
 async function doMassUpdateListinoV2() {
   const from = document.getElementById('mass-from').value;
   const to = document.getElementById('mass-to').value;
@@ -17553,7 +17574,16 @@ async function doMassUpdateListinoV2() {
   const listino = DB.get('listino') || [];
   const rooms = DB.get('rooms');
   const regole = getRegoleTipo();
-  const dates = getDatesInRange(from, to);
+  let dates = getDatesInRange(from, to);
+  // Solo i giorni della settimana scelti (es. venerdì, sabato e domenica)
+  const giorniScelti = Array.from(document.querySelectorAll('.mass-giorno')).filter(cb => cb.checked).map(cb => parseInt(cb.value));
+  const nomiGiorni = {1:'Lun',2:'Mar',3:'Mer',4:'Gio',5:'Ven',6:'Sab',0:'Dom'};
+  const soloAlcuniGiorni = giorniScelti.length > 0 && giorniScelti.length < 7;
+  if (giorniScelti.length === 0) { showToast('Seleziona almeno un giorno della settimana'); return; }
+  dates = dates.filter(ds => { const p = ds.split('-'); return giorniScelti.indexOf(new Date(+p[0], +p[1]-1, +p[2]).getDay()) >= 0; });
+  if (!dates.length) { showToast('Nel periodo scelto non ci sono i giorni della settimana selezionati'); return; }
+  const maggVal = parseFloat((document.getElementById('mass-magg-val') || {}).value);
+  const maggUnit = (document.getElementById('mass-magg-unit') || {}).value || '%';
   const types = Array.from(new Set(rooms.map(r => normCatType(r.type))));
   const masterType = types.find(t => t.toLowerCase()==='standard') || types[0];
   const masterRoom = rooms.find(r => normCatType(r.type) === masterType);
@@ -17676,7 +17706,8 @@ async function doMassUpdateListinoV2() {
   // (tranne l'unica ancora assoluta, la cella base di Standard) ha un riferimento — un'ALTRA
   // tipologia in catena (es. Deluxe 2p ← Superior 2p) oppure una fascia diversa della STESSA
   // tipologia (es. 4 Pax ← 3 Pax) — risolto in modo generico per ciascun giorno del periodo.
-  if (masterRoom && Object.keys(offsetsInseriti).length) {
+  const maggAttiva = !isNaN(maggVal) && maggVal !== 0 && basePrice == null;
+  if (masterRoom && (Object.keys(offsetsInseriti).length || maggAttiva)) {
     var dateScoperte = {};
     var baseEl = document.getElementById('mass-base-input');
     var masterPax = baseEl ? baseEl.dataset.pax : 'PAX2';
@@ -17702,6 +17733,20 @@ async function doMassUpdateListinoV2() {
     dates.forEach(function(ds){
       var valore = {}; // chiave "Tipologia|PAXn" -> prezzo finale per QUESTO giorno
       valore[masterType+'|'+masterPax] = (basePrice != null) ? basePrice : (getPrezzoListino(masterRoom.id, 2, ds, lstTariffaId) || masterRoom.price || 0);
+      if (maggAttiva) {
+        // Maggiorazione (o sconto) sul prezzo base già presente di questo giorno; poi si scrive anche la cella base
+        var _att = valore[masterType+'|'+masterPax];
+        var _nuovo = Math.max(0, Math.round(maggUnit === '%' ? _att * (1 + maggVal/100) : _att + maggVal));
+        valore[masterType+'|'+masterPax] = _nuovo;
+        rooms.filter(function(r){ return normCatType(r.type)===masterType; }).forEach(function(room){
+          var e = listino.find(function(l){ return l.roomId===room.id && (l.tariffaId||'standard')===lstTariffaId; });
+          if (!e) { e = {roomId:room.id, tariffaId:lstTariffaId, prezzi:{}, periodi:[]}; listino.push(e); }
+          if (!e.periodi) e.periodi = [];
+          var pd0 = e.periodi.find(function(p){ return p.dal===ds && p.al===ds; });
+          if (!pd0) { pd0 = {dal:ds, al:ds, prezzi:{}}; e.periodi.push(pd0); }
+          pd0.prezzi[masterPax] = _nuovo;
+        });
+      }
 
       var cambiato = true, giri = 0;
       while (cambiato && giri < 12) {
@@ -17750,8 +17795,9 @@ async function doMassUpdateListinoV2() {
     if (d.minN !== null) pezzi.push('soggiorno minimo → ' + d.minN + ' nott' + (d.minN===1?'e':'i'));
     if (d.closed !== null) pezzi.push(d.closed==='closed' ? 'chiusa alla vendita' : 'riaperta alla vendita');
     if (offsetsInseriti[t] && Object.keys(offsetsInseriti[t]).length) pezzi.push('prezzi aggiornati (' + Object.keys(offsetsInseriti[t]).length + ' fasce)');
+    if (maggAttiva && t === masterType) pezzi.push('maggiorazione ' + (maggVal>0?'+':'') + maggVal + maggUnit + ' sul prezzo base');
     if (pezzi.length) {
-      registraModificaListino(fmtDate(from)+' → '+fmtDate(to)+': <strong>'+t+'</strong> ('+tariffaLbl+') — '+pezzi.join(', '));
+      registraModificaListino(fmtDate(from)+' → '+fmtDate(to)+(soloAlcuniGiorni ? ' (solo '+[1,2,3,4,5,6,0].filter(g=>giorniScelti.indexOf(g)>=0).map(g=>nomiGiorni[g]).join('-')+')' : '')+': <strong>'+t+'</strong> ('+tariffaLbl+') — '+pezzi.join(', '));
     }
   });
 
