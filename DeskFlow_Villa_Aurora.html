@@ -346,7 +346,7 @@ tr:hover td{background:var(--surface2)}
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
       <span id="utente-corrente-badge" style="display:none;font-size:10.5px;font-weight:700;color:var(--accent);margin-top:2px"></span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 21/11/2026 · 15:30</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 21/11/2026 · 19:50</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -14098,7 +14098,7 @@ function eseguiInvioPreventivo(id, metodo) {
           + '\n'));
   const notaCaparra = 'Al momento della conferma, verrà richiesta una caparra confirmatoria del 30% oppure un numero di carta di credito a garanzia e nel caso di tariffe scontate, la caparra versata verrà trattenuta in caso di cancellazione.\n\n';
   const notaCaparraEn = 'Upon confirmation, a 30% deposit or a credit card number as guarantee will be required — for discounted rates, the deposit paid will be retained in case of cancellation.\n\n';
-  const bodyBase = en
+  const bodyBase0 = en
     ? 'QUOTE NO. '+q.num+'\n\n'
       +'Dear '+q.clientName+',\n'
       +'Thank you for contacting us — as requested, please find below your non-binding stay quote'+(q.expiry?', valid until '+fmtDate(q.expiry):'')+'.\n\n'
@@ -14125,6 +14125,25 @@ function eseguiInvioPreventivo(id, metodo) {
           .replace(/\{link_scelta\}/g, (piuOpzioni && linkScelta) ? 'Può anche scegliere la soluzione che preferisce direttamente da qui:\n'+linkScelta+'\n\n' : '')
           .replace(/\{totale\}/g, piuOpzioni ? '' : 'Totale soggiorno'+(q.colazioneInclusa!==false?' con Prima Colazione':'')+': '+fmtCurrency(Number(q.totalPrice))+'\n\n');
       })();
+  // Comunicazione al cliente quando nel preventivo è stato spuntato lo sconto contanti (ultima notte)
+  const _sc = (q.scontoContanti && q.scontoContanti.importo) ? Number(q.scontoContanti.importo) : 0;
+  let notaContanti = '';
+  if (_sc > 0) {
+    const _semplice = !(piuOpzioni || piuPeriodi);
+    const _conSconto = Number(q.totalPrice), _senza = _conSconto + _sc;
+    notaContanti = en
+      ? 'PAYING IN CASH: if you settle the stay in cash, the last night is on us'
+        + (_semplice ? ' — the total above ('+fmtCurrency(_conSconto)+') already includes this discount of '+fmtCurrency(_sc)+' (instead of '+fmtCurrency(_senza)+').' : '.')
+        + ' The offer applies only to payment of the balance in cash, and cannot be combined with other payment methods.\n\n'
+      : 'PAGAMENTO IN CONTANTI: se salda il soggiorno in contanti, le offriamo in omaggio l\'ultima notte'
+        + (_semplice ? ' — il totale indicato sopra ('+fmtCurrency(_conSconto)+') comprende già questo sconto di '+fmtCurrency(_sc)+' (invece di '+fmtCurrency(_senza)+').' : '.')
+        + ' L\'agevolazione è valida solo per il saldo pagato in contanti e non è cumulabile con altre modalità di pagamento.\n\n';
+  }
+  let bodyBase = bodyBase0;
+  if (notaContanti) {
+    const _ix = bodyBase0.search(/Al momento della conferma|Upon confirmation/);
+    bodyBase = _ix >= 0 ? bodyBase0.slice(0, _ix) + notaContanti + bodyBase0.slice(_ix) : bodyBase0 + '\n' + notaContanti;
+  }
   const firma = (en ? '\nBest regards,\n' : '\nCordiali saluti,\n')+cfg.propertyName+(cfg.cin?' — CIN '+cfg.cin:'')
     +(cfg.telefono?'\n'+cfg.telefono:'')
     +(cfg.email?'\n'+cfg.email:'');
