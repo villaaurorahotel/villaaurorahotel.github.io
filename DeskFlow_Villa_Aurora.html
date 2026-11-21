@@ -346,7 +346,7 @@ tr:hover td{background:var(--surface2)}
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
       <span id="utente-corrente-badge" style="display:none;font-size:10.5px;font-weight:700;color:var(--accent);margin-top:2px"></span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 21/11/2026 · 10:00</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 21/11/2026 · 14:00</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -392,6 +392,7 @@ tr:hover td{background:var(--surface2)}
   <div class="nav-item" onclick="navigate('wamassivo')" data-page="wamassivo">📨 WhatsApp massivo</div>
   <div class="nav-item" onclick="navigate('emailmassiva')" data-page="emailmassiva">📧 Email massiva</div>
   <div class="nav-item" onclick="navigate('previsionale')" data-page="previsionale">📈 Previsionale</div>
+  <div class="nav-item" onclick="navigate('cassaprev')" data-page="cassaprev">💶 Previsione di cassa</div>
   <div class="nav-item" onclick="navigate('report')" data-page="report">📊 Report</div>
   <div class="nav-item" onclick="navigate('reportpasti')" data-page="reportpasti">🍽 Report Pasti</div>
   <div class="nav-section">Impostazioni</div>
@@ -468,6 +469,7 @@ tr:hover td{background:var(--surface2)}
   <div id="page-puliziamobile" class="page"></div>
   <div id="page-biancheria" class="page"></div>
   <div id="page-previsionale" class="page"></div>
+  <div id="page-cassaprev" class="page"></div>
   <div id="page-report" class="page"></div>
   <div id="page-reportpasti" class="page"></div>
   <div id="page-extra" class="page"></div>
@@ -11640,7 +11642,7 @@ function navigate(page){
     dashboard:renderDashboard,calendario:renderCalendario,prenotazioni:renderPrenotazioni,gruppi:renderGruppiEventi,fatture:renderFatture,recensioni:renderRecensioni,messaggi:renderMessaggi,mobilecheckin:renderMobileCheckin,wamassivo:renderWaMassivo,emailmassiva:renderEmailMassiva,
     checkin:renderCheckin,checkout:renderCheckout,'arrivi-partenze':renderArriviPartenze,checkineffettuati:renderCheckinEffettuati,checkouteffettuati:renderCheckoutEffettuati,effettuati:renderEffettuati,planner:renderPlanner,contidasaldare:renderContiDaSaldare,corrispettivi:renderCorrispettiviPage,condizioni:renderCondizioni,revenue:renderRevenue,camere:renderCamere,ospiti:renderOspiti,archivioospiti:renderArchivioOspiti,guidaospiti:renderGuidaOspiti,
     listino:renderListino,livelli:renderLivelliTariffari,tipologie:renderTipologie,tassasoggiorno:renderTassaSoggiorno,preventivi:renderPreventivi,addebitiextra:renderAddebitiExtra,
-    housekeeping:renderHousekeeping,previsionale:renderPrevisionale,report:renderReport,biancheria:renderBiancheria,
+    housekeeping:renderHousekeeping,previsionale:renderPrevisionale,cassaprev:renderPrevisioneCassa,report:renderReport,biancheria:renderBiancheria,
     extra:renderExtra,manutenzione:renderManutenzione,adempimenti:renderAdempimenti,reportpasti:renderReportPasti,
     blacklist:renderBlacklist,ical:renderIcal,impostazioni:renderImpostazioni,
     salvataggio:renderSalvataggio,sitoweb:renderSitoWeb,utenti:renderGestioneUtenti,registro:renderRegistro,statistichesito:renderStatisticheSito
@@ -13250,6 +13252,7 @@ function openNuovoPreventivo() {
     +'<div class="form-group"><label>Sconto</label><input type="number" id="qf-sconto-valore" step="0.01" min="0" value="0" oninput="ricalcolaPrezzoScontato()"></div>'
     +'<div class="form-group"><label>Tipo sconto</label><select id="qf-sconto-tipo" onchange="ricalcolaPrezzoScontato()"><option value="percentuale">% Percentuale</option><option value="importo">€ Importo fisso</option></select></div>'
     +'<div class="form-group full"><label>Prezzo totale (€)</label><input type="number" id="qf-price" step="0.01" value="" readonly style="background:var(--surface2)"></div>'
+    +'<label style="display:flex;align-items:center;gap:6px;margin-top:2px;font-size:13px;font-weight:500"><input type="checkbox" id="qf-contanti" style="width:auto" onchange="ricalcolaPrezzoScontato()"> 💶 Sconto contanti: ultima notte in omaggio <span id="qf-contanti-imp" style="color:var(--green);font-weight:700"></span></label>'
     +'<label style="display:flex;align-items:center;gap:6px;margin-top:2px;font-size:13px;font-weight:500"><input type="checkbox" id="qf-colazione" checked style="width:auto"> Colazione inclusa</label>'
     +'<div class="form-group full"><label>Valido fino al</label><input type="date" id="qf-expiry" value="'+addD(tod,7)+'"></div>'
     +'<div class="form-group full"><label>Note</label><textarea id="qf-notes" placeholder="Note per il cliente..."></textarea></div>'
@@ -13584,8 +13587,66 @@ function ricalcolaPrezzoScontato() {
   if (valore > 0) {
     netto = (tipo === 'importo') ? (lordo - valore) : (lordo * (1 - valore/100));
   }
-  netto = Math.max(0, Math.round(netto*100)/100);
+  const scontoCont = prevScontoContantiAttuale();
+  const impEl = document.getElementById('qf-contanti-imp'); if (impEl) impEl.textContent = scontoCont ? '(−'+fmtCurrency(scontoCont)+')' : '';
+  netto = Math.max(0, Math.round((netto - scontoCont)*100)/100);
   priceEl.value = lordo ? netto.toFixed(2) : '';
+}
+
+// ════════════════════════════════════════════════════════════════════════════════════════════
+// SCONTO CONTANTI — "ultima notte": lo applichi tu, caso per caso, a chi paga in contanti.
+// Nel conto: pulsante sulla riga Soggiorno (importo modificabile). Nel preventivo: spunta sotto il totale.
+// ════════════════════════════════════════════════════════════════════════════════════════════
+function contoScontoContanti(bookingId) {
+  const bookings = DB.get('bookings'), b = bookings.find(x => x.id === bookingId);
+  if (!b) return;
+  if (b.scontoContanti) { showToast('Lo sconto contanti è già applicato'); return; }
+  const n = nights(b.checkin, b.checkout), tot = parseFloat(b.totalPrice || 0);
+  if (n < 1 || !(tot > 0)) { showToast('Nessun importo del soggiorno da scontare'); return; }
+  const ultima = addDays(b.checkout, -1);
+  let prezzo = 0; try { prezzo = getPrezzoListino(b.roomId, b.adults || 2, ultima, b.tariffaId || 'standard') || 0; } catch (e) {}
+  const media = Math.round(tot / n * 100) / 100;
+  const sug = (prezzo > 0 && prezzo <= tot) ? prezzo : media;
+  const r = prompt('Sconto contanti — ultima notte (' + fmtDate(ultima) + ').\nImporto da togliere dal soggiorno, in € (puoi cambiarlo):', sug);
+  if (r === null) return;
+  const v = Math.round(parseFloat(String(r).replace(',', '.')) * 100) / 100;
+  if (isNaN(v) || v <= 0 || v > tot) { showToast('Importo non valido'); return; }
+  if (b.pagato === 'si' && !confirm('Questa prenotazione risulta già pagata per intero. Applicare comunque lo sconto e ricalcolare il conto?')) return;
+  b.scontoContanti = { importo: v, prezzoOriginale: tot, data: new Date().toISOString() };
+  b.totalPrice = Math.round((tot - v) * 100) / 100;
+  DB.set('bookings', bookings);
+  registraModificaPrenotazione(bookingId, 'modifica', 'Sconto contanti (ultima notte) applicato: −' + fmtCurrency(v) + ' — soggiorno da ' + fmtCurrency(tot) + ' a ' + fmtCurrency(b.totalPrice));
+  showToast('Sconto contanti applicato: −' + fmtCurrency(v));
+  apriConto(bookingId);
+}
+function contoTogliScontoContanti(bookingId) {
+  const bookings = DB.get('bookings'), b = bookings.find(x => x.id === bookingId);
+  if (!b || !b.scontoContanti) return;
+  if (!confirm('Togliere lo sconto contanti e riportare il soggiorno all\'importo di prima?')) return;
+  const v = b.scontoContanti.importo;
+  b.totalPrice = Math.round((parseFloat(b.totalPrice || 0) + v) * 100) / 100;
+  delete b.scontoContanti;
+  DB.set('bookings', bookings);
+  registraModificaPrenotazione(bookingId, 'modifica', 'Sconto contanti tolto: +' + fmtCurrency(v) + ' — soggiorno ' + fmtCurrency(b.totalPrice));
+  showToast('Sconto contanti tolto');
+  apriConto(bookingId);
+}
+// Preventivo: sconto = prezzo medio di una notte di ogni camera, per ogni periodo
+function prevScontoContantiPeriodi(periodi) {
+  let s = 0;
+  (periodi || []).forEach(function(p) {
+    const n = nights(p.checkin, p.checkout); if (n < 1) return;
+    (p.rooms || []).forEach(function(r) { s += (r.total || 0) / n; });
+  });
+  return Math.round(s * 100) / 100;
+}
+function prevScontoContantiAttuale() {
+  const cb = document.getElementById('qf-contanti');
+  if (!cb || !cb.checked) return 0;
+  const per = (window._prevPeriodiExtra || []).slice();
+  const ci = (document.getElementById('qf-checkin') || {}).value, co = (document.getElementById('qf-checkout') || {}).value;
+  if (ci && co) per.push({ checkin: ci, checkout: co, rooms: window._prevRoomsSel || [] });
+  return prevScontoContantiPeriodi(per);
 }
 
 function savePreventivo() {
@@ -13612,7 +13673,8 @@ function savePreventivo() {
   if (scontoValore > 0) {
     totalePreventivo = (scontoTipo === 'importo') ? (totaleLordoPreventivo - scontoValore) : (totaleLordoPreventivo * (1 - scontoValore/100));
   }
-  totalePreventivo = Math.max(0, Math.round(totalePreventivo*100)/100);
+  const scontoContanti = (document.getElementById('qf-contanti')||{}).checked ? prevScontoContantiPeriodi(periodi) : 0;
+  totalePreventivo = Math.max(0, Math.round((totalePreventivo - scontoContanti)*100)/100);
   const q = {
     id: uid(), num, clientName,
     clientEmail: document.getElementById('qf-email').value,
@@ -13637,7 +13699,8 @@ function savePreventivo() {
     scontoTipo:  scontoTipo,
     colazioneInclusa: !!document.getElementById('qf-colazione')?.checked,
     expiry:      document.getElementById('qf-expiry').value,
-    notes:       document.getElementById('qf-notes').value,
+    notes:       document.getElementById('qf-notes').value + (scontoContanti ? ((document.getElementById('qf-notes').value ? '\n' : '') + 'Sconto contanti: ultima notte in omaggio (−' + fmtCurrency(scontoContanti) + ') pagando in contanti.') : ''),
+    scontoContanti: scontoContanti ? { importo: scontoContanti } : null,
     status:      'bozza',
     createdAt:   new Date().toISOString(),
   };
@@ -16474,7 +16537,7 @@ var PAGINE_PERMESSO = {
   planner:'planner', calendario:'calendario', arrivi:'arrivi', 'arrivi-partenze':'arrivi-partenze', housekeeping:'housekeeping', biancheria:'biancheria', puliziamobile:'puliziamobile',
   mobilecheckin:'mobilecheckin', prenotazioni:'prenotazioni', ospiti:'ospiti', archivioospiti:'archivioospiti', preventivi:'preventivi', wamassivo:'wamassivo', emailmassiva:'emailmassiva',
   gruppi:'gruppi', fatture:'fatture', recensioni:'recensioni', messaggi:'messaggi',
-  report:'report', reportpasti:'reportpasti', previsionale:'previsionale', revenue:'revenue',
+  report:'report', reportpasti:'reportpasti', previsionale:'previsionale', cassaprev:'cassaprev', revenue:'revenue',
   corrispettivi:'corrispettivi', contidasaldare:'contidasaldare',
   listino:'listino', livelli:'livelli', tipologie:'tipologie', tassasoggiorno:'tassasoggiorno', camere:'camere',
   manutenzione:'manutenzione',
@@ -16510,6 +16573,7 @@ var VOCI_PERMESSO = [
   {k:'report', l:'📊 Report'},
   {k:'reportpasti', l:'🍽 Report Pasti'},
   {k:'previsionale', l:'📈 Previsionale'},
+  {k:'cassaprev', l:'💶 Previsione di cassa'},
   {k:'manutenzione', l:'🔧 Manutenzione'},
   {k:'recensioni', l:'⭐ Recensioni'},
   {k:'extra', l:'🛎 Extra/Servizi'},
@@ -32986,7 +33050,7 @@ function renderPage(page) {
     camere: renderCamere, ospiti: renderOspiti, archivioospiti: renderArchivioOspiti, guidaospiti: renderGuidaOspiti, report: renderReport,
     impostazioni: renderImpostazioni, listino: renderListino, tassasoggiorno: renderTassaSoggiorno,
     housekeeping: renderHousekeeping, puliziamobile: renderPuliziaMobile, preventivi: renderPreventivi, registro: renderRegistro, addebitiextra: renderAddebitiExtra,
-    previsionale: renderPrevisionale, esporta: renderEsporta,
+    previsionale: renderPrevisionale, cassaprev: renderPrevisioneCassa, esporta: renderEsporta,
     extra: renderExtra,
     ical: renderIcal,
     salvataggio: renderSalvataggio,
@@ -34616,6 +34680,9 @@ function apriConto(bookingId) {
       '<div style="font-weight:700;color:var(--accent);margin-bottom:6px;text-transform:uppercase;font-size:11px;letter-spacing:.5px">Conteggi</div>'+
       '<table style="width:100%;border-collapse:collapse;margin-bottom:16px">'+
         '<tr><td style="padding:5px 0;color:var(--text2)">Soggiorno</td><td>'+fmtCurrency(b.totalPrice)+'</td></tr>'+
+        (b.scontoContanti
+          ? '<tr><td style="padding:3px 0;color:var(--green);font-size:12px">💶 Sconto contanti (ultima notte) già applicato: −'+fmtCurrency(b.scontoContanti.importo)+'</td><td><button type="button" class="btn btn-sm" onclick="contoTogliScontoContanti(\''+b.id+'\')">Togli</button></td></tr>'
+          : '<tr><td colspan="2" style="padding:3px 0"><button type="button" class="btn btn-sm" onclick="contoScontoContanti(\''+b.id+'\')" title="Toglie dal soggiorno il prezzo dell\'ultima notte — solo se il cliente paga in contanti">💶 Applica sconto contanti (ultima notte)</button></td></tr>')+
         '<tr><td style="padding:5px 0;color:var(--text2)">Tassa di soggiorno</td><td>'+fmtCurrency(taxInfo.tax)+(taxInfo.etaBasata?' <span class="badge badge-green" style="font-size:9px" title="Calcolata dalle date di nascita inserite in check-in, non dai conteggi manuali della prenotazione">🎂 in base all\'età</span>':'')+'</td></tr>'+
         '<tr><td style="padding:5px 0;color:var(--text2)">Extra</td><td>'+fmtCurrency(extrasTotal)+'</td></tr>'+
         '<tr><td style="padding:10px 0;font-weight:800;font-size:15px;border-top:1.5px solid var(--border)">TOTALE DOVUTO</td><td style="padding:10px 0;font-weight:800;font-size:15px;border-top:1.5px solid var(--border)">'+fmtCurrency(totaleDovuto)+'</td></tr>'+
@@ -37231,6 +37298,7 @@ function cpApri() {
           '<div><div style="font-size:12px;font-weight:700;margin-bottom:4px">Chiusura</div><select id="cp-chiusura" style="padding:5px;border-radius:6px;border:1px solid var(--border2);font-size:13px"><option value="">—</option><option value="open">APRI 🔓</option><option value="closed">CHIUDI 🔒</option></select></div>' +
         '</div>' +
         '<label style="display:flex;gap:6px;align-items:center;font-size:12px;margin-bottom:10px"><input type="checkbox" id="cp-tutti" checked style="width:auto;margin:0"> Minimo notti e chiusura per tutte le tipologie</label>' +
+        '<div id="cp-suppl"></div>' +
         '<div style="font-size:12px;font-weight:700;margin-bottom:4px">Anteprima (prima → dopo)</div>' +
         '<div id="cp-prev" style="max-height:170px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;margin-bottom:10px"></div>' +
         '<button class="btn btn-primary" id="cp-applica" onclick="cpApplica()" style="width:100%;font-weight:800">Applica ai giorni scelti</button>' +
@@ -37306,7 +37374,7 @@ function cpRinfresca() {
   var der = cpEDerivata();
   var n = document.getElementById('cp-nota-derivata'); if (n) n.style.display = der ? 'block' : 'none';
   ['cp-az', 'cp-val', 'cp-unit'].forEach(function(id) { var e = document.getElementById(id); if (e) e.disabled = der; });
-  cpDisegna(); cpPanel(); cpStoria();
+  cpDisegna(); cpPanel(); cpStoria(); cpSuppl();
 }
 
 function cpDisegna() {
@@ -37382,6 +37450,79 @@ function cpSalvaCella(ds, txt) {
   var tarNome = (getTariffaObj(tid) || {}).nome || tid;
   cpRegistra('✏️ <strong>' + tarNome + '</strong> · ' + t + ' · ' + fmtDate(ds) + ': ' + cpFmt(prima) + ' → ' + cpFmt(v) + ' €', payload);
   showToast('Prezzo aggiornato');
+  cpRinfresca();
+  if (typeof renderListino === 'function') renderListino();
+}
+
+// ── Supplementi (1, 3, 4 persone) direttamente nel Calendario prezzi ──
+// Sono gli stessi scostamenti della "Maschera classica" (listinoScostamenti): una volta salvati qui o lì,
+// ogni cambio prezzo fatto dal calendario li usa per ricalcolare 1, 3 e 4 persone.
+function cpSuppl() {
+  var box = document.getElementById('cp-suppl'); if (!box) return;
+  var info = lstCalcolaRiferimentiCelle(DB.get('rooms') || []), sc = DB.get('listinoScostamenti') || [];
+  var chiavi = Object.keys(info.cellRef).filter(function(k) { return info.cellRef[k].t === cp.tipo; }).sort();
+  if (!chiavi.length) { box.innerHTML = ''; return; }
+  var h = '<div style="font-size:12px;font-weight:700;margin:4px 0 4px">Supplementi — ' + cp.tipo + '</div>';
+  chiavi.forEach(function(k) {
+    var c = info.cellRef[k], s = sc.find(function(x) { return x.tipo === c.t && x.pax === c.pk; });
+    var lab = c.pk.replace('PAX', '') + ' Pax', rif = (c.refType === c.t ? '' : c.refType + ' ') + c.refPax.replace('PAX', '') + ' Pax';
+    h += '<div style="display:flex;gap:5px;align-items:center;margin-bottom:4px;font-size:12px"><span style="flex:1">' + lab + ' ± da ' + rif + '</span>' +
+      '<input type="number" step="0.5" class="cp-sup" data-pax="' + c.pk + '" value="' + (s ? s.valore : '') + '" placeholder="—" style="width:68px;padding:4px;font-size:13px">' +
+      '<select class="cp-sup-u" data-pax="' + c.pk + '" style="padding:4px;font-size:13px;border-radius:5px;border:1px solid var(--border2)"><option value="€"' + ((s && s.unita === '%') ? '' : ' selected') + '>€</option><option value="%"' + ((s && s.unita === '%') ? ' selected' : '') + '>%</option></select></div>';
+  });
+  h += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"><button class="btn btn-sm" onclick="cpSalvaSuppl()">Salva supplementi</button>' +
+    '<button class="btn btn-sm btn-primary" onclick="cpRiallinea()" title="Ricalcola 1, 3 e 4 persone dei giorni scelti partendo dalla doppia">Riallinea giorni scelti</button></div>';
+  box.innerHTML = h;
+}
+function cpSalvaSuppl(silenzioso) {
+  var sc = DB.get('listinoScostamenti') || [], n = 0;
+  document.querySelectorAll('.cp-sup').forEach(function(el) {
+    if (el.value === '') return;
+    var pk = el.dataset.pax, v = parseFloat(el.value); if (isNaN(v)) return;
+    var u = (document.querySelector('.cp-sup-u[data-pax="' + pk + '"]') || {}).value || '€';
+    var s = sc.find(function(x) { return x.tipo === cp.tipo && x.pax === pk; });
+    if (s) { s.valore = v; s.unita = u; } else sc.push({ tipo: cp.tipo, pax: pk, valore: v, unita: u });
+    n++;
+  });
+  DB.set('listinoScostamenti', sc);
+  if (!silenzioso) showToast(n ? 'Supplementi salvati' : 'Scrivi almeno un supplemento');
+  return n;
+}
+// Ricalcola 1/3/4 persone (tutte le tipologie con scostamento salvato) per i giorni scelti, dalla doppia già presente
+function cpRiallinea() {
+  var gg = cpGiorniScelti();
+  if (!gg.length) { showToast('Scegli prima i giorni da riallineare'); return; }
+  if (cpEDerivata()) { showToast('Scegli la tariffa Standard per riallineare i prezzi'); return; }
+  cpSalvaSuppl(true);
+  var rooms = DB.get('rooms') || [], listino = DB.get('listino') || [], info = lstCalcolaRiferimentiCelle(rooms);
+  var masterRooms = cpRoomsDi(info.masterType), tid = cp.tariffa;
+  var payload = { tid: tid, giorni: {}, celle: [], reg: [] }, toccati = 0, saltati = 0;
+  if (!masterRooms.length) return;
+  gg.forEach(function(ds) {
+    var p0 = getPrezzoListinoDiretto(masterRooms[0].id, 2, ds, tid);
+    if (!p0) { saltati++; return; }
+    var prima = cpPrezzo(ds, cp.tipo, tid), cat = cpCatena(p0), scritto = false;
+    Object.keys(cat.info.cellRef).forEach(function(k) {
+      var c = cat.info.cellRef[k]; if (cat.valore[k] == null || !cat.off(c.t, c.pk).salvato) return;
+      cpRoomsDi(c.t).forEach(function(room) {
+        var e = listino.find(function(l) { return l.roomId === room.id && (l.tariffaId || 'standard') === tid; });
+        if (!e) { e = { roomId: room.id, tariffaId: tid, prezzi: {}, periodi: [] }; listino.push(e); }
+        if (!e.periodi) e.periodi = [];
+        var pd = e.periodi.find(function(p) { return p.dal === ds && p.al === ds; });
+        if (!pd) { pd = { dal: ds, al: ds, prezzi: {} }; e.periodi.push(pd); }
+        var vecchio = (pd.prezzi[c.pk] !== undefined && pd.prezzi[c.pk] !== '') ? pd.prezzi[c.pk] : null;
+        if (vecchio === cat.valore[k]) return;
+        pd.prezzi[c.pk] = cat.valore[k]; payload.celle.push([room.id, ds, c.pk, vecchio, cat.valore[k]]); scritto = true;
+      });
+    });
+    if (scritto) { payload.giorni[ds] = [prima, cpPrezzo(ds, cp.tipo, tid) || prima]; toccati++; }
+  });
+  if (!payload.celle.length) { showToast(saltati ? 'Nei giorni scelti non c\'è ancora il prezzo della doppia' : 'Era già tutto allineato (o mancano i supplementi)'); return; }
+  DB.set('listino', listino);
+  avvisaHostexSubito(); avvisaHostexRestrizioniSubito();
+  if (typeof avvisaHostexPrezziSubito === 'function') avvisaHostexPrezziSubito();
+  cpRegistra('🔁 <strong>Riallineati 1/3/4 persone</strong> · ' + gg.length + ' giorni (' + fmtDate(gg[0]) + (gg.length > 1 ? ' → ' + fmtDate(gg[gg.length - 1]) : '') + '), ' + toccati + ' modificati', payload);
+  showToast('Riallineati ' + toccati + ' giorni' + (saltati ? ' — ' + saltati + ' senza prezzo saltati' : ''));
   cpRinfresca();
   if (typeof renderListino === 'function') renderListino();
 }
@@ -37643,6 +37784,126 @@ async function cpAnnulla(idx) {
   cpRinfresca();
   if (typeof renderListino === 'function') renderListino();
 }
+
+// ════════════════════════════════════════════════════════════════════════════════════════════
+// PREVISIONE DI CASSA — mese per mese quanti soldi entrano e quanti escono, per vedere in anticipo
+// in quale mese il saldo va sotto zero. Entrate = prenotazioni (automatiche); commissioni OTA = stima
+// automatica (pagate da te con bonifico); costi fissi, IVA, F24 e altro = inseriti a mano.
+// Non include tassa di soggiorno (non è tua). I dati stanno nelle Impostazioni (blob "settings").
+// ════════════════════════════════════════════════════════════════════════════════════════════
+var CASSA_TIPI = {
+  fisso:   { l: 'Costo fisso mensile', uscita: true },
+  iva:     { l: 'IVA', uscita: true },
+  f24:     { l: 'F24 / imposte', uscita: true },
+  altro:   { l: 'Altro costo', uscita: true },
+  entrata: { l: 'Altra entrata', uscita: false }
+};
+function cassaGet() {
+  var s = DB.getObj('settings', {}) || {};
+  var c = s.cassaPrev || {};
+  if (!c.voci) c.voci = [];
+  if (c.saldoIniziale === undefined) c.saldoIniziale = 0;
+  if (!c.comm) c.comm = { 'Booking.com': 15, 'Airbnb': 15, 'Expedia': 18 };
+  if (!c.meseIncasso) c.meseIncasso = 'checkin';
+  if (!c.meseComm) c.meseComm = 'successivo';
+  if (!c.inizio) c.inizio = today().slice(0, 7);
+  return c;
+}
+function cassaSalva(c) { var s = DB.getObj('settings', {}) || {}; s.cassaPrev = c; DB.setObj('settings', s); }
+function cassaMesi(inizio, n) {
+  var p = inizio.split('-'), out = [];
+  for (var i = 0; i < n; i++) { var d = new Date(+p[0], +p[1] - 1 + i, 1); out.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')); }
+  return out;
+}
+function cassaMeseSucc(m) { return cassaMesi(m, 2)[1]; }
+function cassaEsc(t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+
+function cassaCalcola() {
+  var c = cassaGet(), mesi = cassaMesi(c.inizio, 12);
+  var righe = { entrate: {}, altreEntrate: {}, comm: {}, fisso: {}, iva: {}, f24: {}, altro: {} };
+  mesi.forEach(function(m) { Object.keys(righe).forEach(function(k) { righe[k][m] = 0; }); });
+  (DB.get('bookings') || []).forEach(function(b) {
+    if (!b || b.status === 'cancellata' || b.escludiConteggi) return;
+    var tot = parseFloat(b.totalPrice || 0); if (!(tot > 0)) return;
+    var m = (c.meseIncasso === 'checkout' ? b.checkout : b.checkin || '').slice(0, 7);
+    if (righe.entrate[m] !== undefined) righe.entrate[m] += tot;
+    var pct = parseFloat(c.comm[b.source]);
+    if (pct > 0) {
+      var mc = c.meseComm === 'successivo' ? cassaMeseSucc((b.checkout || b.checkin || '').slice(0, 7)) : (b.checkout || b.checkin || '').slice(0, 7);
+      if (righe.comm[mc] !== undefined) righe.comm[mc] += tot * pct / 100;
+    }
+  });
+  c.voci.forEach(function(v) {
+    var imp = parseFloat(v.importo) || 0, dal = v.dal, al = v.al || v.dal; if (!dal) return;
+    var t = CASSA_TIPI[v.tipo] ? v.tipo : 'altro', k = t === 'entrata' ? 'altreEntrate' : t;
+    mesi.forEach(function(m) { if (m >= dal && m <= al) righe[k][m] += imp; });
+  });
+  var saldo = parseFloat(c.saldoIniziale) || 0, out = [];
+  mesi.forEach(function(m) {
+    var ent = righe.entrate[m] + righe.altreEntrate[m];
+    var usc = righe.comm[m] + righe.fisso[m] + righe.iva[m] + righe.f24[m] + righe.altro[m];
+    saldo += ent - usc; out.push({ m: m, ent: ent, usc: usc, mov: ent - usc, saldo: saldo });
+  });
+  return { c: c, mesi: mesi, righe: righe, tot: out };
+}
+function cassaMeseTesto(m) { var p = m.split('-'); return CP_MESI[+p[1] - 1].slice(0, 3) + ' ' + p[0].slice(2); }
+function cassaNum(n) { var v = Math.round(n); return v === 0 ? '—' : v.toLocaleString('it-IT'); }
+
+function renderPrevisioneCassa() {
+  var el = document.getElementById('page-cassaprev'); if (!el) return;
+  var r = cassaCalcola(), c = r.c;
+  var primoNeg = r.tot.filter(function(x) { return x.saldo < 0; })[0];
+  var minimo = r.tot.reduce(function(a, x) { return x.saldo < a.saldo ? x : a; }, r.tot[0]);
+  var avviso = primoNeg
+    ? '<div style="background:#fde2e2;color:#a61e1e;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-weight:700">⚠ A <b>' + cassaMeseTesto(primoNeg.m) + '</b> il saldo va sotto zero: ' + fmtCurrency(primoNeg.saldo) + '. Il punto più basso è a ' + cassaMeseTesto(minimo.m) + ' (' + fmtCurrency(minimo.saldo) + '). Meglio parlarne con la banca per tempo.</div>'
+    : '<div style="background:#e3f6e8;color:#1b6b34;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-weight:700">✓ Nei prossimi 12 mesi il saldo resta sopra zero. Punto più basso: ' + cassaMeseTesto(minimo.m) + ' (' + fmtCurrency(minimo.saldo) + ').</div>';
+  function riga(label, k, segno, colore, nota) {
+    return '<tr><td style="padding:5px 8px;white-space:nowrap;font-weight:600;position:sticky;left:0;background:var(--surface)"' + (nota ? ' title="' + cassaEsc(nota) + '"' : '') + '>' + label + '</td>' +
+      r.mesi.map(function(m) { var v = r.righe[k][m]; return '<td style="padding:5px 8px;text-align:right;color:' + (v ? colore : 'var(--text3)') + '">' + (v ? (segno < 0 ? '−' : '') + cassaNum(v) : '—') + '</td>'; }).join('') + '</tr>';
+  }
+  var th = '<tr><th style="padding:6px 8px;text-align:left;position:sticky;left:0;background:var(--surface2)"></th>' + r.mesi.map(function(m) { return '<th style="padding:6px 8px;text-align:right;background:var(--surface2);white-space:nowrap">' + cassaMeseTesto(m) + '</th>'; }).join('') + '</tr>';
+  var tabella =
+    '<div style="overflow-x:auto;border:1px solid var(--border2);border-radius:8px"><table style="border-collapse:collapse;font-size:13px;width:100%">' + th +
+    riga('Prenotazioni (incassi)', 'entrate', 1, 'var(--green)', 'Soggiorno di tutte le prenotazioni non cancellate, senza tassa di soggiorno') +
+    riga('Altre entrate', 'altreEntrate', 1, 'var(--green)') +
+    riga('Commissioni OTA (stima)', 'comm', -1, '#a61e1e', 'Pagate da te con bonifico — calcolate con le percentuali qui sotto') +
+    riga('Costi fissi', 'fisso', -1, '#a61e1e') + riga('IVA', 'iva', -1, '#a61e1e') + riga('F24 / imposte', 'f24', -1, '#a61e1e') + riga('Altri costi', 'altro', -1, '#a61e1e') +
+    '<tr style="border-top:2px solid var(--border2)"><td style="padding:6px 8px;font-weight:700;position:sticky;left:0;background:var(--surface)">Movimento del mese</td>' + r.tot.map(function(x) { return '<td style="padding:6px 8px;text-align:right;font-weight:700;color:' + (x.mov < 0 ? '#a61e1e' : 'var(--text1)') + '">' + (x.mov < 0 ? '−' : '') + cassaNum(Math.abs(x.mov)) + '</td>'; }).join('') + '</tr>' +
+    '<tr><td style="padding:8px;font-weight:800;position:sticky;left:0;background:var(--surface)">Saldo a fine mese</td>' + r.tot.map(function(x) { return '<td style="padding:8px;text-align:right;font-weight:800;background:' + (x.saldo < 0 ? '#fde2e2' : '#e9f7ee') + ';color:' + (x.saldo < 0 ? '#a61e1e' : '#1b6b34') + '">' + (x.saldo < 0 ? '−' : '') + cassaNum(Math.abs(x.saldo)) + '</td>'; }).join('') + '</tr></table></div>';
+  var imp = '<div class="card" style="margin-top:16px"><div class="card-header"><span class="card-title">⚙ Impostazioni</span></div><div class="modal-body" style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end">' +
+    '<div><label style="font-size:12px;font-weight:700;display:block">Parti dal mese</label><input type="month" value="' + c.inizio + '" onchange="cassaImp(\'inizio\',this.value)" style="padding:5px"></div>' +
+    '<div><label style="font-size:12px;font-weight:700;display:block">Saldo sul conto oggi (€) <span style="font-weight:400;color:var(--text3)">solo la parte tua</span></label><input type="number" step="0.01" value="' + c.saldoIniziale + '" onchange="cassaImp(\'saldoIniziale\',parseFloat(this.value)||0)" style="padding:5px;width:130px"></div>' +
+    '<div><label style="font-size:12px;font-weight:700;display:block">Incasso delle prenotazioni nel mese di</label><select onchange="cassaImp(\'meseIncasso\',this.value)" style="padding:5px"><option value="checkin"' + (c.meseIncasso === 'checkin' ? ' selected' : '') + '>Check-in</option><option value="checkout"' + (c.meseIncasso === 'checkout' ? ' selected' : '') + '>Check-out</option></select></div>' +
+    '<div><label style="font-size:12px;font-weight:700;display:block">Paghi le commissioni OTA</label><select onchange="cassaImp(\'meseComm\',this.value)" style="padding:5px"><option value="successivo"' + (c.meseComm === 'successivo' ? ' selected' : '') + '>Il mese dopo il check-out</option><option value="stesso"' + (c.meseComm === 'stesso' ? ' selected' : '') + '>Nel mese del check-out</option></select></div>' +
+    '<div><label style="font-size:12px;font-weight:700;display:block">Commissione OTA %</label><div style="display:flex;gap:8px">' +
+      Object.keys(c.comm).map(function(k) { return '<label style="font-size:12px">' + k + ' <input type="number" step="0.1" min="0" value="' + c.comm[k] + '" onchange="cassaComm(\'' + k + '\',this.value)" style="width:58px;padding:4px"></label>'; }).join('') + '</div></div>' +
+    '</div></div>';
+  var voci = '<div class="card" style="margin-top:16px"><div class="card-header"><span class="card-title">✍ Costi, IVA, F24 e altre voci (inseriti da te)</span></div><div class="modal-body">' +
+    (c.voci.length ? '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px"><thead><tr style="color:var(--text3);text-align:left"><th style="padding:5px">Cosa</th><th>Tipo</th><th style="text-align:right">Importo €</th><th>Dal mese</th><th>Fino al mese</th><th></th></tr></thead><tbody>' +
+      c.voci.map(function(v, i) { return '<tr style="border-top:1px solid var(--border)"><td style="padding:5px">' + cassaEsc(v.nome) + '</td><td>' + (CASSA_TIPI[v.tipo] || CASSA_TIPI.altro).l + '</td><td style="text-align:right">' + fmtCurrency(v.importo) + '</td><td>' + (v.dal || '') + '</td><td>' + (v.al && v.al !== v.dal ? v.al : '<span style="color:var(--text3)">solo quel mese</span>') + '</td><td style="text-align:right"><button class="btn btn-sm" onclick="cassaVoceElimina(' + i + ')">✕</button></td></tr>'; }).join('') + '</tbody></table>'
+      : '<div style="font-size:12.5px;color:var(--text3);margin-bottom:10px">Nessuna voce inserita. Aggiungi qui stipendi, affitti, utenze, IVA e F24: ogni voce va nel mese (o nei mesi) che indichi.</div>') +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;padding:10px;background:var(--surface2);border-radius:8px">' +
+      '<div><label style="font-size:11px;font-weight:700;display:block">Cosa</label><input type="text" id="cv-nome" placeholder="es. Stipendio, Rata IVA" style="padding:5px;width:170px"></div>' +
+      '<div><label style="font-size:11px;font-weight:700;display:block">Tipo</label><select id="cv-tipo" style="padding:5px">' + Object.keys(CASSA_TIPI).map(function(k) { return '<option value="' + k + '">' + CASSA_TIPI[k].l + '</option>'; }).join('') + '</select></div>' +
+      '<div><label style="font-size:11px;font-weight:700;display:block">Importo €</label><input type="number" step="0.01" id="cv-imp" placeholder="0" style="padding:5px;width:100px"></div>' +
+      '<div><label style="font-size:11px;font-weight:700;display:block">Dal mese</label><input type="month" id="cv-dal" value="' + c.inizio + '" style="padding:5px"></div>' +
+      '<div><label style="font-size:11px;font-weight:700;display:block">Fino al mese <span style="font-weight:400">(vuoto = solo quel mese)</span></label><input type="month" id="cv-al" style="padding:5px"></div>' +
+      '<button class="btn btn-primary" onclick="cassaVoceAggiungi()">+ Aggiungi</button></div>' +
+    '</div></div>';
+  el.innerHTML = '<div class="page-header"><div><div class="page-title">💶 Previsione di cassa</div><div class="page-subtitle">Quanti soldi tuoi avrai, mese per mese — per accorgerti in anticipo di un mese in rosso</div></div></div>' +
+    '<div class="page-content">' + avviso + tabella +
+    '<div style="font-size:11.5px;color:var(--text3);margin-top:6px">Le entrate sono il soggiorno delle prenotazioni confermate (senza tassa di soggiorno). Le commissioni OTA sono una stima con le percentuali sotto. IVA, F24 e costi li inserisci tu.</div>' + imp + voci + '</div>';
+}
+function cassaImp(k, v) { var c = cassaGet(); c[k] = v; cassaSalva(c); renderPrevisioneCassa(); }
+function cassaComm(k, v) { var c = cassaGet(); c.comm[k] = parseFloat(v) || 0; cassaSalva(c); renderPrevisioneCassa(); }
+function cassaVoceAggiungi() {
+  var nome = document.getElementById('cv-nome').value.trim(), tipo = document.getElementById('cv-tipo').value, imp = parseFloat(document.getElementById('cv-imp').value);
+  var dal = document.getElementById('cv-dal').value, al = document.getElementById('cv-al').value;
+  if (!nome || isNaN(imp) || !dal) { showToast('Scrivi cosa, l\'importo e il mese di partenza'); return; }
+  if (al && al < dal) { showToast('Il mese finale è prima di quello iniziale'); return; }
+  var c = cassaGet(); c.voci.push({ id: uid(), nome: nome, tipo: tipo, importo: imp, dal: dal, al: al || dal }); cassaSalva(c); renderPrevisioneCassa(); showToast('Voce aggiunta');
+}
+function cassaVoceElimina(i) { var c = cassaGet(); if (!confirm('Togliere "' + c.voci[i].nome + '"?')) return; c.voci.splice(i, 1); cassaSalva(c); renderPrevisioneCassa(); }
 
 </script>
 </body>
