@@ -346,7 +346,7 @@ tr:hover td{background:var(--surface2)}
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
       <span id="utente-corrente-badge" style="display:none;font-size:10.5px;font-weight:700;color:var(--accent);margin-top:2px"></span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 21/11/2026 · 14:30</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 21/11/2026 · 15:30</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -851,6 +851,14 @@ let _supabaseSyncingCount = 0; // contatore (non booleano!): più salvataggi pos
 // ritentativo prende sempre lo stato PIÙ RECENTE al momento del nuovo tentativo, non una copia vecchia.
 let _syncRetryTimers = {};
 let _syncRetryAttempts = {};
+// Messaggio di errore salvataggio con il motivo vero (tabella + causa), così si capisce cosa non va
+function _toastErroreSync(tipo, err) {
+  var m = (err && (err.message || err.details || err.hint)) || String(err || '');
+  var code = (err && err.code) ? ' [' + err.code + ']' : '';
+  window._ultimoErroreSync = { tipo: tipo, msg: m, code: code, quando: new Date().toISOString() };
+  showToast('⚠ Errore di salvataggio su Supabase (' + tipo + '): ' + String(m).slice(0, 160) + code + ' — nuovo tentativo automatico…');
+}
+
 function scheduleSyncRetry(tipo, syncFn, getCurrentData) {
   if (_syncRetryTimers[tipo]) return; // c'è già un ritentativo in coda per questo tipo di dato
   const tentativo = (_syncRetryAttempts[tipo] || 0) + 1;
@@ -1464,7 +1472,7 @@ async function syncRoomsToSupabase(newRooms) {
     _segnaSincronizzato('rooms', toUpsert, []);
   } catch (err) {
     console.error('Errore sincronizzazione camere:', err);
-    showToast('⚠ Errore di salvataggio su Supabase — nuovo tentativo automatico in corso…');
+    _toastErroreSync('rooms', err);
     scheduleSyncRetry('rooms', syncRoomsToSupabase, () => DB.get('rooms'));
     _supabaseSyncingCount = Math.max(0, _supabaseSyncingCount - 1);
     throw err;
@@ -1515,7 +1523,7 @@ async function syncBookingsToSupabase(newBookings) {
     if (falliti > 0) throw new Error(falliti+' prenotazioni su '+toUpsert.length+' non salvate — riprova il salvataggio');
   } catch (err) {
     console.error('Errore sincronizzazione prenotazioni:', err);
-    showToast('⚠ Errore di salvataggio su Supabase — nuovo tentativo automatico in corso…');
+    _toastErroreSync('bookings', err);
     scheduleSyncRetry('bookings', syncBookingsToSupabase, () => DB.get('bookings'));
     _supabaseSyncingCount = Math.max(0, _supabaseSyncingCount - 1);
     throw err;
@@ -1571,7 +1579,7 @@ async function syncGuestsToSupabase(newGuests) {
     if (falliti > 0) throw new Error(falliti+' ospiti su '+toUpsert.length+' non salvati');
   } catch (err) {
     console.error('Errore sincronizzazione ospiti:', err);
-    showToast('⚠ Errore di salvataggio su Supabase — nuovo tentativo automatico in corso…');
+    _toastErroreSync('guests', err);
     scheduleSyncRetry('guests', syncGuestsToSupabase, () => DB.get('guests'));
     _supabaseSyncingCount = Math.max(0, _supabaseSyncingCount - 1);
     throw err;
@@ -1602,7 +1610,7 @@ async function syncListinoToSupabase(newListino) {
     toUpsert.forEach(r => { const {key, ...rest} = r; m.set(key, JSON.stringify(rest)); });
   } catch (err) {
     console.error('Errore sincronizzazione listino:', err);
-    showToast('⚠ Errore di salvataggio su Supabase — nuovo tentativo automatico in corso…');
+    _toastErroreSync('listino', err);
     scheduleSyncRetry('listino', syncListinoToSupabase, () => DB.get('listino'));
     _supabaseSyncingCount = Math.max(0, _supabaseSyncingCount - 1);
     throw err;
@@ -1622,7 +1630,7 @@ async function syncTariffeToSupabase(newTariffe) {
     _segnaSincronizzato('tariffe', toUpsert, []);
   } catch (err) {
     console.error('Errore sincronizzazione tariffe:', err);
-    showToast('⚠ Errore di salvataggio su Supabase — nuovo tentativo automatico in corso…');
+    _toastErroreSync('tariffe', err);
     scheduleSyncRetry('tariffe', syncTariffeToSupabase, () => DB.get('tariffe'));
     _supabaseSyncingCount = Math.max(0, _supabaseSyncingCount - 1);
     throw err;
@@ -1640,7 +1648,7 @@ async function syncQuotesToSupabase(newQuotes) {
     _segnaSincronizzato('quotes', toUpsert, []);
   } catch (err) {
     console.error('Errore sincronizzazione preventivi:', err);
-    showToast('⚠ Errore di salvataggio su Supabase — nuovo tentativo automatico in corso…');
+    _toastErroreSync('quotes', err);
     scheduleSyncRetry('quotes', syncQuotesToSupabase, () => DB.get('quotes'));
     _supabaseSyncingCount = Math.max(0, _supabaseSyncingCount - 1);
     throw err;
@@ -1659,7 +1667,7 @@ async function syncRichiestePreventivoToSupabase(newRichieste) {
     _segnaSincronizzato('richieste_preventivo', toUpsert, []);
   } catch (err) {
     console.error('Errore sincronizzazione richieste preventivo:', err);
-    showToast('⚠ Errore di salvataggio su Supabase — nuovo tentativo automatico in corso…');
+    _toastErroreSync('richieste_preventivo', err);
     scheduleSyncRetry('richieste_preventivo', syncRichiestePreventivoToSupabase, () => DB.get('richiestePreventivo'));
     _supabaseSyncingCount = Math.max(0, _supabaseSyncingCount - 1);
     throw err;
@@ -1678,7 +1686,7 @@ async function syncRoomTypeInfoToSupabase(newInfo) {
     _segnaSincronizzato('room_type_info', toUpsert, []);
   } catch (err) {
     console.error('Errore sincronizzazione descrizioni tipologie:', err);
-    showToast('⚠ Errore di salvataggio su Supabase — nuovo tentativo automatico in corso…');
+    _toastErroreSync('room_type_info', err);
     scheduleSyncRetry('room_type_info', syncRoomTypeInfoToSupabase, () => DB.get('roomTypeInfo'));
     _supabaseSyncingCount = Math.max(0, _supabaseSyncingCount - 1);
     throw err;
@@ -1701,7 +1709,7 @@ async function syncSiteContentToSupabase(newContent) {
     // ospiti, questa funzione non riprovava mai da sola in caso di intoppo — falliva un colpo solo e
     // la modifica restava solo nel browser finché non si ricaricava la pagina, perdendola per sempre.
     // Ora, come per prenotazioni/ospiti, riprova da sola alcune volte prima di arrendersi davvero.
-    showToast('⚠ Errore di salvataggio su Supabase — nuovo tentativo automatico in corso…');
+    _toastErroreSync('site_content', err);
     scheduleSyncRetry('site_content', syncSiteContentToSupabase, () => DB.get('siteContent'));
     _supabaseSyncingCount = Math.max(0, _supabaseSyncingCount - 1);
     throw err;
@@ -1738,7 +1746,7 @@ function syncBlobToSupabase(key, value) {
       // non riprovava mai da sola in caso di intoppo — falliva un colpo solo e la modifica restava solo
       // nel browser finché non si ricaricava la pagina. Ora riprova da sola alcune volte, come già
       // succede per prenotazioni/ospiti/camere.
-      showToast('⚠ Errore di salvataggio su Supabase — nuovo tentativo automatico in corso…');
+      _toastErroreSync(key, err);
       _blobRetryAttempts[key] = (_blobRetryAttempts[key]||0) + 1;
       if (_blobRetryAttempts[key] <= 5) {
         var attesa = Math.min(60000, 5000 * _blobRetryAttempts[key]);
@@ -37651,7 +37659,7 @@ function cpRegistra(testo, payload) {
   var log = DB.get('listinoRegistro') || [];
   var e = { data: new Date().toISOString(), testo: testo }; if (payload) e.cp = payload;
   log.unshift(e);
-  for (var i = 25; i < log.length; i++) { if (log[i].cp) { delete log[i].cp.celle; delete log[i].cp.reg; } } // solo le ultime 25 restano annullabili
+  for (var i = 10; i < log.length; i++) { if (log[i].cp) { delete log[i].cp.celle; delete log[i].cp.reg; } } // solo le ultime 10 restano annullabili
   if (log.length > 300) log = log.slice(0, 300);
   DB.set('listinoRegistro', log);
 }
