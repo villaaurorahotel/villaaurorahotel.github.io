@@ -346,7 +346,7 @@ tr:hover td{background:var(--surface2)}
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
       <span id="utente-corrente-badge" style="display:none;font-size:10.5px;font-weight:700;color:var(--accent);margin-top:2px"></span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 20/11/2026 · 18:30</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 21/11/2026 · 09:00</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -37204,6 +37204,14 @@ function cpApri() {
           '<button class="btn btn-sm" onclick="cpSelRapido(\'mese\')">Tutto il mese</button>' +
           '<button class="btn btn-sm" onclick="cpSelRapido(\'svuota\')">Svuota selezione</button>' +
         '</div>' +
+        '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px;padding:8px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px">' +
+          '<span style="font-size:12px;font-weight:700">Periodo dal</span><input type="date" id="cp-dal" style="padding:4px;font-size:13px">' +
+          '<span style="font-size:12px;font-weight:700">al</span><input type="date" id="cp-al" style="padding:4px;font-size:13px">' +
+          '<span style="display:flex;gap:6px;font-size:12px;flex-wrap:wrap">' + CP_GIORNI.map(function(g,i){ return '<label style="display:flex;gap:2px;align-items:center"><input type="checkbox" class="cp-gs" value="'+i+'" checked style="width:auto;margin:0">'+g+'</label>'; }).join('') + '</span>' +
+          '<button class="btn btn-sm btn-primary" onclick="cpRange(true)">+ Aggiungi periodo</button>' +
+          '<button class="btn btn-sm" onclick="cpRange(false)">− Togli periodo</button>' +
+        '</div>' +
+        '<div id="cp-riepilogo" style="font-size:12px;color:var(--text2);margin-bottom:8px"></div>' +
         '<div id="cp-cal" onmouseleave="cp.trascina=false"></div>' +
         '<div style="font-size:11.5px;color:var(--text3);margin-top:6px">Clic su un giorno per sceglierlo, trascina per sceglierne più di fila, Maiusc+clic per un intervallo. ✎ = modificato di recente · 🔒 = chiuso.</div>' +
       '</div>' +
@@ -37362,6 +37370,35 @@ function cpSelRapido(tipo) {
   }
   cpDisegna(); cpPanel();
 }
+function cpRange(aggiungi) {
+  var a = document.getElementById('cp-dal').value, b = document.getElementById('cp-al').value;
+  if (!a) { showToast('Scegli la data di inizio'); return; }
+  if (!b) b = a;
+  if (b < a) { var x = a; a = b; b = x; }
+  var gs = {}; document.querySelectorAll('.cp-gs').forEach(function(c){ if (c.checked) gs[c.value] = true; });
+  var n = 0;
+  getDatesInRange(a, b).forEach(function(ds) {
+    if (!gs[cpDow(ds)]) return;
+    if (aggiungi) cp.sel[ds] = true; else delete cp.sel[ds]; n++;
+  });
+  if (!n) showToast('Nessun giorno nel periodo con i giorni della settimana scelti');
+  cp.mese = a.slice(0, 7);
+  cp.ancora = '';
+  document.getElementById('cp-dal').value = ''; document.getElementById('cp-al').value = '';
+  cpDisegna(); cpPanel();
+}
+function cpRiepilogoTesto() {
+  var gg = cpGiorniScelti(); if (!gg.length) return '';
+  var out = [], ini = gg[0], prev = gg[0];
+  function chiudi() { out.push(ini === prev ? fmtDate(ini) : fmtDate(ini) + ' → ' + fmtDate(prev)); }
+  for (var i = 1; i < gg.length; i++) {
+    var d = (parseLD(gg[i]) - parseLD(prev)) / 86400000;
+    if (d === 1) { prev = gg[i]; } else { chiudi(); ini = prev = gg[i]; }
+  }
+  chiudi();
+  return '<b>Giorni scelti:</b> ' + (out.length > 12 ? out.slice(0, 12).join(' · ') + ' · … (+' + (out.length - 12) + ' periodi)' : out.join(' · '));
+}
+
 function cpGiorniScelti() { return Object.keys(cp.sel).sort(); }
 function cpAzCambiata() { var im = document.getElementById('cp-az').value === 'imposta'; var u = document.getElementById('cp-unit'); if (im) u.value = '€'; u.disabled = im || cpEDerivata(); cpAnteprima(); }
 
@@ -37396,6 +37433,7 @@ function cpPanel() {
   var gg = cpGiorniScelti(), c = document.getElementById('cp-count'); if (!c) return;
   c.textContent = gg.length ? (gg.length + (gg.length === 1 ? ' giorno scelto' : ' giorni scelti')) : 'Scegli i giorni sul calendario';
   var b = document.getElementById('cp-applica'); if (b) b.textContent = gg.length ? 'Applica ai ' + gg.length + ' giorni scelti' : 'Applica ai giorni scelti';
+  var rp = document.getElementById('cp-riepilogo'); if (rp) rp.innerHTML = cpRiepilogoTesto();
   cpAnteprima(); cpStoria();
 }
 function cpAnteprima() {
