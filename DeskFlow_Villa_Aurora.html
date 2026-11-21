@@ -346,7 +346,7 @@ tr:hover td{background:var(--surface2)}
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
       <span id="utente-corrente-badge" style="display:none;font-size:10.5px;font-weight:700;color:var(--accent);margin-top:2px"></span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 21/11/2026 · 09:30</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 21/11/2026 · 10:00</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -37213,7 +37213,7 @@ function cpApri() {
         '</div>' +
         '<div id="cp-riepilogo" style="font-size:12px;color:var(--text2);margin-bottom:8px"></div>' +
         '<div id="cp-cal" onmouseleave="cp.trascina=false"></div>' +
-        '<div style="font-size:11.5px;color:var(--text3);margin-top:6px">Clic su un giorno per sceglierlo, trascina per sceglierne più di fila, Maiusc+clic per un intervallo. ✎ = modificato di recente · 🔒 = chiuso.</div>' +
+        '<div style="font-size:11.5px;color:var(--text3);margin-top:6px">Scrivi direttamente nel numero di un giorno per cambiare il suo prezzo (Invio per salvare). Clic sul resto della cella per sceglierlo, trascina per sceglierne più di fila, Maiusc+clic per un intervallo. ✎ = modificato di recente · 🔒 = chiuso.</div>' +
       '</div>' +
       '<div style="flex:0 1 340px;min-width:290px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:14px">' +
         '<div id="cp-count" style="font-weight:800;font-size:14px;margin-bottom:10px"></div>' +
@@ -37330,12 +37330,60 @@ function cpDisegna() {
       'title="' + (rc ? 'Modificato il ' + new Date(rc.data).toLocaleDateString('it-IT') + ': ' + cpFmt(rc.a) + ' → ' + cpFmt(rc.b) + ' €' : '') + '" ' +
       'style="cursor:pointer;border:1.5px solid ' + (sel ? 'var(--accent)' : ds === oggi ? 'var(--text2)' : 'var(--border2)') + ';border-radius:8px;padding:5px 4px;min-height:62px;background:' + bg + ';color:' + col + ';position:relative">' +
       '<div style="font-size:11px;opacity:.8;font-weight:700">' + d + (chiuso ? ' 🔒' : '') + '</div>' +
-      '<div style="font-size:15px;font-weight:800;text-align:center;margin-top:4px">' + cpFmt(prezzo) + '</div>' +
+      (cpEDerivata()
+        ? '<div style="font-size:15px;font-weight:800;text-align:center;margin-top:4px">' + cpFmt(prezzo) + '</div>'
+        : '<input type="text" inputmode="decimal" value="' + (prezzo ? String(prezzo).replace('.', ',') : '') + '" placeholder="—" title="Scrivi il prezzo e premi Invio" ' +
+          'onmousedown="event.stopPropagation()" onmouseover="event.stopPropagation()" onclick="event.stopPropagation();this.select()" onkeydown="if(event.key===\'Enter\'){this.blur();}" onchange="cpSalvaCella(\'' + ds + '\',this.value)" ' +
+          'style="width:100%;box-sizing:border-box;font-size:15px;font-weight:800;text-align:center;margin-top:3px;padding:1px 0;border:1px dashed ' + (sel ? '#fff' : 'var(--border2)') + ';border-radius:5px;background:' + (sel ? 'rgba(255,255,255,.2)' : 'rgba(255,255,255,.6)') + ';color:' + col + '">') +
       '<div style="font-size:10px;text-align:center;opacity:.85;min-height:12px">' + (minN ? 'min ' + minN + ' n.' : '') + '</div>' +
       (rc ? '<span style="position:absolute;top:2px;right:4px;font-size:10px">✎</span>' : '') +
       '</div>';
   }
   box.innerHTML = h + '</div>';
+}
+
+// Modifica manuale del prezzo di una singola cella del calendario
+function cpSalvaCella(ds, txt) {
+  txt = String(txt).replace(',', '.').replace(/[^0-9.]/g, '');
+  var v = parseFloat(txt);
+  if (isNaN(v) || v <= 0) { cpDisegna(); return; }
+  v = Math.round(v * 100) / 100;
+  var tid = cp.tariffa, t = cp.tipo, rooms = DB.get('rooms') || [], listino = DB.get('listino') || [];
+  var info = lstCalcolaRiferimentiCelle(rooms), pk = cpPaxPrim(t), rs = cpRoomsDi(t);
+  if (!rs.length) { cpDisegna(); return; }
+  var prima = cpPrezzo(ds, t, tid);
+  if (prima === v) { cpDisegna(); return; }
+  var payload = { tid: tid, giorni: {}, celle: [], reg: [] };
+  function scrivi(room, pkk, nuovo) {
+    var e = listino.find(function(l) { return l.roomId === room.id && (l.tariffaId || 'standard') === tid; });
+    if (!e) { e = { roomId: room.id, tariffaId: tid, prezzi: {}, periodi: [] }; listino.push(e); }
+    if (!e.periodi) e.periodi = [];
+    var pd = e.periodi.find(function(p) { return p.dal === ds && p.al === ds; });
+    if (!pd) { pd = { dal: ds, al: ds, prezzi: {} }; e.periodi.push(pd); }
+    var vecchio = (pd.prezzi[pkk] !== undefined && pd.prezzi[pkk] !== '') ? pd.prezzi[pkk] : null;
+    pd.prezzi[pkk] = nuovo;
+    payload.celle.push([room.id, ds, pkk, vecchio, nuovo]);
+  }
+  if (t === info.masterType && pk === 'PAX2') {
+    // Standard 2 persone: ricalcola a catena le altre tipologie come nel resto del calendario
+    var cat = cpCatena(v);
+    rs.forEach(function(r) { scrivi(r, 'PAX2', v); });
+    Object.keys(cat.info.cellRef).forEach(function(k) {
+      var c = cat.info.cellRef[k]; if (cat.valore[k] == null || !cat.off(c.t, c.pk).salvato) return;
+      cpRoomsDi(c.t).forEach(function(r) { scrivi(r, c.pk, cat.valore[k]); });
+    });
+  } else {
+    rs.forEach(function(r) { scrivi(r, pk, v); }); // solo questa tipologia/fascia
+  }
+  payload.giorni[ds] = [prima, v];
+  DB.set('listino', listino);
+  avvisaHostexSubito(); avvisaHostexRestrizioniSubito();
+  if (typeof avvisaHostexPrezziSubito === 'function') avvisaHostexPrezziSubito();
+  var tarNome = (getTariffaObj(tid) || {}).nome || tid;
+  cpRegistra('✏️ <strong>' + tarNome + '</strong> · ' + t + ' · ' + fmtDate(ds) + ': ' + cpFmt(prima) + ' → ' + cpFmt(v) + ' €', payload);
+  showToast('Prezzo aggiornato');
+  cpRinfresca();
+  if (typeof renderListino === 'function') renderListino();
 }
 
 function cpMeseVai(delta) {
