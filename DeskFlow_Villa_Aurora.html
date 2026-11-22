@@ -346,7 +346,7 @@ tr:hover td{background:var(--surface2)}
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
       <span id="utente-corrente-badge" style="display:none;font-size:10.5px;font-weight:700;color:var(--accent);margin-top:2px"></span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 22/11/2026 · 21:30</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 22/11/2026 · 22:15</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -17361,7 +17361,7 @@ function lstPropagaDaStandard(rId, pk, v, context) {
   var rooms = DB.get('rooms') || [];
   var room = rooms.find(function(r){ return r.id === rId; });
   if (!room) return false;
-  var info = lstCalcolaRiferimentiCelle(rooms);
+  var info = cpInfo(rooms);
   if (normCatType(room.type) !== info.masterType || pk !== 'PAX2') return false;
   if (!Object.keys(info.cellRef).length) return false; // nessun'altra tipologia da aggiornare
 
@@ -17394,6 +17394,7 @@ function lstPropagaDaStandard(rId, pk, v, context) {
     var c = info.cellRef[chiave];
     var prezzo = valore[chiave];
     if (prezzo == null) return;
+    if (c.master && !scostamenti.some(function(x){ return x.tipo===c.t && x.pax===c.pk; })) return; // fasce di Standard: solo se hai già salvato lo scostamento
     var targetRooms = rooms.filter(function(r){ return normCatType(r.type) === c.t; });
     targetRooms.forEach(function(troom){
       var e = lst.find(function(l){ return l.roomId===troom.id && (l.tariffaId||'standard')===lstTariffaId; });
@@ -37263,10 +37264,24 @@ var cp = { mese:'', tipo:'', tariffa:'standard', sel:{}, ancora:'', trascina:fal
 var CP_GIORNI = ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'];
 var CP_MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 
+// Come lstCalcolaRiferimentiCelle, ma include anche le fasce 1/3/4 persone di Standard (la tipologia base):
+// quella funzione le salta, per questo cambiando il prezzo della doppia Standard non si aggiornavano.
+// Ogni fascia scosta dalla propria 2 Pax (la 4 Pax dalla 3 Pax), come nella maschera "Aggiornamento Massivo".
+function cpInfo(rooms) {
+  var info = lstCalcolaRiferimentiCelle(rooms), t = info.masterType, cellRef = {};
+  Object.keys(info.cellRef).forEach(function(k) { cellRef[k] = info.cellRef[k]; });
+  var maxCap = lstMaxCapOf(t, rooms), prim = lstPaxPrimario(t, rooms);
+  for (var p = 1; p <= maxCap; p++) {
+    var pk = 'PAX' + p; if (pk === prim) continue;
+    cellRef[t + '|' + pk] = { t: t, pk: pk, refType: t, refPax: (pk === 'PAX4') ? 'PAX3' : prim, master: true };
+  }
+  return { types: info.types, masterType: t, cellRef: cellRef };
+}
+
 function cpApri() {
   var rooms = DB.get('rooms') || [];
   if (!rooms.length) { showToast('Non ci sono ancora camere'); return; }
-  var info = lstCalcolaRiferimentiCelle(rooms);
+  var info = cpInfo(rooms);
   cp.tipi = info.types; cp.master = info.masterType;
   if (cp.tipi.indexOf(cp.tipo) < 0) cp.tipo = info.masterType;
   cp.tariffa = 'standard';
@@ -37445,7 +37460,7 @@ function cpSalvaCella(ds, txt) {
   v = Math.round(v * 100) / 100;
   cpSalvaSuppl(true);
   var tid = cp.tariffa, t = cp.tipo, rooms = DB.get('rooms') || [], listino = DB.get('listino') || [];
-  var info = lstCalcolaRiferimentiCelle(rooms), pk = cpPaxPrim(t), rs = cpRoomsDi(t);
+  var info = cpInfo(rooms), pk = cpPaxPrim(t), rs = cpRoomsDi(t);
   if (!rs.length) { cpDisegna(); return; }
   var prima = cpPrezzo(ds, t, tid);
   if (prima === v) { cpDisegna(); return; }
@@ -37487,7 +37502,7 @@ function cpSalvaCella(ds, txt) {
 // ogni cambio prezzo fatto dal calendario li usa per ricalcolare 1, 3 e 4 persone.
 function cpSuppl() {
   var box = document.getElementById('cp-suppl'); if (!box) return;
-  var info = lstCalcolaRiferimentiCelle(DB.get('rooms') || []), sc = DB.get('listinoScostamenti') || [];
+  var info = cpInfo(DB.get('rooms') || []), sc = DB.get('listinoScostamenti') || [];
   var chiavi = Object.keys(info.cellRef).filter(function(k) { return info.cellRef[k].t === cp.tipo; }).sort();
   if (!chiavi.length) { box.innerHTML = ''; return; }
   var nessuno = chiavi.every(function(k) { var c = info.cellRef[k]; return !sc.find(function(x) { return x.tipo === c.t && x.pax === c.pk; }); });
@@ -37535,7 +37550,7 @@ function cpRiallinea() {
   if (!gg.length) { showToast('Scegli prima i giorni da riallineare'); return; }
   if (cpEDerivata()) { showToast('Scegli la tariffa Standard per riallineare i prezzi'); return; }
   cpSalvaSuppl(true);
-  var rooms = DB.get('rooms') || [], listino = DB.get('listino') || [], info = lstCalcolaRiferimentiCelle(rooms);
+  var rooms = DB.get('rooms') || [], listino = DB.get('listino') || [], info = cpInfo(rooms);
   var masterRooms = cpRoomsDi(info.masterType), tid = cp.tariffa;
   var payload = { tid: tid, giorni: {}, celle: [], reg: [] }, toccati = 0, saltati = 0;
   if (!masterRooms.length) return;
@@ -37644,7 +37659,7 @@ function cpNuovoBase(p0) {
 }
 // Catena: dato il nuovo prezzo base, valori di tutte le celle (solo quelle con scostamento salvato verranno poi scritte)
 function cpCatena(baseNuova) {
-  var rooms = DB.get('rooms') || [], info = lstCalcolaRiferimentiCelle(rooms), sc = DB.get('listinoScostamenti') || [];
+  var rooms = DB.get('rooms') || [], info = cpInfo(rooms), sc = DB.get('listinoScostamenti') || [];
   var valore = {}; valore[info.masterType + '|PAX2'] = baseNuova;
   function off(t, pk) { var s = sc.find(function(x) { return x.tipo === t && x.pax === pk; }); return s ? { valore: s.valore, unita: s.unita || '€', salvato: true } : { valore: 0, unita: '€', salvato: false }; }
   var cambiato = true, giri = 0;
@@ -37674,7 +37689,7 @@ function cpAnteprima() {
   var haPrezzo = !cpEDerivata() && document.getElementById('cp-val').value !== '';
   if (!haPrezzo) { box.innerHTML = '<div style="padding:8px;color:var(--text3)">Scrivi un prezzo per vedere l\'anteprima (oppure cambia solo minimo notti / chiusura).</div>'; return; }
   var t = cp.tipo, pkP = cpPaxPrim(t), cell = t + '|' + pkP, rooms = DB.get('rooms') || [];
-  var info = lstCalcolaRiferimentiCelle(rooms), rm = cpRoomsDi(info.masterType)[0];
+  var info = cpInfo(rooms), rm = cpRoomsDi(info.masterType)[0];
   box.innerHTML = gg.slice(0, 80).map(function(ds, i) {
     var p0m = rm ? getPrezzoListinoDiretto(rm.id, 2, ds, cp.tariffa) : 0, nb = cpNuovoBase(p0m);
     var prima = cpPrezzo(ds, t, cp.tariffa), dopo = null;
@@ -37725,7 +37740,7 @@ async function cpApplica() {
   if (!vuolePrezzo && !vuoleMin && !vuoleChi) { showToast('Scrivi un prezzo, un minimo di notti o scegli una chiusura'); return; }
 
   if (vuolePrezzo) cpSalvaSuppl(true); // salva i supplementi mostrati a destra, così 1/3/4 persone seguono sempre la doppia
-  var rooms = DB.get('rooms') || [], listino = DB.get('listino') || [], info = lstCalcolaRiferimentiCelle(rooms);
+  var rooms = DB.get('rooms') || [], listino = DB.get('listino') || [], info = cpInfo(rooms);
   var masterRooms = cpRoomsDi(info.masterType), regole = getRegoleTipo();
   var payload = { tid: tid, giorni: {}, celle: [], reg: [] };
   var saltati = 0, toccati = 0;
