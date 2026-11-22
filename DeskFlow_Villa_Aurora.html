@@ -346,7 +346,7 @@ tr:hover td{background:var(--surface2)}
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
       <span id="utente-corrente-badge" style="display:none;font-size:10.5px;font-weight:700;color:var(--accent);margin-top:2px"></span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 22/11/2026 · 09:05</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 22/11/2026 · 11:30</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -393,7 +393,6 @@ tr:hover td{background:var(--surface2)}
   <div class="nav-item" onclick="navigate('emailmassiva')" data-page="emailmassiva">📧 Email massiva</div>
   <div class="nav-item" onclick="navigate('previsionale')" data-page="previsionale">📈 Previsionale</div>
   <div class="nav-item" onclick="navigate('cassaprev')" data-page="cassaprev">💶 Previsione di cassa</div>
-  <div class="nav-item" onclick="navigate('numeri')" data-page="numeri">🧮 Numeri</div>
   <div class="nav-item" onclick="navigate('report')" data-page="report">📊 Report</div>
   <div class="nav-item" onclick="navigate('reportpasti')" data-page="reportpasti">🍽 Report Pasti</div>
   <div class="nav-section">Impostazioni</div>
@@ -471,7 +470,6 @@ tr:hover td{background:var(--surface2)}
   <div id="page-biancheria" class="page"></div>
   <div id="page-previsionale" class="page"></div>
   <div id="page-cassaprev" class="page"></div>
-  <div id="page-numeri" class="page"></div>
   <div id="page-report" class="page"></div>
   <div id="page-reportpasti" class="page"></div>
   <div id="page-extra" class="page"></div>
@@ -11652,7 +11650,7 @@ function navigate(page){
     dashboard:renderDashboard,calendario:renderCalendario,prenotazioni:renderPrenotazioni,gruppi:renderGruppiEventi,fatture:renderFatture,recensioni:renderRecensioni,messaggi:renderMessaggi,mobilecheckin:renderMobileCheckin,wamassivo:renderWaMassivo,emailmassiva:renderEmailMassiva,
     checkin:renderCheckin,checkout:renderCheckout,'arrivi-partenze':renderArriviPartenze,checkineffettuati:renderCheckinEffettuati,checkouteffettuati:renderCheckoutEffettuati,effettuati:renderEffettuati,planner:renderPlanner,contidasaldare:renderContiDaSaldare,corrispettivi:renderCorrispettiviPage,condizioni:renderCondizioni,revenue:renderRevenue,camere:renderCamere,ospiti:renderOspiti,archivioospiti:renderArchivioOspiti,guidaospiti:renderGuidaOspiti,
     listino:renderListino,livelli:renderLivelliTariffari,tipologie:renderTipologie,tassasoggiorno:renderTassaSoggiorno,preventivi:renderPreventivi,addebitiextra:renderAddebitiExtra,
-    housekeeping:renderHousekeeping,previsionale:renderPrevisionale,cassaprev:renderPrevisioneCassa,numeri:renderNumeri,report:renderReport,biancheria:renderBiancheria,
+    housekeeping:renderHousekeeping,previsionale:renderPrevisionale,cassaprev:renderPrevisioneCassa,report:renderReport,biancheria:renderBiancheria,
     extra:renderExtra,manutenzione:renderManutenzione,adempimenti:renderAdempimenti,reportpasti:renderReportPasti,
     blacklist:renderBlacklist,ical:renderIcal,impostazioni:renderImpostazioni,
     salvataggio:renderSalvataggio,sitoweb:renderSitoWeb,utenti:renderGestioneUtenti,registro:renderRegistro,statistichesito:renderStatisticheSito
@@ -16566,7 +16564,7 @@ var PAGINE_PERMESSO = {
   planner:'planner', calendario:'calendario', arrivi:'arrivi', 'arrivi-partenze':'arrivi-partenze', housekeeping:'housekeeping', biancheria:'biancheria', puliziamobile:'puliziamobile',
   mobilecheckin:'mobilecheckin', prenotazioni:'prenotazioni', ospiti:'ospiti', archivioospiti:'archivioospiti', preventivi:'preventivi', wamassivo:'wamassivo', emailmassiva:'emailmassiva',
   gruppi:'gruppi', fatture:'fatture', recensioni:'recensioni', messaggi:'messaggi',
-  report:'report', reportpasti:'reportpasti', previsionale:'previsionale', cassaprev:'cassaprev', numeri:'cassaprev', revenue:'revenue',
+  report:'report', reportpasti:'reportpasti', previsionale:'previsionale', cassaprev:'cassaprev', revenue:'revenue',
   corrispettivi:'corrispettivi', contidasaldare:'contidasaldare',
   listino:'listino', livelli:'livelli', tipologie:'tipologie', tassasoggiorno:'tassasoggiorno', camere:'camere',
   manutenzione:'manutenzione',
@@ -37821,14 +37819,9 @@ async function cpAnnulla(idx) {
 
 // ════════════════════════════════════════════════════════════════════════════════════════════
 // PREVISIONE DI CASSA — mese per mese quanti soldi entrano e quanti escono, per vedere in anticipo
-// in quale mese il saldo va sotto zero. Entrate = prenotazioni (automatiche, solo la parte NON ancora
-// incassata, perché quella già incassata è già nel saldo di oggi); commissioni OTA = stima automatica
-// (pagate da te con bonifico); costi per soggiorno = dalla pagina "🧮 Numeri"; costi fissi, IVA, F24
-// e altro = inseriti a mano. Non include tassa di soggiorno (non è tua).
-// I dati stanno nelle Impostazioni (blob "settings", chiave cassaPrev) e sono condivisi con "🧮 Numeri".
-// Revisione 22/11/2026: (1) non conta più due volte caparre e pagamenti già incassati; (2) aggiunti
-// gli extra; (3) commissioni riconosciute anche se la fonte è scritta diversa (es. "booking");
-// (4) "commissioni già pagate fino al mese"; (5) costi per soggiorno (pulizie, biancheria, kit).
+// in quale mese il saldo va sotto zero. Entrate = prenotazioni (automatiche); commissioni OTA = stima
+// automatica (pagate da te con bonifico); costi fissi, IVA, F24 e altro = inseriti a mano.
+// Non include tassa di soggiorno (non è tua). I dati stanno nelle Impostazioni (blob "settings").
 // ════════════════════════════════════════════════════════════════════════════════════════════
 var CASSA_TIPI = {
   fisso:   { l: 'Costo fisso mensile', uscita: true },
@@ -37846,17 +37839,10 @@ function cassaGet() {
   if (!c.meseIncasso) c.meseIncasso = 'checkin';
   if (!c.meseComm) c.meseComm = 'successivo';
   if (!c.inizio) c.inizio = today().slice(0, 7);
-  if (c.commPagateFino === undefined) c.commPagateFino = '';
-  if (c.passateIncassate === undefined) c.passateIncassate = true;
-  if (!c.costi) c.costi = { pulizia: 0, biancheria: 0, kit: 0, perNotte: 0 };
-  if (!c.budget) c.budget = {};
-  if (c.unita === undefined) c.unita = 0; // 0 = conta le camere/unità presenti nel PMS
+  if (!c.anno) c.anno = parseInt(c.inizio.slice(0, 4));
   return c;
 }
-function cassaSalva(c) {
-  var s = DB.getObj('settings', {}) || {}; s.cassaPrev = c; DB.setObj('settings', s);
-  if (typeof forceSyncSettingsNow === 'function') { try { forceSyncSettingsNow(); } catch (e) {} }
-}
+function cassaSalva(c) { var s = DB.getObj('settings', {}) || {}; s.cassaPrev = c; DB.setObj('settings', s); }
 function cassaMesi(inizio, n) {
   var p = inizio.split('-'), out = [];
   for (var i = 0; i < n; i++) { var d = new Date(+p[0], +p[1] - 1 + i, 1); out.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')); }
@@ -37865,63 +37851,20 @@ function cassaMesi(inizio, n) {
 function cassaMeseSucc(m) { return cassaMesi(m, 2)[1]; }
 function cassaEsc(t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
 
-// ── Funzioni comuni a Previsione di cassa e Numeri ──
-// Prenotazione da contare? (non cancellata, non bozza, non esclusa dai conteggi, con date)
-function numValida(b) {
-  if (!b || !b.checkin || !b.checkout || b.escludiConteggi) return false;
-  var st = String(b.status || '').toLowerCase();
-  return st !== 'cancellata' && st !== 'cancelled' && st !== 'bozza';
-}
-// Nome "pulito" del canale: Booking/booking.com/BOOKING → "Booking.com" ecc.; vuoto → "Diretto"
-function numCanale(src) {
-  var s = String(src || '').trim(), l = s.toLowerCase();
-  if (!s) return 'Diretto';
-  if (l.indexOf('booking') >= 0) return 'Booking.com';
-  if (l.indexOf('airbnb') >= 0) return 'Airbnb';
-  if (l.indexOf('expedia') >= 0) return 'Expedia';
-  return s;
-}
-function numCommPct(c, src) { var v = parseFloat(c.comm[numCanale(src)]); return v > 0 ? v : 0; }
-function numExtra(b) { return (b.extras || []).reduce(function(s, ex) { return s + (Number(ex.totale) || 0); }, 0); }
-// Costi che sostieni per ogni soggiorno (pulizia, biancheria, kit una volta + consumi per notte)
-function numCostoSoggiorno(c, b) {
-  var k = c.costi || {}, n = Math.max(1, nights(b.checkin, b.checkout));
-  return (parseFloat(k.pulizia) || 0) + (parseFloat(k.biancheria) || 0) + (parseFloat(k.kit) || 0) + (parseFloat(k.perNotte) || 0) * n;
-}
-// Quanto hai GIÀ incassato di soggiorno+extra (caparra + pagamenti registrati nel Conto)
-function numGiaIncassato(b, totMio) {
-  if (b.pagato === 'si') return totMio;
-  var pag = (b.pagamenti || []).reduce(function(s, p) { return s + (parseFloat(p.importo) || 0); }, 0);
-  return Math.min(totMio, (parseFloat(b.caparra) || 0) + pag);
-}
-function numCostiFissiMese(c, m) {
-  return c.voci.reduce(function(s, v) { var al = v.al || v.dal; return (v.tipo === 'fisso' && v.dal && m >= v.dal && m <= al) ? s + (parseFloat(v.importo) || 0) : s; }, 0);
-}
-
-function cassaCalcola() {
-  var c = cassaGet(), mesi = cassaMesi(c.inizio, 12), oggi = today();
-  var righe = { entrate: {}, altreEntrate: {}, comm: {}, costiSogg: {}, fisso: {}, iva: {}, f24: {}, altro: {} };
+function cassaCalcola(inizioOpt) {
+  var c = cassaGet(), mesi = cassaMesi(inizioOpt || c.inizio, 12);
+  var righe = { entrate: {}, altreEntrate: {}, comm: {}, fisso: {}, iva: {}, f24: {}, altro: {} };
   mesi.forEach(function(m) { Object.keys(righe).forEach(function(k) { righe[k][m] = 0; }); });
-  var primo = mesi[0];
   (DB.get('bookings') || []).forEach(function(b) {
-    if (!numValida(b)) return;
-    var sogg = parseFloat(b.totalPrice || 0) || 0, totMio = sogg + numExtra(b);
-    // 1) Incasso: solo quello che manca da incassare (il resto è già nel saldo di oggi)
-    var giaPassata = b.checkout < oggi;
-    var residuo = (giaPassata && c.passateIncassate) ? 0 : Math.max(0, totMio - numGiaIncassato(b, totMio));
-    if (residuo > 0) {
-      var m = (c.meseIncasso === 'checkout' ? b.checkout : b.checkin).slice(0, 7);
-      if (m < primo) m = primo; // soggiorno già iniziato ma non ancora saldato → lo incassi adesso
-      if (righe.entrate[m] !== undefined) righe.entrate[m] += residuo;
+    if (!b || b.status === 'cancellata' || b.escludiConteggi) return;
+    var tot = parseFloat(b.totalPrice || 0); if (!(tot > 0)) return;
+    var m = (c.meseIncasso === 'checkout' ? b.checkout : b.checkin || '').slice(0, 7);
+    if (righe.entrate[m] !== undefined) righe.entrate[m] += tot;
+    var pct = parseFloat(c.comm[b.source]);
+    if (pct > 0) {
+      var mc = c.meseComm === 'successivo' ? cassaMeseSucc((b.checkout || b.checkin || '').slice(0, 7)) : (b.checkout || b.checkin || '').slice(0, 7);
+      if (righe.comm[mc] !== undefined) righe.comm[mc] += tot * pct / 100;
     }
-    // 2) Commissione OTA (sul soggiorno), nel mese in cui la paghi
-    var pct = numCommPct(c, b.source);
-    if (pct > 0 && sogg > 0) {
-      var mco = b.checkout.slice(0, 7), mc = c.meseComm === 'successivo' ? cassaMeseSucc(mco) : mco;
-      if (!(c.commPagateFino && mc <= c.commPagateFino) && righe.comm[mc] !== undefined) righe.comm[mc] += sogg * pct / 100;
-    }
-    // 3) Costi per soggiorno (pulizie, biancheria, kit…): solo soggiorni non ancora finiti, nel mese del check-out
-    if (!giaPassata) { var mk = b.checkout.slice(0, 7); if (mk < primo) mk = primo; if (righe.costiSogg[mk] !== undefined) righe.costiSogg[mk] += numCostoSoggiorno(c, b); }
   });
   c.voci.forEach(function(v) {
     var imp = parseFloat(v.importo) || 0, dal = v.dal, al = v.al || v.dal; if (!dal) return;
@@ -37931,7 +37874,7 @@ function cassaCalcola() {
   var saldo = parseFloat(c.saldoIniziale) || 0, out = [];
   mesi.forEach(function(m) {
     var ent = righe.entrate[m] + righe.altreEntrate[m];
-    var usc = righe.comm[m] + righe.costiSogg[m] + righe.fisso[m] + righe.iva[m] + righe.f24[m] + righe.altro[m];
+    var usc = righe.comm[m] + righe.fisso[m] + righe.iva[m] + righe.f24[m] + righe.altro[m];
     saldo += ent - usc; out.push({ m: m, ent: ent, usc: usc, mov: ent - usc, saldo: saldo });
   });
   return { c: c, mesi: mesi, righe: righe, tot: out };
@@ -37947,40 +37890,31 @@ function renderPrevisioneCassa() {
   var avviso = primoNeg
     ? '<div style="background:#fde2e2;color:#a61e1e;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-weight:700">⚠ A <b>' + cassaMeseTesto(primoNeg.m) + '</b> il saldo va sotto zero: ' + fmtCurrency(primoNeg.saldo) + '. Il punto più basso è a ' + cassaMeseTesto(minimo.m) + ' (' + fmtCurrency(minimo.saldo) + '). Meglio parlarne con la banca per tempo.</div>'
     : '<div style="background:#e3f6e8;color:#1b6b34;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-weight:700">✓ Nei prossimi 12 mesi il saldo resta sopra zero. Punto più basso: ' + cassaMeseTesto(minimo.m) + ' (' + fmtCurrency(minimo.saldo) + ').</div>';
-  var costiVuoti = !((c.costi.pulizia || 0) + (c.costi.biancheria || 0) + (c.costi.kit || 0) + (c.costi.perNotte || 0));
-  var fissiVuoti = !c.voci.some(function(v) { return v.tipo === 'fisso'; });
-  var promemoria = (costiVuoti || fissiVuoti)
-    ? '<div style="background:#fff6dc;color:#7a5600;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px">💡 Per una previsione affidabile mancano: ' + [fissiVuoti ? 'i <b>costi fissi</b> (qui sotto)' : '', costiVuoti ? 'i <b>costi per soggiorno</b> (pulizie, biancheria… nella pagina <a href="#" onclick="navigate(\'numeri\');return false">🧮 Numeri</a>)' : ''].filter(Boolean).join(' e ') + '.</div>'
-    : '';
   function riga(label, k, segno, colore, nota) {
-    return '<tr><td style="padding:5px 8px;white-space:nowrap;font-weight:600;position:sticky;left:0;background:var(--surface)"' + (nota ? ' title="' + cassaEsc(nota) + '"' : '') + '>' + label + (nota ? ' <span style="color:var(--text3);font-weight:400">ⓘ</span>' : '') + '</td>' +
+    return '<tr><td style="padding:5px 8px;white-space:nowrap;font-weight:600;position:sticky;left:0;background:var(--surface)"' + (nota ? ' title="' + cassaEsc(nota) + '"' : '') + '>' + label + '</td>' +
       r.mesi.map(function(m) { var v = r.righe[k][m]; return '<td style="padding:5px 8px;text-align:right;color:' + (v ? colore : 'var(--text3)') + '">' + (v ? (segno < 0 ? '−' : '') + cassaNum(v) : '—') + '</td>'; }).join('') + '</tr>';
   }
   var th = '<tr><th style="padding:6px 8px;text-align:left;position:sticky;left:0;background:var(--surface2)"></th>' + r.mesi.map(function(m) { return '<th style="padding:6px 8px;text-align:right;background:var(--surface2);white-space:nowrap">' + cassaMeseTesto(m) + '</th>'; }).join('') + '</tr>';
   var tabella =
     '<div style="overflow-x:auto;border:1px solid var(--border2);border-radius:8px"><table style="border-collapse:collapse;font-size:13px;width:100%">' + th +
-    riga('Prenotazioni (da incassare)', 'entrate', 1, 'var(--green)', 'Soggiorno + extra ancora da incassare. Caparre e pagamenti già registrati non sono contati: sono già nel saldo di oggi. Senza tassa di soggiorno') +
+    riga('Prenotazioni (incassi)', 'entrate', 1, 'var(--green)', 'Soggiorno di tutte le prenotazioni non cancellate, senza tassa di soggiorno') +
     riga('Altre entrate', 'altreEntrate', 1, 'var(--green)') +
     riga('Commissioni OTA (stima)', 'comm', -1, '#a61e1e', 'Pagate da te con bonifico — calcolate con le percentuali qui sotto') +
-    riga('Costi per soggiorno', 'costiSogg', -1, '#a61e1e', 'Pulizie, biancheria, kit e consumi — si impostano nella pagina Numeri') +
     riga('Costi fissi', 'fisso', -1, '#a61e1e') + riga('IVA', 'iva', -1, '#a61e1e') + riga('F24 / imposte', 'f24', -1, '#a61e1e') + riga('Altri costi', 'altro', -1, '#a61e1e') +
     '<tr style="border-top:2px solid var(--border2)"><td style="padding:6px 8px;font-weight:700;position:sticky;left:0;background:var(--surface)">Movimento del mese</td>' + r.tot.map(function(x) { return '<td style="padding:6px 8px;text-align:right;font-weight:700;color:' + (x.mov < 0 ? '#a61e1e' : 'var(--text1)') + '">' + (x.mov < 0 ? '−' : '') + cassaNum(Math.abs(x.mov)) + '</td>'; }).join('') + '</tr>' +
     '<tr><td style="padding:8px;font-weight:800;position:sticky;left:0;background:var(--surface)">Saldo a fine mese</td>' + r.tot.map(function(x) { return '<td style="padding:8px;text-align:right;font-weight:800;background:' + (x.saldo < 0 ? '#fde2e2' : '#e9f7ee') + ';color:' + (x.saldo < 0 ? '#a61e1e' : '#1b6b34') + '">' + (x.saldo < 0 ? '−' : '') + cassaNum(Math.abs(x.saldo)) + '</td>'; }).join('') + '</tr></table></div>';
-  var lab = 'style="font-size:12px;font-weight:700;display:block"';
   var imp = '<div class="card" style="margin-top:16px"><div class="card-header"><span class="card-title">⚙ Impostazioni</span></div><div class="modal-body" style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end">' +
-    '<div><label ' + lab + '>Parti dal mese</label><input type="month" value="' + c.inizio + '" onchange="cassaImp(\'inizio\',this.value)" style="padding:5px"></div>' +
-    '<div><label ' + lab + '>Saldo sul conto oggi (€) <span style="font-weight:400;color:var(--text3)">solo la parte tua</span></label><input type="number" step="0.01" value="' + c.saldoIniziale + '" onchange="cassaImp(\'saldoIniziale\',parseFloat(this.value)||0)" style="padding:5px;width:130px"></div>' +
-    '<div><label ' + lab + '>Incasso delle prenotazioni nel mese di</label><select onchange="cassaImp(\'meseIncasso\',this.value)" style="padding:5px"><option value="checkin"' + (c.meseIncasso === 'checkin' ? ' selected' : '') + '>Check-in</option><option value="checkout"' + (c.meseIncasso === 'checkout' ? ' selected' : '') + '>Check-out</option></select></div>' +
-    '<div><label ' + lab + '>Soggiorni già finiti</label><select onchange="cassaImp(\'passateIncassate\',this.value===\'si\')" style="padding:5px"><option value="si"' + (c.passateIncassate ? ' selected' : '') + '>Già incassati (sono nel saldo)</option><option value="no"' + (!c.passateIncassate ? ' selected' : '') + '>Guarda i pagamenti registrati</option></select></div>' +
-    '<div><label ' + lab + '>Paghi le commissioni OTA</label><select onchange="cassaImp(\'meseComm\',this.value)" style="padding:5px"><option value="successivo"' + (c.meseComm === 'successivo' ? ' selected' : '') + '>Il mese dopo il check-out</option><option value="stesso"' + (c.meseComm === 'stesso' ? ' selected' : '') + '>Nel mese del check-out</option></select></div>' +
-    '<div><label ' + lab + '>Commissioni già pagate fino a <span style="font-weight:400;color:var(--text3)">(vuoto = nessuna)</span></label><input type="month" value="' + (c.commPagateFino || '') + '" onchange="cassaImp(\'commPagateFino\',this.value)" style="padding:5px"></div>' +
-    '<div><label ' + lab + '>Commissione OTA %</label><div style="display:flex;gap:8px">' +
-      Object.keys(c.comm).map(function(k) { return '<label style="font-size:12px">' + cassaEsc(k) + ' <input type="number" step="0.1" min="0" value="' + c.comm[k] + '" onchange="cassaComm(\'' + cassaEsc(k) + '\',this.value)" style="width:58px;padding:4px"></label>'; }).join('') + '</div></div>' +
+    '<div><label style="font-size:12px;font-weight:700;display:block">Parti dal mese</label><input type="month" value="' + c.inizio + '" onchange="cassaImp(\'inizio\',this.value)" style="padding:5px"></div>' +
+    '<div><label style="font-size:12px;font-weight:700;display:block">Saldo sul conto oggi (€) <span style="font-weight:400;color:var(--text3)">solo la parte tua</span></label><input type="number" step="0.01" value="' + c.saldoIniziale + '" onchange="cassaImp(\'saldoIniziale\',parseFloat(this.value)||0)" style="padding:5px;width:130px"></div>' +
+    '<div><label style="font-size:12px;font-weight:700;display:block">Incasso delle prenotazioni nel mese di</label><select onchange="cassaImp(\'meseIncasso\',this.value)" style="padding:5px"><option value="checkin"' + (c.meseIncasso === 'checkin' ? ' selected' : '') + '>Check-in</option><option value="checkout"' + (c.meseIncasso === 'checkout' ? ' selected' : '') + '>Check-out</option></select></div>' +
+    '<div><label style="font-size:12px;font-weight:700;display:block">Paghi le commissioni OTA</label><select onchange="cassaImp(\'meseComm\',this.value)" style="padding:5px"><option value="successivo"' + (c.meseComm === 'successivo' ? ' selected' : '') + '>Il mese dopo il check-out</option><option value="stesso"' + (c.meseComm === 'stesso' ? ' selected' : '') + '>Nel mese del check-out</option></select></div>' +
+    '<div><label style="font-size:12px;font-weight:700;display:block">Commissione OTA %</label><div style="display:flex;gap:8px">' +
+      Object.keys(c.comm).map(function(k) { return '<label style="font-size:12px">' + k + ' <input type="number" step="0.1" min="0" value="' + c.comm[k] + '" onchange="cassaComm(\'' + k + '\',this.value)" style="width:58px;padding:4px"></label>'; }).join('') + '</div></div>' +
     '</div></div>';
   var voci = '<div class="card" style="margin-top:16px"><div class="card-header"><span class="card-title">✍ Costi, IVA, F24 e altre voci (inseriti da te)</span></div><div class="modal-body">' +
     (c.voci.length ? '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px"><thead><tr style="color:var(--text3);text-align:left"><th style="padding:5px">Cosa</th><th>Tipo</th><th style="text-align:right">Importo €</th><th>Dal mese</th><th>Fino al mese</th><th></th></tr></thead><tbody>' +
       c.voci.map(function(v, i) { return '<tr style="border-top:1px solid var(--border)"><td style="padding:5px">' + cassaEsc(v.nome) + '</td><td>' + (CASSA_TIPI[v.tipo] || CASSA_TIPI.altro).l + '</td><td style="text-align:right">' + fmtCurrency(v.importo) + '</td><td>' + (v.dal || '') + '</td><td>' + (v.al && v.al !== v.dal ? v.al : '<span style="color:var(--text3)">solo quel mese</span>') + '</td><td style="text-align:right"><button class="btn btn-sm" onclick="cassaVoceElimina(' + i + ')">✕</button></td></tr>'; }).join('') + '</tbody></table>'
-      : '<div style="font-size:12.5px;color:var(--text3);margin-bottom:10px">Nessuna voce inserita. Aggiungi qui stipendi, affitti, utenze, IVA e F24: ogni voce va nel mese (o nei mesi) che indichi. I "Costi fissi mensili" servono anche alla pagina 🧮 Numeri per il punto di pareggio.</div>') +
+      : '<div style="font-size:12.5px;color:var(--text3);margin-bottom:10px">Nessuna voce inserita. Aggiungi qui stipendi, affitti, utenze, IVA e F24: ogni voce va nel mese (o nei mesi) che indichi.</div>') +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;padding:10px;background:var(--surface2);border-radius:8px">' +
       '<div><label style="font-size:11px;font-weight:700;display:block">Cosa</label><input type="text" id="cv-nome" placeholder="es. Stipendio, Rata IVA" style="padding:5px;width:170px"></div>' +
       '<div><label style="font-size:11px;font-weight:700;display:block">Tipo</label><select id="cv-tipo" style="padding:5px">' + Object.keys(CASSA_TIPI).map(function(k) { return '<option value="' + k + '">' + CASSA_TIPI[k].l + '</option>'; }).join('') + '</select></div>' +
@@ -37989,10 +37923,70 @@ function renderPrevisioneCassa() {
       '<div><label style="font-size:11px;font-weight:700;display:block">Fino al mese <span style="font-weight:400">(vuoto = solo quel mese)</span></label><input type="month" id="cv-al" style="padding:5px"></div>' +
       '<button class="btn btn-primary" onclick="cassaVoceAggiungi()">+ Aggiungi</button></div>' +
     '</div></div>';
-  el.innerHTML = '<div class="page-header"><div><div class="page-title">💶 Previsione di cassa</div><div class="page-subtitle">Quanti soldi tuoi avrai, mese per mese — per accorgerti in anticipo di un mese in rosso</div></div><div><button class="btn btn-sm" onclick="navigate(\'numeri\')">🧮 Vai ai Numeri</button></div></div>' +
-    '<div class="page-content">' + avviso + promemoria + tabella +
-    '<div style="font-size:11.5px;color:var(--text3);margin-top:6px">Entrate = soggiorno + extra ancora da incassare (senza tassa di soggiorno; caparre e pagamenti già registrati non si contano, sono già nel saldo). Commissioni OTA = stima con le percentuali sotto. IVA, F24 e costi fissi li inserisci tu.</div>' + imp + voci + '</div>';
+  el.innerHTML = '<div class="page-header"><div><div class="page-title">💶 Previsione di cassa</div><div class="page-subtitle">Quanti soldi tuoi avrai, mese per mese — per accorgerti in anticipo di un mese in rosso</div></div></div>' +
+    '<div class="page-content"><div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><button class="btn btn-sm" onclick="cassaAnno(-1)">◀</button><div style="font-weight:800;font-size:18px;min-width:70px;text-align:center">' + c.anno + '</div><button class="btn btn-sm" onclick="cassaAnno(1)">▶</button><span style="font-size:12px;color:var(--text3)">cambia anno per programmare: la tabella mostra gennaio–dicembre di quell\'anno</span></div>' + avviso + tabella +
+    '<div style="font-size:11.5px;color:var(--text3);margin-top:6px">Le entrate sono il soggiorno delle prenotazioni confermate (senza tassa di soggiorno). Le commissioni OTA sono una stima con le percentuali sotto. IVA, F24 e costi li inserisci tu.</div>' + cassaBeHtml() + imp + voci + '</div>';
 }
+// ── Anno di programmazione + costo minimo della camera al giorno ──
+function cassaAnno(delta) { var c = cassaGet(); c.anno = (c.anno || parseInt(c.inizio.slice(0, 4))) + delta; c.inizio = c.anno + '-01'; cassaSalva(c); renderPrevisioneCassa(); }
+function cassaBeImp(k, v) { var c = cassaGet(); if (!c.be) c.be = {}; c.be[k] = v; cassaSalva(c); renderPrevisioneCassa(); }
+function cassaBeDefault(c) {
+  var b = c.be || {};
+  return { giorni: b.giorni || 365, camere: b.camere || 0, occ: b.occ || 60, comm: (b.comm === undefined || b.comm === null || b.comm === '') ? null : b.comm,
+    fisso: b.fisso !== false, altro: b.altro !== false, f24: b.f24 !== false, iva: b.iva === true };
+}
+function cassaOccupazioneReale(anno) {
+  var ini = parseLD(anno + '-01-01'), fine = parseLD((anno + 1) + '-01-01'), notti = 0, incasso = 0, rooms = (DB.get('rooms') || []).length;
+  (DB.get('bookings') || []).forEach(function(b) {
+    if (!b || b.status === 'cancellata' || b.escludiConteggi || !b.checkin || !b.checkout) return;
+    var a = parseLD(b.checkin), z = parseLD(b.checkout); if (a < ini) a = ini; if (z > fine) z = fine;
+    var n = Math.round((z - a) / 86400000); if (n <= 0) return;
+    var tot = parseFloat(b.totalPrice || 0), nn = Math.max(1, Math.round((parseLD(b.checkout) - parseLD(b.checkin)) / 86400000));
+    notti += n; incasso += tot * n / nn;
+  });
+  return { notti: notti, incasso: incasso, rooms: rooms };
+}
+function cassaCommMedia() {
+  var c = cassaGet(), tot = 0, comm = 0;
+  (DB.get('bookings') || []).forEach(function(b) {
+    if (!b || b.status === 'cancellata' || b.escludiConteggi) return;
+    var t = parseFloat(b.totalPrice || 0); if (!(t > 0)) return; tot += t; comm += t * (parseFloat(c.comm[b.source]) || 0) / 100;
+  });
+  return tot ? comm / tot * 100 : 0;
+}
+function cassaBeHtml() {
+  var c = cassaGet(), anno = c.anno || parseInt(c.inizio.slice(0, 4)), be = cassaBeDefault(c);
+  var r = cassaCalcola(anno + '-01'), somma = function(k) { return r.mesi.reduce(function(a, m) { return a + r.righe[k][m]; }, 0); };
+  var voci = [['fisso', 'Costi fissi'], ['altro', 'Altri costi'], ['f24', 'F24 / imposte'], ['iva', 'IVA']];
+  var costi = voci.reduce(function(a, v) { return a + (be[v[0]] ? somma(v[0]) : 0); }, 0);
+  var real = cassaOccupazioneReale(anno), camere = be.camere || real.rooms || 1;
+  var disp = camere * be.giorni, commAuto = cassaCommMedia(), comm = be.comm === null ? commAuto : parseFloat(be.comm) || 0;
+  var fmt = function(n) { return isFinite(n) ? n.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'; };
+  var occReale = disp ? real.notti / disp * 100 : 0, adr = real.notti ? real.incasso / real.notti : 0;
+  var perCamGiorno = disp ? costi / disp : 0;
+  function minimo(occ) { var netto = disp && occ ? costi / (disp * occ / 100) : 0; return { netto: netto, lordo: comm < 100 ? netto / (1 - comm / 100) : 0 }; }
+  var m0 = minimo(be.occ);
+  var scen = [30, 40, 50, 60, 70, 80, 90].map(function(o) { var m = minimo(o); return '<tr style="border-top:1px solid var(--border)"><td style="padding:5px 8px">' + o + '%</td><td style="text-align:right;padding:5px 8px">' + fmt(m.netto) + ' €</td><td style="text-align:right;padding:5px 8px;font-weight:700">' + fmt(m.lordo) + ' €</td></tr>'; }).join('');
+  var inclusi = '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px">' + voci.map(function(v) {
+    return '<label style="font-size:12.5px;display:flex;gap:5px;align-items:center"><input type="checkbox" ' + (be[v[0]] ? 'checked' : '') + ' onchange="cassaBeImp(\'' + v[0] + '\',this.checked)" style="width:auto;margin:0"> ' + v[1] + ' <span style="color:var(--text3)">(' + fmtCurrency(somma(v[0])) + ')</span></label>'; }).join('') + '</div>';
+  var campo = function(lab, k, val, extra) { return '<div><label style="font-size:11px;font-weight:700;display:block">' + lab + '</label><input type="number" step="any" value="' + val + '" onchange="cassaBeImp(\'' + k + '\',parseFloat(this.value)||0)" style="padding:5px;width:100px">' + (extra || '') + '</div>'; };
+  return '<div class="card" style="margin-top:16px"><div class="card-header"><span class="card-title">🎯 Costo minimo della camera al giorno — anno ' + anno + '</span></div><div class="modal-body">' +
+    '<div style="font-size:12.5px;color:var(--text2);margin-bottom:8px">Quanto deve costare almeno una camera venduta per coprire le spese dell\'anno. Scegli quali voci contare (l\'IVA di solito si passa al cliente, non è un costo tuo) e a che occupazione vuoi arrivare.</div>' + inclusi +
+    '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px">' +
+      campo('Camere', 'camere', camere, '<div style="font-size:10.5px;color:var(--text3)">nel PMS: ' + real.rooms + '</div>') +
+      campo('Giorni di apertura/anno', 'giorni', be.giorni) +
+      campo('Occupazione prevista %', 'occ', be.occ, '<div style="font-size:10.5px;color:var(--text3)">reale ' + anno + ': ' + occReale.toFixed(0) + '%</div>') +
+      '<div><label style="font-size:11px;font-weight:700;display:block">Commissione OTA media %</label><input type="number" step="0.1" value="' + comm.toFixed(1) + '" onchange="cassaBeImp(\'comm\',parseFloat(this.value)||0)" style="padding:5px;width:100px"><div style="font-size:10.5px;color:var(--text3)">dalle tue prenotazioni: ' + commAuto.toFixed(1) + '%</div></div></div>' +
+    '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">' +
+      '<div style="flex:1 1 200px;background:var(--surface2);border-radius:8px;padding:12px"><div style="font-size:11px;color:var(--text3)">Spese dell\'anno da coprire</div><div style="font-size:20px;font-weight:800">' + fmt(costi) + ' €</div></div>' +
+      '<div style="flex:1 1 200px;background:var(--surface2);border-radius:8px;padding:12px"><div style="font-size:11px;color:var(--text3)">Costo per camera al giorno (tutte vendute)</div><div style="font-size:20px;font-weight:800">' + fmt(perCamGiorno) + ' €</div></div>' +
+      '<div style="flex:1 1 200px;background:#e9f7ee;border-radius:8px;padding:12px"><div style="font-size:11px;color:#1b6b34">Prezzo minimo per notte venduta (occ. ' + be.occ + '%)</div><div style="font-size:20px;font-weight:800;color:#1b6b34">' + fmt(m0.netto) + ' €</div><div style="font-size:11px;color:#1b6b34">con commissioni OTA: <b>' + fmt(m0.lordo) + ' €</b></div></div></div>' +
+    (adr ? '<div style="font-size:12.5px;margin-bottom:10px;padding:8px 10px;border-radius:6px;background:' + (adr >= m0.lordo ? '#e9f7ee' : '#fde2e2') + '">Il tuo prezzo medio reale nel ' + anno + ' è <b>' + fmt(adr) + ' €</b> a notte: ' + (adr >= m0.lordo ? 'sopra' : '<b>sotto</b>') + ' il minimo di ' + fmt(m0.lordo) + ' € (occupazione reale ' + occReale.toFixed(0) + '%).</div>' : '') +
+    '<table style="border-collapse:collapse;font-size:13px;min-width:360px"><thead><tr style="color:var(--text3);text-align:left"><th style="padding:5px 8px">Se riempi le camere al</th><th style="text-align:right;padding:5px 8px">Prezzo minimo netto</th><th style="text-align:right;padding:5px 8px">Prezzo minimo con commissioni</th></tr></thead><tbody>' + scen + '</tbody></table>' +
+    '<div style="font-size:11.5px;color:var(--text3);margin-top:8px">Formula: spese dell\'anno ÷ (camere × giorni di apertura × occupazione). "Con commissioni" divide ancora per (1 − commissione OTA), così dopo la commissione ti resta il minimo. Non include il guadagno: è il prezzo sotto il quale vai in perdita.</div>' +
+    '</div></div>';
+}
+
 function cassaImp(k, v) { var c = cassaGet(); c[k] = v; cassaSalva(c); renderPrevisioneCassa(); }
 function cassaComm(k, v) { var c = cassaGet(); c.comm[k] = parseFloat(v) || 0; cassaSalva(c); renderPrevisioneCassa(); }
 function cassaVoceAggiungi() {
@@ -38003,150 +37997,6 @@ function cassaVoceAggiungi() {
   var c = cassaGet(); c.voci.push({ id: uid(), nome: nome, tipo: tipo, importo: imp, dal: dal, al: al || dal }); cassaSalva(c); renderPrevisioneCassa(); showToast('Voce aggiunta');
 }
 function cassaVoceElimina(i) { var c = cassaGet(); if (!confirm('Togliere "' + c.voci[i].nome + '"?')) return; c.voci.splice(i, 1); cassaSalva(c); renderPrevisioneCassa(); }
-
-// ════════════════════════════════════════════════════════════════════════════════════════════
-// 🧮 NUMERI — i numeri che comandano (idea dal libro "I numeri comandano" di M. Gasparotto):
-// occupazione, prezzo medio, RevPAR, margine vero per canale, punto di pareggio, budget contro reale.
-// Collegata alla Previsione di cassa: usa le stesse commissioni OTA e gli stessi "Costi fissi mensili";
-// i costi per soggiorno impostati qui finiscono anche nella Previsione di cassa.
-// Ricavi e notti sono divisi notte per notte nel mese in cui si dorme (non nel mese dell'incasso).
-// ════════════════════════════════════════════════════════════════════════════════════════════
-var numeriSel = { mese: '', anno: false };
-function numUnita(c) {
-  var u = parseInt(c.unita, 10); if (u > 0) return u;
-  var r = (DB.get('rooms') || []).length; return r > 0 ? r : 1;
-}
-function numGiorniMese(m) { var p = m.split('-'); return new Date(+p[0], +p[1], 0).getDate(); }
-// Calcola tutti i numeri per un elenco di mesi (es. ['2026-11'] oppure i 12 mesi di un anno)
-function numeriCalcola(mesi) {
-  var c = cassaGet(), u = numUnita(c), set = {}; mesi.forEach(function(m) { set[m] = true; });
-  var giorni = mesi.reduce(function(s, m) { return s + numGiorniMese(m); }, 0);
-  var tot = { notti: 0, ricavo: 0, extra: 0, comm: 0, costi: 0, pren: 0 }, canali = {}, perMese = {};
-  mesi.forEach(function(m) { perMese[m] = { notti: 0, ricavo: 0, extra: 0, comm: 0, costi: 0 }; });
-  (DB.get('bookings') || []).forEach(function(b) {
-    if (!numValida(b)) return;
-    var n = nights(b.checkin, b.checkout); if (n <= 0) return;
-    var sogg = parseFloat(b.totalPrice || 0) || 0, ext = numExtra(b), pct = numCommPct(c, b.source), cs = numCostoSoggiorno(c, b);
-    var dentro = 0, d = b.checkin;
-    for (var i = 0; i < n; i++) { var m = d.slice(0, 7); if (set[m]) { dentro++; var pm = perMese[m]; pm.notti++; pm.ricavo += sogg / n; pm.extra += ext / n; pm.comm += sogg * pct / 100 / n; pm.costi += cs / n; } d = addDays(d, 1); }
-    if (!dentro) return;
-    var q = dentro / n, k = numCanale(b.source);
-    var ch = canali[k] || (canali[k] = { pren: 0, notti: 0, ricavo: 0, extra: 0, comm: 0, costi: 0, pct: pct });
-    ch.pren++; ch.notti += dentro; ch.ricavo += sogg * q; ch.extra += ext * q; ch.comm += sogg * pct / 100 * q; ch.costi += cs * q;
-    tot.pren++;
-  });
-  mesi.forEach(function(m) { var pm = perMese[m]; ['notti', 'ricavo', 'extra', 'comm', 'costi'].forEach(function(k) { tot[k] += pm[k]; }); pm.fissi = numCostiFissiMese(c, m); });
-  var fissi = mesi.reduce(function(s, m) { return s + perMese[m].fissi; }, 0);
-  var margine = tot.ricavo + tot.extra - tot.comm - tot.costi;
-  var margNotte = tot.notti ? margine / tot.notti : 0;
-  var disp = u * giorni;
-  var nottiDirette = Object.keys(canali).reduce(function(s, k) { return s + (canali[k].pct > 0 ? 0 : canali[k].notti); }, 0);
-  return {
-    c: c, mesi: mesi, unita: u, giorni: giorni, disp: disp, tot: tot, canali: canali, perMese: perMese, fissi: fissi,
-    occ: disp ? tot.notti / disp * 100 : 0, adr: tot.notti ? tot.ricavo / tot.notti : 0, revpar: disp ? tot.ricavo / disp : 0,
-    margine: margine, margNotte: margNotte, risultato: margine - fissi,
-    pareggio: margNotte > 0 ? Math.ceil(fissi / margNotte) : null,
-    quotaDiretta: tot.notti ? nottiDirette / tot.notti * 100 : 0
-  };
-}
-function numTile(titolo, valore, sotto, colore) {
-  return '<div style="flex:1 1 150px;min-width:140px;background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:12px 14px">' +
-    '<div style="font-size:11.5px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.4px">' + titolo + '</div>' +
-    '<div style="font-size:22px;font-weight:800;margin-top:4px;color:' + (colore || 'var(--text1)') + '">' + valore + '</div>' +
-    (sotto ? '<div style="font-size:11.5px;color:var(--text3);margin-top:2px">' + sotto + '</div>' : '') + '</div>';
-}
-function numPct(v) { return (Math.round(v * 10) / 10).toLocaleString('it-IT') + '%'; }
-function renderNumeri() {
-  var el = document.getElementById('page-numeri'); if (!el) return;
-  if (!numeriSel.mese) numeriSel.mese = today().slice(0, 7);
-  var anno = numeriSel.mese.slice(0, 4);
-  var mesi = numeriSel.anno ? cassaMesi(anno + '-01', 12) : [numeriSel.mese];
-  var r = numeriCalcola(mesi), c = r.c;
-  var nomePeriodo = numeriSel.anno ? 'anno ' + anno : CP_MESI[+numeriSel.mese.slice(5) - 1] + ' ' + anno;
-  var oggiM = today().slice(0, 7), futuro = mesi[mesi.length - 1] >= oggiM;
-
-  // ── Semaforo punto di pareggio ──
-  var sem;
-  if (!r.fissi) sem = '<div style="background:#fff6dc;color:#7a5600;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:13.5px">💡 Per calcolare il <b>punto di pareggio</b> inserisci i tuoi <b>costi fissi mensili</b> nella pagina <a href="#" onclick="navigate(\'cassaprev\');return false">💶 Previsione di cassa</a> (tipo "Costo fisso mensile").</div>';
-  else if (r.pareggio === null) sem = '<div style="background:#fde2e2;color:#a61e1e;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-weight:700">🔴 Nessuna notte con margine positivo in questo periodo: i costi fissi (' + fmtCurrency(r.fissi) + ') non sono coperti.</div>';
-  else {
-    var manca = Math.max(0, r.pareggio - r.tot.notti), ok = manca === 0, quasi = !ok && r.tot.notti >= r.pareggio * 0.7;
-    sem = '<div style="background:' + (ok ? '#e3f6e8' : quasi ? '#fff6dc' : '#fde2e2') + ';color:' + (ok ? '#1b6b34' : quasi ? '#7a5600' : '#a61e1e') + ';border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:14px">' +
-      '<b>' + (ok ? '🟢 In pari' : quasi ? '🟡 Quasi in pari' : '🔴 Sotto il pareggio') + '</b> — ' + nomePeriodo + ': servono <b>' + r.pareggio + ' notti</b> per coprire i costi fissi (' + fmtCurrency(r.fissi) + '), ne hai ' + (futuro ? 'prenotate ' : 'vendute ') + '<b>' + r.tot.notti + '</b>. ' +
-      (ok ? 'Ogni notte in più è guadagno: circa ' + fmtCurrency(r.margNotte) + ' a notte.' : 'Ne mancano <b>' + manca + '</b>' + (futuro ? ' — valuta un\'offerta o una promozione sul diretto.' : '.')) + '</div>';
-  }
-
-  // ── Riquadri principali ──
-  var tiles = '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">' +
-    numTile('Occupazione', numPct(r.occ), r.tot.notti + ' notti su ' + r.disp + ' disponibili') +
-    numTile('Prezzo medio a notte', fmtCurrency(r.adr), 'solo soggiorno (ADR)') +
-    numTile('RevPAR', fmtCurrency(r.revpar), 'ricavo per unità disponibile al giorno') +
-    numTile('Ricavi', fmtCurrency(r.tot.ricavo + r.tot.extra), 'soggiorno ' + fmtCurrency(r.tot.ricavo) + ' + extra ' + fmtCurrency(r.tot.extra)) +
-    numTile('Margine', fmtCurrency(r.margine), 'dopo commissioni e costi per soggiorno — ' + fmtCurrency(r.margNotte) + ' a notte', r.margine < 0 ? '#a61e1e' : 'var(--green)') +
-    numTile('Risultato', fmtCurrency(r.risultato), 'margine − costi fissi (prima delle imposte)', r.risultato < 0 ? '#a61e1e' : '#1b6b34') +
-    numTile('Prenotazioni dirette', numPct(r.quotaDiretta), 'delle notti, senza commissioni') +
-    '</div>';
-
-  // ── Tabella per canale ──
-  var ks = Object.keys(r.canali).sort(function(a, b) { return r.canali[b].notti - r.canali[a].notti; });
-  var thS = 'style="padding:6px 8px;text-align:right;background:var(--surface2);white-space:nowrap"';
-  var canTab = '<div class="card" style="margin-bottom:14px"><div class="card-header"><span class="card-title">📡 Quanto ti lascia ogni canale</span></div><div class="modal-body" style="overflow-x:auto">' +
-    (ks.length ? '<table style="border-collapse:collapse;font-size:13px;width:100%"><tr><th style="padding:6px 8px;text-align:left;background:var(--surface2)">Canale</th><th ' + thS + '>Pren.</th><th ' + thS + '>Notti</th><th ' + thS + '>Ricavi</th><th ' + thS + '>Commissione</th><th ' + thS + '>Costi soggiorno</th><th ' + thS + '>Ti resta</th><th ' + thS + '>Ti resta a notte</th></tr>' +
-      ks.map(function(k) { var x = r.canali[k], resta = x.ricavo + x.extra - x.comm - x.costi; return '<tr style="border-top:1px solid var(--border)"><td style="padding:6px 8px;font-weight:600">' + cassaEsc(k) + (x.pct ? ' <span style="color:var(--text3);font-weight:400">(' + x.pct + '%)</span>' : '') + '</td><td style="text-align:right;padding:6px 8px">' + x.pren + '</td><td style="text-align:right;padding:6px 8px">' + x.notti + '</td><td style="text-align:right;padding:6px 8px">' + fmtCurrency(x.ricavo + x.extra) + '</td><td style="text-align:right;padding:6px 8px;color:#a61e1e">' + (x.comm ? '−' + fmtCurrency(x.comm) : '—') + '</td><td style="text-align:right;padding:6px 8px;color:#a61e1e">' + (x.costi ? '−' + fmtCurrency(x.costi) : '—') + '</td><td style="text-align:right;padding:6px 8px;font-weight:700">' + fmtCurrency(resta) + '</td><td style="text-align:right;padding:6px 8px;font-weight:700">' + fmtCurrency(x.notti ? resta / x.notti : 0) + '</td></tr>'; }).join('') + '</table>'
-      : '<div style="color:var(--text3);font-size:13px">Nessuna prenotazione in questo periodo.</div>') + '</div></div>';
-
-  // ── Prezzo minimo ──
-  var k = c.costi, durata = (function() { var nn = 0, pp = 0; (DB.get('bookings') || []).forEach(function(b) { if (numValida(b)) { var n = nights(b.checkin, b.checkout); if (n > 0) { nn += n; pp++; } } }); return pp ? nn / pp : 3; })();
-  var fissoSogg = (parseFloat(k.pulizia) || 0) + (parseFloat(k.biancheria) || 0) + (parseFloat(k.kit) || 0);
-  var varNotte = fissoSogg / durata + (parseFloat(k.perNotte) || 0);
-  var commB = parseFloat(c.comm['Booking.com']) || 0;
-  // Media sui soli mesi che hanno costi fissi (in vista Anno i mesi vuoti falserebbero il calcolo)
-  var mf = mesi.filter(function(m) { return r.perMese[m].fissi > 0; });
-  var nottiMeseTipiche = mf.length ? mf.reduce(function(s, m) { return s + r.perMese[m].notti; }, 0) / mf.length : 0;
-  var fissiMeseMedio = mf.length ? mf.reduce(function(s, m) { return s + r.perMese[m].fissi; }, 0) / mf.length : 0;
-  var minimoConFissi = nottiMeseTipiche > 0 ? varNotte + fissiMeseMedio / nottiMeseTipiche : null;
-  var prezzi = '<div class="card" style="margin-bottom:14px"><div class="card-header"><span class="card-title">🏷 Sotto questo prezzo ci rimetti</span></div><div class="modal-body" style="font-size:13.5px;line-height:1.7">' +
-    'Soggiorno medio: <b>' + (Math.round(durata * 10) / 10).toLocaleString('it-IT') + ' notti</b>. Costi per notte (pulizie divise sulle notti + consumi): <b>' + fmtCurrency(varNotte) + '</b>.<br>' +
-    '• Prezzo minimo a notte per non perderci <b>sul singolo soggiorno</b>: diretto <b>' + fmtCurrency(varNotte) + '</b>' + (commB ? ' · su Booking.com <b>' + fmtCurrency(varNotte / (1 - commB / 100)) + '</b>' : '') + '<br>' +
-    (minimoConFissi !== null && fissiMeseMedio > 0 && nottiMeseTipiche >= 1 ? '• Prezzo medio a notte per coprire <b>anche i costi fissi</b> (con ' + Math.round(nottiMeseTipiche) + ' notti al mese): diretto <b>' + fmtCurrency(minimoConFissi) + '</b>' + (commB ? ' · su Booking.com <b>' + fmtCurrency(minimoConFissi / (1 - commB / 100)) + '</b>' : '') + '<br>' : '') +
-    '<span style="color:var(--text3);font-size:12px">Usalo quando fai uno sconto o un preventivo: sotto la prima cifra quel soggiorno ti costa più di quanto incassi.</span></div></div>';
-
-  // ── Budget contro reale (anno) ──
-  var mesiAnno = cassaMesi(anno + '-01', 12), ra = numeriCalcola(mesiAnno), totB = 0, totR = 0;
-  var bud = '<div class="card" style="margin-bottom:14px"><div class="card-header"><span class="card-title">🎯 Obiettivo contro reale ' + anno + '</span></div><div class="modal-body" style="overflow-x:auto">' +
-    '<div style="font-size:12.5px;color:var(--text3);margin-bottom:8px">Scrivi quanto vuoi incassare ogni mese (soggiorno + extra). Per i mesi futuri "Reale" è quello già prenotato.</div>' +
-    '<table style="border-collapse:collapse;font-size:13px;width:100%"><tr><th style="padding:6px 8px;text-align:left;background:var(--surface2)">Mese</th><th ' + thS + '>Obiettivo €</th><th ' + thS + '>Reale / prenotato</th><th ' + thS + '>Differenza</th><th ' + thS + '>%</th></tr>' +
-    mesiAnno.map(function(m) {
-      var b = parseFloat(c.budget[m]) || 0, re = ra.perMese[m].ricavo + ra.perMese[m].extra, diff = re - b; totB += b; totR += re;
-      return '<tr style="border-top:1px solid var(--border)' + (m === oggiM ? ';background:var(--surface2)' : '') + '"><td style="padding:5px 8px;font-weight:600">' + CP_MESI[+m.slice(5) - 1] + (m > oggiM ? ' <span style="color:var(--text3);font-weight:400">(futuro)</span>' : '') + '</td>' +
-        '<td style="text-align:right;padding:4px 8px"><input type="number" step="10" min="0" value="' + (b || '') + '" placeholder="0" onchange="numBudget(\'' + m + '\',this.value)" style="width:100px;padding:4px;text-align:right"></td>' +
-        '<td style="text-align:right;padding:5px 8px">' + fmtCurrency(re) + '</td>' +
-        '<td style="text-align:right;padding:5px 8px;font-weight:700;color:' + (!b ? 'var(--text3)' : diff < 0 ? '#a61e1e' : '#1b6b34') + '">' + (b ? (diff < 0 ? '−' : '+') + fmtCurrency(Math.abs(diff)) : '—') + '</td>' +
-        '<td style="text-align:right;padding:5px 8px">' + (b ? numPct(re / b * 100) : '—') + '</td></tr>';
-    }).join('') +
-    '<tr style="border-top:2px solid var(--border2);font-weight:800"><td style="padding:6px 8px">Totale</td><td style="text-align:right;padding:6px 8px">' + fmtCurrency(totB) + '</td><td style="text-align:right;padding:6px 8px">' + fmtCurrency(totR) + '</td><td style="text-align:right;padding:6px 8px;color:' + (!totB ? 'var(--text3)' : totR < totB ? '#a61e1e' : '#1b6b34') + '">' + (totB ? (totR < totB ? '−' : '+') + fmtCurrency(Math.abs(totR - totB)) : '—') + '</td><td style="text-align:right;padding:6px 8px">' + (totB ? numPct(totR / totB * 100) : '—') + '</td></tr></table></div></div>';
-
-  // ── Impostazioni costi per soggiorno ──
-  var inp = function(key, label, nota) { return '<div><label style="font-size:12px;font-weight:700;display:block">' + label + (nota ? ' <span style="font-weight:400;color:var(--text3)">' + nota + '</span>' : '') + '</label><input type="number" step="0.5" min="0" value="' + (k[key] || '') + '" placeholder="0" onchange="numCosto(\'' + key + '\',this.value)" style="padding:5px;width:110px"></div>'; };
-  var imp = '<div class="card"><div class="card-header"><span class="card-title">⚙ I tuoi costi per soggiorno</span></div><div class="modal-body">' +
-    '<div style="font-size:12.5px;color:var(--text3);margin-bottom:10px">Quanto spendi tu per ogni soggiorno. Valgono anche per la Previsione di cassa. I costi fissi mensili e le commissioni OTA si impostano nella <a href="#" onclick="navigate(\'cassaprev\');return false">💶 Previsione di cassa</a>.</div>' +
-    '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end">' +
-    inp('pulizia', 'Pulizia €', 'a soggiorno') + inp('biancheria', 'Biancheria/lavanderia €', 'a soggiorno') + inp('kit', 'Kit cortesia €', 'a soggiorno') + inp('perNotte', 'Consumi €', 'a notte (luce, gas, acqua…)') +
-    '<div><label style="font-size:12px;font-weight:700;display:block">Unità in vendita <span style="font-weight:400;color:var(--text3)">(vuoto = ' + ((DB.get('rooms') || []).length || 1) + ' dal PMS)</span></label><input type="number" step="1" min="0" value="' + (parseInt(c.unita, 10) > 0 ? c.unita : '') + '" placeholder="auto" onchange="numUnitaSet(this.value)" style="padding:5px;width:90px"></div>' +
-    '</div></div></div>';
-
-  var testa = '<div class="page-header"><div><div class="page-title">🧮 Numeri</div><div class="page-subtitle">I numeri che comandano: quanto rendi davvero, quanto ti resta e quante notti ti servono</div></div>' +
-    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input type="month" value="' + numeriSel.mese + '" onchange="numeriSel.mese=this.value||today().slice(0,7);renderNumeri()" style="padding:5px">' +
-    '<button class="btn btn-sm' + (!numeriSel.anno ? ' btn-primary' : '') + '" onclick="numeriSel.anno=false;renderNumeri()">Mese</button>' +
-    '<button class="btn btn-sm' + (numeriSel.anno ? ' btn-primary' : '') + '" onclick="numeriSel.anno=true;renderNumeri()">Anno</button>' +
-    '<button class="btn btn-sm" onclick="navigate(\'cassaprev\')">💶 Previsione di cassa</button></div></div>';
-  el.innerHTML = testa + '<div class="page-content">' +
-    '<div style="font-size:13px;color:var(--text3);margin-bottom:8px">Periodo: <b style="color:var(--text1)">' + nomePeriodo + '</b> · ' + r.unita + ' unità · ' + r.tot.pren + ' prenotazioni (le notti sono contate nel mese in cui si dorme)</div>' +
-    sem + tiles + canTab + prezzi + bud + imp + '</div>';
-}
-function numCosto(key, v) { var c = cassaGet(); c.costi[key] = parseFloat(v) || 0; cassaSalva(c); renderNumeri(); }
-function numUnitaSet(v) { var c = cassaGet(); c.unita = parseInt(v, 10) || 0; cassaSalva(c); renderNumeri(); }
-function numBudget(m, v) { var c = cassaGet(); var n = parseFloat(v); if (n > 0) c.budget[m] = n; else delete c.budget[m]; cassaSalva(c); renderNumeri(); }
 
 </script>
 </body>
