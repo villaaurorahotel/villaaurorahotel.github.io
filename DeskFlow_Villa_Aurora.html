@@ -346,7 +346,7 @@ tr:hover td{background:var(--surface2)}
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
       <span id="utente-corrente-badge" style="display:none;font-size:10.5px;font-weight:700;color:var(--accent);margin-top:2px"></span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 22/11/2026 · 16:30</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 22/11/2026 · 21:30</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -37443,6 +37443,7 @@ function cpSalvaCella(ds, txt) {
   var v = parseFloat(txt);
   if (isNaN(v) || v <= 0) { cpDisegna(); return; }
   v = Math.round(v * 100) / 100;
+  cpSalvaSuppl(true);
   var tid = cp.tariffa, t = cp.tipo, rooms = DB.get('rooms') || [], listino = DB.get('listino') || [];
   var info = lstCalcolaRiferimentiCelle(rooms), pk = cpPaxPrim(t), rs = cpRoomsDi(t);
   if (!rs.length) { cpDisegna(); return; }
@@ -37502,7 +37503,8 @@ function cpSuppl() {
       '<select class="cp-sup-u" data-pax="' + c.pk + '" style="padding:4px;font-size:13px;border-radius:5px;border:1px solid var(--border2)"><option value="€"' + ((s && s.unita === '%') ? '' : ' selected') + '>€</option><option value="%"' + ((s && s.unita === '%') ? ' selected' : '') + '>%</option></select></div>';
   });
   h += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"><button class="btn btn-sm" onclick="cpSalvaSuppl()">Salva supplementi</button>' +
-    '<button class="btn btn-sm btn-primary" onclick="cpRiallinea()" title="Ricalcola 1, 3 e 4 persone dei giorni scelti partendo dalla doppia">Riallinea giorni scelti</button></div>';
+    '<button class="btn btn-sm btn-primary" onclick="cpRiallinea()" title="Ricalcola 1, 3 e 4 persone dei giorni scelti partendo dalla doppia">Riallinea giorni scelti</button>' +
+    '<button class="btn btn-sm" onclick="cpRiallineaTutto()" title="Ricalcola 1, 3 e 4 persone di tutti i giorni da oggi in poi">Riallinea tutto da oggi</button></div>';
   box.innerHTML = h;
 }
 function cpSalvaSuppl(silenzioso) {
@@ -37520,6 +37522,14 @@ function cpSalvaSuppl(silenzioso) {
   return n;
 }
 // Ricalcola 1/3/4 persone (tutte le tipologie con scostamento salvato) per i giorni scelti, dalla doppia già presente
+function cpRiallineaTutto() {
+  if (cpEDerivata()) { showToast('Scegli la tariffa Standard per riallineare i prezzi'); return; }
+  if (!confirm('Ricalcolo 1, 3 e 4 persone di TUTTI i giorni da oggi in poi, partendo dal prezzo della doppia e dai supplementi scritti qui a destra. Continuare?')) return;
+  var salva = cp.sel; cp.sel = {};
+  getDatesInRange(today(), addDays(today(), 540)).forEach(function(ds) { cp.sel[ds] = true; });
+  cpRiallinea();
+  cp.sel = salva; cpRinfresca();
+}
 function cpRiallinea() {
   var gg = cpGiorniScelti();
   if (!gg.length) { showToast('Scegli prima i giorni da riallineare'); return; }
@@ -37549,6 +37559,7 @@ function cpRiallinea() {
     if (scritto) { payload.giorni[ds] = [prima, cpPrezzo(ds, cp.tipo, tid) || prima]; toccati++; }
   });
   if (!payload.celle.length) { showToast(saltati ? 'Nei giorni scelti non c\'è ancora il prezzo della doppia' : 'Era già tutto allineato (o mancano i supplementi)'); return; }
+  if (payload.celle.length > 3000) { delete payload.celle; delete payload.reg; }
   DB.set('listino', listino);
   avvisaHostexSubito(); avvisaHostexRestrizioniSubito();
   if (typeof avvisaHostexPrezziSubito === 'function') avvisaHostexPrezziSubito();
@@ -37713,6 +37724,7 @@ async function cpApplica() {
   var vuoleMin = minV !== '', vuoleChi = chiV !== '';
   if (!vuolePrezzo && !vuoleMin && !vuoleChi) { showToast('Scrivi un prezzo, un minimo di notti o scegli una chiusura'); return; }
 
+  if (vuolePrezzo) cpSalvaSuppl(true); // salva i supplementi mostrati a destra, così 1/3/4 persone seguono sempre la doppia
   var rooms = DB.get('rooms') || [], listino = DB.get('listino') || [], info = lstCalcolaRiferimentiCelle(rooms);
   var masterRooms = cpRoomsDi(info.masterType), regole = getRegoleTipo();
   var payload = { tid: tid, giorni: {}, celle: [], reg: [] };
