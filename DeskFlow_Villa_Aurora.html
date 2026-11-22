@@ -346,7 +346,7 @@ tr:hover td{background:var(--surface2)}
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
       <span id="utente-corrente-badge" style="display:none;font-size:10.5px;font-weight:700;color:var(--accent);margin-top:2px"></span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 22/11/2026 · 11:30</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 22/11/2026 · 16:30</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -37925,7 +37925,7 @@ function renderPrevisioneCassa() {
     '</div></div>';
   el.innerHTML = '<div class="page-header"><div><div class="page-title">💶 Previsione di cassa</div><div class="page-subtitle">Quanti soldi tuoi avrai, mese per mese — per accorgerti in anticipo di un mese in rosso</div></div></div>' +
     '<div class="page-content"><div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><button class="btn btn-sm" onclick="cassaAnno(-1)">◀</button><div style="font-weight:800;font-size:18px;min-width:70px;text-align:center">' + c.anno + '</div><button class="btn btn-sm" onclick="cassaAnno(1)">▶</button><span style="font-size:12px;color:var(--text3)">cambia anno per programmare: la tabella mostra gennaio–dicembre di quell\'anno</span></div>' + avviso + tabella +
-    '<div style="font-size:11.5px;color:var(--text3);margin-top:6px">Le entrate sono il soggiorno delle prenotazioni confermate (senza tassa di soggiorno). Le commissioni OTA sono una stima con le percentuali sotto. IVA, F24 e costi li inserisci tu.</div>' + cassaBeHtml() + imp + voci + '</div>';
+    '<div style="font-size:11.5px;color:var(--text3);margin-top:6px">Le entrate sono il soggiorno delle prenotazioni confermate (senza tassa di soggiorno). Le commissioni OTA sono una stima con le percentuali sotto. IVA, F24 e costi li inserisci tu.</div>' + cassaPrevHtml() + cassaBeHtml() + imp + voci + '</div>';
 }
 // ── Anno di programmazione + costo minimo della camera al giorno ──
 function cassaAnno(delta) { var c = cassaGet(); c.anno = (c.anno || parseInt(c.inizio.slice(0, 4))) + delta; c.inizio = c.anno + '-01'; cassaSalva(c); renderPrevisioneCassa(); }
@@ -37984,6 +37984,104 @@ function cassaBeHtml() {
     (adr ? '<div style="font-size:12.5px;margin-bottom:10px;padding:8px 10px;border-radius:6px;background:' + (adr >= m0.lordo ? '#e9f7ee' : '#fde2e2') + '">Il tuo prezzo medio reale nel ' + anno + ' è <b>' + fmt(adr) + ' €</b> a notte: ' + (adr >= m0.lordo ? 'sopra' : '<b>sotto</b>') + ' il minimo di ' + fmt(m0.lordo) + ' € (occupazione reale ' + occReale.toFixed(0) + '%).</div>' : '') +
     '<table style="border-collapse:collapse;font-size:13px;min-width:360px"><thead><tr style="color:var(--text3);text-align:left"><th style="padding:5px 8px">Se riempi le camere al</th><th style="text-align:right;padding:5px 8px">Prezzo minimo netto</th><th style="text-align:right;padding:5px 8px">Prezzo minimo con commissioni</th></tr></thead><tbody>' + scen + '</tbody></table>' +
     '<div style="font-size:11.5px;color:var(--text3);margin-top:8px">Formula: spese dell\'anno ÷ (camere × giorni di apertura × occupazione). "Con commissioni" divide ancora per (1 − commissione OTA), così dopo la commissione ti resta il minimo. Non include il guadagno: è il prezzo sotto il quale vai in perdita.</div>' +
+    '</div></div>';
+}
+
+// ── PREVISIONALE VENDITE: prenotato + potenziale delle notti ancora libere ai prezzi di listino di oggi ──
+// Si ricalcola ogni volta che apri la pagina (o premi "Aggiorna"), quindi segue le modifiche fatte nel Calendario prezzi.
+function cassaPrevGet(c) { var p = c.prev || {}; return { occLibero: (p.occLibero === undefined) ? 40 : p.occLibero }; }
+function cassaPrevImp(k, v) { var c = cassaGet(); if (!c.prev) c.prev = {}; c.prev[k] = v; cassaSalva(c); renderPrevisioneCassa(); }
+function cassaPrevisionale(anno) {
+  var c = cassaGet(), be = cassaBeDefault(c), pv = cassaPrevGet(c), rooms = DB.get('rooms') || [];
+  var comm = be.comm === null ? cassaCommMedia() : (parseFloat(be.comm) || 0);
+  var mesi = cassaMesi(anno + '-01', 12), occ = {}, righe = {};
+  mesi.forEach(function(m) { righe[m] = { m: m, disp: 0, prenNotti: 0, prenIncasso: 0, liberiNotti: 0, liberiListino: 0 }; });
+  (DB.get('bookings') || []).forEach(function(b) {
+    if (!b || b.status === 'cancellata' || b.escludiConteggi || !b.checkin || !b.checkout) return;
+    var n = Math.round((parseLD(b.checkout) - parseLD(b.checkin)) / 86400000); if (n < 1) return;
+    var per = (parseFloat(b.totalPrice) || 0) / n;
+    getDatesInRange(b.checkin, addDays(b.checkout, -1)).forEach(function(ds) {
+      var m = ds.slice(0, 7); if (!righe[m]) return;
+      righe[m].prenNotti++; righe[m].prenIncasso += per; if (b.roomId) occ[b.roomId + '|' + ds] = true;
+    });
+  });
+  mesi.forEach(function(m) {
+    var p = m.split('-'), nG = new Date(+p[0], +p[1], 0).getDate(), r = righe[m];
+    for (var d = 1; d <= nG; d++) {
+      var ds = m + '-' + String(d).padStart(2, '0');
+      rooms.forEach(function(room) {
+        r.disp++;
+        if (occ[room.id + '|' + ds]) return;
+        var pr = 0; try { pr = getPrezzoListino(room.id, 2, ds, 'standard') || 0; } catch (e) {}
+        if (pr > 0) { r.liberiNotti++; r.liberiListino += pr; }
+      });
+    }
+  });
+  var costiM = cassaCalcola(anno + '-01'), out = [];
+  mesi.forEach(function(m) {
+    var r = righe[m], cr = costiM.righe;
+    var costi = (be.fisso ? cr.fisso[m] : 0) + (be.altro ? cr.altro[m] : 0) + (be.f24 ? cr.f24[m] : 0) + (be.iva ? cr.iva[m] : 0);
+    var vendibili = r.liberiNotti * pv.occLibero / 100, previsto = r.liberiNotti ? r.liberiListino / r.liberiNotti * vendibili : 0;
+    var incasso = r.prenIncasso + previsto, commMese = incasso * comm / 100;
+    var prezzoMedioLibero = r.liberiNotti ? r.liberiListino / r.liberiNotti : 0;
+    var nettoPren = r.prenIncasso * (1 - comm / 100), mancano = Math.max(0, costi - nettoPren);
+    var nottiPerCoprire = prezzoMedioLibero ? mancano / (prezzoMedioLibero * (1 - comm / 100)) : 0;
+    out.push({ m: m, disp: r.disp, prenNotti: r.prenNotti, prenIncasso: r.prenIncasso, liberi: r.liberiNotti, prezzoMedioLibero: prezzoMedioLibero,
+      pieno: r.liberiListino, previsto: previsto, incasso: incasso, costi: costi, comm: commMese, margine: incasso - commMese - costi, nottiPerCoprire: nottiPerCoprire });
+  });
+  return { righe: out, comm: comm, occLibero: pv.occLibero };
+}
+function cassaPrevSnapshot(anno, tot) {
+  var c = cassaGet(), oggi = today(); if (!c.prevStorico) c.prevStorico = [];
+  var ult = c.prevStorico.filter(function(x) { return x.anno === anno; }).slice(-1)[0];
+  var snap = { d: oggi, anno: anno, pren: Math.round(tot.pren), incasso: Math.round(tot.incasso), pieno: Math.round(tot.pieno), margine: Math.round(tot.margine) };
+  if (ult && ult.d === oggi) { if (JSON.stringify(ult) === JSON.stringify(snap)) return c.prevStorico; c.prevStorico[c.prevStorico.lastIndexOf(ult)] = snap; }
+  else if (ult && ult.pren === snap.pren && ult.incasso === snap.incasso && ult.pieno === snap.pieno) return c.prevStorico; // niente di nuovo
+  else c.prevStorico.push(snap);
+  if (c.prevStorico.length > 80) c.prevStorico = c.prevStorico.slice(-80);
+  cassaSalva(c); return c.prevStorico;
+}
+function cassaPrevHtml() {
+  var c = cassaGet(), anno = c.anno || parseInt(c.inizio.slice(0, 4)), r = cassaPrevisionale(anno);
+  var tot = r.righe.reduce(function(a, x) { a.pren += x.prenIncasso; a.previsto += x.previsto; a.incasso += x.incasso; a.costi += x.costi; a.comm += x.comm; a.margine += x.margine; a.pieno += x.pieno; return a; }, { pren: 0, previsto: 0, incasso: 0, costi: 0, comm: 0, margine: 0, pieno: 0 });
+  var storico = cassaPrevSnapshot(anno, tot).filter(function(x) { return x.anno === anno; }).slice(-8);
+  var n0 = function(n) { var v = Math.round(n); return v === 0 ? '—' : v.toLocaleString('it-IT'); };
+  var maxV = Math.max.apply(null, r.righe.map(function(x) { return Math.max(x.incasso, x.costi); }).concat([1]));
+  var barre = '<div style="display:flex;gap:6px;align-items:flex-end;height:110px;margin:10px 0 4px;padding:0 2px">' + r.righe.map(function(x) {
+    var hp = Math.round(x.prenIncasso / maxV * 100), hv = Math.round(x.previsto / maxV * 100), hc = Math.round(x.costi / maxV * 100);
+    return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px" title="' + cassaMeseTesto(x.m) + ': prenotato ' + n0(x.prenIncasso) + ' €, previsto ' + n0(x.previsto) + ' €, costi ' + n0(x.costi) + ' €">' +
+      '<div style="width:100%;height:100px;position:relative;display:flex;flex-direction:column;justify-content:flex-end"><div style="background:#bfd9ff;height:' + hv + '%"></div><div style="background:#1a73e8;height:' + hp + '%"></div>' +
+      (x.costi ? '<div style="position:absolute;left:-1px;right:-1px;bottom:' + hc + '%;border-top:2px solid #d33"></div>' : '') + '</div><div style="font-size:10px;color:var(--text3)">' + cassaMeseTesto(x.m).slice(0, 3) + '</div></div>'; }).join('') + '</div>' +
+    '<div style="font-size:11px;color:var(--text3);margin-bottom:10px"><span style="color:#1a73e8">■</span> già prenotato &nbsp; <span style="color:#8bb8f5">■</span> previsto sulle notti libere &nbsp; <span style="color:#d33">━</span> costi del mese</div>';
+  var riga = function(lab, f, stile) { return '<tr><td style="padding:5px 8px;font-weight:600;white-space:nowrap;position:sticky;left:0;background:var(--surface)">' + lab + '</td>' + r.righe.map(function(x) { return '<td style="padding:5px 8px;text-align:right;' + (stile ? stile(x) : '') + '">' + f(x) + '</td>'; }).join('') + '</tr>'; };
+  var th = '<tr><th style="position:sticky;left:0;background:var(--surface2)"></th>' + r.righe.map(function(x) { return '<th style="padding:6px 8px;text-align:right;background:var(--surface2);white-space:nowrap">' + cassaMeseTesto(x.m) + '</th>'; }).join('') + '</tr>';
+  var tab = '<div style="overflow-x:auto;border:1px solid var(--border2);border-radius:8px"><table style="border-collapse:collapse;font-size:13px;width:100%">' + th +
+    riga('Notti prenotate', function(x) { return x.prenNotti || '—'; }) +
+    riga('Notti libere', function(x) { return x.liberi || '—'; }) +
+    riga('Prezzo medio listino (notti libere)', function(x) { return x.prezzoMedioLibero ? Math.round(x.prezzoMedioLibero) + ' €' : '—'; }, function() { return 'font-weight:700;'; }) +
+    riga('Già prenotato €', function(x) { return n0(x.prenIncasso); }, function() { return 'color:#1a73e8;'; }) +
+    riga('Previsto sulle libere €', function(x) { return n0(x.previsto); }) +
+    riga('Se vendessi tutto a listino €', function(x) { return n0(x.prenIncasso + x.pieno); }, function() { return 'color:var(--text3);'; }) +
+    riga('Incasso previsto €', function(x) { return n0(x.incasso); }, function() { return 'font-weight:700;'; }) +
+    riga('Costi del mese €', function(x) { return n0(x.costi); }, function() { return 'color:#a61e1e;'; }) +
+    riga('Commissioni OTA €', function(x) { return n0(x.comm); }, function() { return 'color:#a61e1e;'; }) +
+    riga('Margine previsto €', function(x) { return (x.margine < 0 ? '−' : '') + n0(Math.abs(x.margine)); }, function(x) { return 'font-weight:800;background:' + (x.margine < 0 ? '#fde2e2' : '#e9f7ee') + ';color:' + (x.margine < 0 ? '#a61e1e' : '#1b6b34') + ';'; }) +
+    riga('Notti da vendere per coprire i costi', function(x) { return !x.costi ? '—' : (x.nottiPerCoprire <= 0 ? '✓ già coperti' : Math.ceil(x.nottiPerCoprire) + (Math.ceil(x.nottiPerCoprire) > x.liberi ? ' ⚠' : '')); }, function(x) { return 'font-size:12px;' + (x.nottiPerCoprire > x.liberi && x.costi ? 'color:#a61e1e;font-weight:700;' : ''); }) +
+    '</table></div>';
+  var trend = '';
+  if (storico.length > 1) {
+    trend = '<div style="margin-top:12px"><div style="font-weight:700;font-size:13px;margin-bottom:4px">📈 Come sta andando (confronto tra le volte in cui hai aperto la pagina)</div><table style="border-collapse:collapse;font-size:12.5px"><thead><tr style="color:var(--text3);text-align:right"><th style="text-align:left;padding:4px 8px">Data</th><th style="padding:4px 8px">Già prenotato</th><th style="padding:4px 8px">Incasso previsto</th><th style="padding:4px 8px">Se tutto a listino</th><th style="padding:4px 8px">Margine anno</th><th style="padding:4px 8px">Variazione previsto</th></tr></thead><tbody>' +
+      storico.map(function(x, i) { var d = i ? x.incasso - storico[i - 1].incasso : 0; return '<tr style="border-top:1px solid var(--border);text-align:right"><td style="text-align:left;padding:4px 8px">' + fmtDate(x.d) + '</td><td style="padding:4px 8px">' + n0(x.pren) + '</td><td style="padding:4px 8px">' + n0(x.incasso) + '</td><td style="padding:4px 8px;color:var(--text3)">' + n0(x.pren + x.pieno) + '</td><td style="padding:4px 8px;color:' + (x.margine < 0 ? '#a61e1e' : '#1b6b34') + '">' + (x.margine < 0 ? '−' : '') + n0(Math.abs(x.margine)) + '</td><td style="padding:4px 8px;font-weight:700;color:' + (d < 0 ? '#a61e1e' : d > 0 ? '#1b6b34' : 'var(--text3)') + '">' + (i ? (d > 0 ? '+' : d < 0 ? '−' : '') + n0(Math.abs(d)) : '—') + '</td></tr>'; }).join('') + '</tbody></table></div>';
+  }
+  return '<div class="card" style="margin-top:16px"><div class="card-header"><span class="card-title">📈 Previsionale vendite — anno ' + anno + '</span><button class="btn btn-sm" onclick="renderPrevisioneCassa()">↻ Aggiorna</button></div><div class="modal-body">' +
+    '<div style="font-size:12.5px;color:var(--text2);margin-bottom:10px">Parte dalle prenotazioni che hai già e aggiunge le notti ancora libere ai <b>prezzi di listino di adesso</b>: se cambi i prezzi nel Calendario prezzi, riapri la pagina (o premi Aggiorna) e i numeri si aggiornano. Costi e commissioni sono quelli impostati in questa pagina.</div>' +
+    '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px"><div><label style="font-size:11px;font-weight:700;display:block">Quante notti libere pensi di vendere %</label><input type="number" min="0" max="100" value="' + r.occLibero + '" onchange="cassaPrevImp(\'occLibero\',parseFloat(this.value)||0)" style="padding:5px;width:90px"></div>' +
+    '<div style="flex:1;min-width:260px;display:flex;gap:10px;flex-wrap:wrap">' +
+      '<div style="background:var(--surface2);border-radius:8px;padding:8px 12px"><div style="font-size:11px;color:var(--text3)">Incasso previsto anno</div><div style="font-size:18px;font-weight:800">' + n0(tot.incasso) + ' €</div></div>' +
+      '<div style="background:var(--surface2);border-radius:8px;padding:8px 12px"><div style="font-size:11px;color:var(--text3)">Costi + commissioni</div><div style="font-size:18px;font-weight:800">' + n0(tot.costi + tot.comm) + ' €</div></div>' +
+      '<div style="background:' + (tot.margine < 0 ? '#fde2e2' : '#e9f7ee') + ';border-radius:8px;padding:8px 12px"><div style="font-size:11px;color:var(--text3)">Margine previsto</div><div style="font-size:18px;font-weight:800;color:' + (tot.margine < 0 ? '#a61e1e' : '#1b6b34') + '">' + (tot.margine < 0 ? '−' : '') + n0(Math.abs(tot.margine)) + ' €</div></div></div></div>' +
+    barre + tab + trend +
+    '<div style="font-size:11.5px;color:var(--text3);margin-top:8px">"Previsto sulle libere" = notti libere × % che pensi di vendere × prezzo medio di listino (tariffa Standard, 2 persone). Le notti bloccate a mano non sono escluse. I costi sono quelli segnati nelle caselle del riquadro "Costo minimo", l\'IVA solo se la spunti lì.</div>' +
     '</div></div>';
 }
 
