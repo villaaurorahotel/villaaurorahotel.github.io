@@ -346,7 +346,7 @@ tr:hover td{background:var(--surface2)}
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
       <span id="utente-corrente-badge" style="display:none;font-size:10.5px;font-weight:700;color:var(--accent);margin-top:2px"></span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 22/11/2026 · 22:15</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 23/11/2026 · 10:30</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -381,7 +381,6 @@ tr:hover td{background:var(--surface2)}
   <div class="nav-item" onclick="navigate('archivioospiti')" data-page="archivioospiti">🗂 Archivio ospiti</div>
   <div class="nav-item" onclick="navigate('guidaospiti')" data-page="guidaospiti">🗺️ Guida ospiti</div>
   <div class="nav-item" onclick="navigate('listino')" data-page="listino">💰 Listino prezzi</div>
-  <div class="nav-item" onclick="navigate('livelli')" data-page="livelli">🎚 Livelli tariffari</div>
   <div class="nav-item" onclick="navigate('tipologie')" data-page="tipologie">🏷 Tipologie</div>
   <div class="nav-item" onclick="navigate('tassasoggiorno')" data-page="tassasoggiorno">🏛 Tassa di soggiorno</div>
   <div class="nav-item" onclick="navigate('statistichesito')" data-page="statistichesito">📈 Statistiche sito</div>
@@ -458,7 +457,6 @@ tr:hover td{background:var(--surface2)}
   <div id="page-archivioospiti" class="page"></div>
   <div id="page-guidaospiti" class="page"></div>
   <div id="page-listino" class="page"></div>
-  <div id="page-livelli" class="page"></div>
   <div id="page-tipologie" class="page"></div>
   <div id="page-tassasoggiorno" class="page"></div>
   <div id="page-preventivi" class="page"></div>
@@ -11649,7 +11647,7 @@ function navigate(page){
   var map={
     dashboard:renderDashboard,calendario:renderCalendario,prenotazioni:renderPrenotazioni,gruppi:renderGruppiEventi,fatture:renderFatture,recensioni:renderRecensioni,messaggi:renderMessaggi,mobilecheckin:renderMobileCheckin,wamassivo:renderWaMassivo,emailmassiva:renderEmailMassiva,
     checkin:renderCheckin,checkout:renderCheckout,'arrivi-partenze':renderArriviPartenze,checkineffettuati:renderCheckinEffettuati,checkouteffettuati:renderCheckoutEffettuati,effettuati:renderEffettuati,planner:renderPlanner,contidasaldare:renderContiDaSaldare,corrispettivi:renderCorrispettiviPage,condizioni:renderCondizioni,revenue:renderRevenue,camere:renderCamere,ospiti:renderOspiti,archivioospiti:renderArchivioOspiti,guidaospiti:renderGuidaOspiti,
-    listino:renderListino,livelli:renderLivelliTariffari,tipologie:renderTipologie,tassasoggiorno:renderTassaSoggiorno,preventivi:renderPreventivi,addebitiextra:renderAddebitiExtra,
+    listino:renderListino,tipologie:renderTipologie,tassasoggiorno:renderTassaSoggiorno,preventivi:renderPreventivi,addebitiextra:renderAddebitiExtra,
     housekeeping:renderHousekeeping,previsionale:renderPrevisionale,cassaprev:renderPrevisioneCassa,report:renderReport,biancheria:renderBiancheria,
     extra:renderExtra,manutenzione:renderManutenzione,adempimenti:renderAdempimenti,reportpasti:renderReportPasti,
     blacklist:renderBlacklist,ical:renderIcal,impostazioni:renderImpostazioni,
@@ -16566,7 +16564,7 @@ var PAGINE_PERMESSO = {
   gruppi:'gruppi', fatture:'fatture', recensioni:'recensioni', messaggi:'messaggi',
   report:'report', reportpasti:'reportpasti', previsionale:'previsionale', cassaprev:'cassaprev', revenue:'revenue',
   corrispettivi:'corrispettivi', contidasaldare:'contidasaldare',
-  listino:'listino', livelli:'livelli', tipologie:'tipologie', tassasoggiorno:'tassasoggiorno', camere:'camere',
+  listino:'listino', tipologie:'tipologie', tassasoggiorno:'tassasoggiorno', camere:'camere',
   manutenzione:'manutenzione',
   extra:'extra', addebitiextra:'addebitiextra', adempimenti:'adempimenti', blacklist:'blacklist', ical:'ical', condizioni:'condizioni', guidaospiti:'guidaospiti', sitoweb:'sitoweb',
   impostazioni:'impostazioni', salvataggio:'salvataggio', utenti:'impostazioni',
@@ -16592,7 +16590,6 @@ var VOCI_PERMESSO = [
   {k:'contidasaldare', l:'💰 Conti da saldare'},
   {k:'fatture', l:'🧾 Fatture'},
   {k:'listino', l:'💰 Listino prezzi'},
-  {k:'livelli', l:'🎚 Livelli tariffari'},
   {k:'tipologie', l:'🏷 Tipologie'},
   {k:'camere', l:'🛏 Camere'},
   {k:'tassasoggiorno', l:'🏛 Tassa di soggiorno'},
@@ -28229,7 +28226,7 @@ function livRisolviGrigliaCompleta(baseStandard2p) {
 // (lstSelFrom/lstSelTo) — scrive su tutte le camere Standard e fa propagare automaticamente le
 // altre tipologie con la stessa funzione già usata quando modifichi una cella a mano nel Listino.
 function livApplicaAlListino(id) {
-  if (!lstSelFrom || !lstSelTo) { showToast('Vai prima sul Listino e seleziona un periodo (Da → A), poi torna qui e applica il livello'); return; }
+  if (!lstSelFrom || !lstSelTo) { showToast('Seleziona prima un periodo (Da → A) nel Listino, poi applica il livello'); return; }
   var livelli = livGetLivelli();
   var l = livelli.find(function(x){return x.id===id;});
   if (!l) return;
@@ -28258,7 +28255,7 @@ function livApplicaAlListino(id) {
   livSegnaGiorni(lstSelFrom, lstSelTo, id);
   if (typeof avvisaHostexPrezziSubito === 'function') avvisaHostexPrezziSubito();
   if (typeof registraModificaListino === 'function') registraModificaListino(fmtDate(lstSelFrom)+' → '+fmtDate(lstSelTo)+': livello → '+l.nome);
-  showToast('Livello '+l.nome+' applicato al periodo '+fmtDate(lstSelFrom)+' → '+fmtDate(lstSelTo)+' — vai sul Listino per vederlo');
+  showToast('Livello '+l.nome+' applicato al periodo '+fmtDate(lstSelFrom)+' → '+fmtDate(lstSelTo)); renderListino();
 }
 
 // ── Mappa data → livello applicato, e cambio livello direttamente dalla griglia del Listino ──
@@ -28359,8 +28356,10 @@ function livCalcolaFesteAnno(anno) {
 }
 
 var livAnno = new Date().getFullYear();
+var lstLivelliAperto = false;
 
 function renderLivelliTariffari() {
+  if (!document.getElementById('lst-livelli-box')) { if (typeof renderListino==='function') renderListino(); return; }
   var livelli = livGetLivelli();
   var feste = livCalcolaFesteAnno(livAnno);
   var rooms = DB.get('rooms') || [];
@@ -28436,12 +28435,9 @@ function renderLivelliTariffari() {
     '</tbody></table>'+
     '</div></div>';
 
-  document.getElementById('page-livelli').innerHTML =
-    '<div class="page-header"><div><div class="page-title">🎚 Livelli tariffari</div>'+
-    '<div class="page-subtitle">Definisci una volta i livelli di prezzo, poi applicali ai periodi con un click — come nel vecchio gestionale</div></div></div>'+
-    '<div class="page-content" style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">'+
-    sidebarFeste + tabellaLivelli +
-    '</div>';
+  var box = document.getElementById('lst-livelli-box');
+  if (!box) return;
+  box.innerHTML = '<div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">'+ sidebarFeste + tabellaLivelli + '</div>';
 }
 
 function renderListino() {
@@ -28745,6 +28741,10 @@ if(lstSelFrom&&lstSelTo){
     avvisoNoStandard+
     (lstMarkupOTA ? '<div style="background:var(--accent-light);color:var(--accent);padding:8px 14px;border-radius:8px;font-size:12.5px;margin-bottom:10px">💡 Margine OTA attivo: <strong>'+otaMarginiAttivi().map(function(m){return m.nome+' '+otaFmtPct(m.pct);}).join(' · ')+'</strong> — passa il mouse su un prezzo per vedere quanto mettere su ogni portale</div>' : '')+
     tariffaTabs+
+    '<div style="margin:6px 0 10px">'+
+      '<button class="btn btn-sm" style="font-weight:700" onclick="lstLivelliAperto=!lstLivelliAperto;renderListino()">🎚 Livelli tariffari '+(lstLivelliAperto?'▲':'▼')+'</button>'+
+      (lstLivelliAperto ? '<div id="lst-livelli-box" style="margin-top:10px"></div>' : '')+
+    '</div>'+
     '<div style="display:flex;flex-direction:column;gap:6px">'+
     '<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">'+
     '<button class="btn btn-sm" onclick="lstScrollDays(-30)">|&lt; -30gg</button>'+
@@ -28820,6 +28820,7 @@ if(lstSelFrom&&lstSelTo){
     '<div style="margin-top:8px">'+renderRegistroListinoHTML()+'</div>'+
     '</details>'+
     '</div>';
+  if (lstLivelliAperto && document.getElementById('lst-livelli-box')) renderLivelliTariffari();
   aggiornaBottoneStopVendite();
 }
 var lstSelFrom='',lstSelTo='',listinoYear=new Date().getFullYear(),lstTariffaId='standard';
