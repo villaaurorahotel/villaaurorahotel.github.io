@@ -346,7 +346,7 @@ tr:hover td{background:var(--surface2)}
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
       <span id="utente-corrente-badge" style="display:none;font-size:10.5px;font-weight:700;color:var(--accent);margin-top:2px"></span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 23/11/2026 · 10:30</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 23/11/2026 · 14:20</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -37484,6 +37484,22 @@ function cpSalvaCella(ds, txt) {
       var c = cat.info.cellRef[k]; if (cat.valore[k] == null || !cat.off(c.t, c.pk).salvato) return;
       cpRoomsDi(c.t).forEach(function(r) { scrivi(r, c.pk, cat.valore[k]); });
     });
+  } else if (pk === cpPaxPrim(t) && t !== info.masterType) {
+    // Prezzo della doppia (fascia principale) di una tipologia NON base: ricalcola 1/3/4 persone della stessa
+    // tipologia con i supplementi salvati (e le tipologie che dipendono da lei), senza toccare il resto.
+    var cat2 = cpCatena(0), val2 = {}; val2[t + '|' + pk] = v;
+    rs.forEach(function(r) { scrivi(r, pk, v); });
+    var giri2 = 0, camb2 = true;
+    while (camb2 && giri2 < 12) {
+      camb2 = false; giri2++;
+      Object.keys(cat2.info.cellRef).forEach(function(k) {
+        if (val2[k] != null) return;
+        var c = cat2.info.cellRef[k], rk = c.refType + '|' + c.refPax; if (val2[rk] == null) return;
+        var o = cat2.off(c.t, c.pk); camb2 = true;
+        val2[k] = Math.max(0, Math.round(o.unita === '%' ? val2[rk] * (1 + o.valore / 100) : val2[rk] + o.valore));
+        if (o.salvato) cpRoomsDi(c.t).forEach(function(r) { scrivi(r, c.pk, val2[k]); });
+      });
+    }
   } else {
     rs.forEach(function(r) { scrivi(r, pk, v); }); // solo questa tipologia/fascia
   }
