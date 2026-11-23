@@ -346,7 +346,7 @@ tr:hover td{background:var(--surface2)}
       <h1>DeskFlow</h1>
       <span id="prop-name">La mia struttura</span>
       <span id="utente-corrente-badge" style="display:none;font-size:10.5px;font-weight:700;color:var(--accent);margin-top:2px"></span>
-      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 23/11/2026 · 14:20</span>
+      <span id="app-build-tag" title="Cambia ad ogni nuova versione del file: se dopo aver caricato su GitHub e ricaricato la pagina (F5/Ctrl+Shift+R) questo codice è diverso da prima, il browser ha davvero preso la versione nuova" style="display:block;font-size:9.5px;color:var(--text3,#999);opacity:.65;margin-top:2px;letter-spacing:.3px">Build 23/11/2026 · 18:10</span>
     </div>
     <button id="btn-refresh-globale" onclick="refreshDatiCorrenti()" title="Aggiorna tutti i dati senza cambiare pagina" style="width:calc(100% - 24px);margin:0 12px 8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="btn-refresh-icon">🔄</span> Aggiorna dati
@@ -37801,11 +37801,19 @@ async function cpApplica() {
         }
       });
     });
-    // "APRI" su tutte le tariffe libera anche i blocchi manuali giorno per giorno del Calendario
-    if (!tidReg && chiV === 'open' && supabaseReady && supabaseClient) {
-      tipiReg.forEach(function(t) { cpRoomsDi(t).forEach(function(room) {
-        supabaseClient.from('room_blocks').delete().eq('room_id', room.id).in('block_date', gg).then(function(){}).catch(function(err){ console.warn('Blocchi non rimossi per', room.name, err); });
-      }); });
+    // "APRI" su tutte le tariffe libera anche i blocchi manuali (giallo/nero) di ogni camera di quelle tipologie
+    if (!tidReg && chiV === 'open') {
+      var sbloccate = 0, camereDaSbloccare = [];
+      tipiReg.forEach(function(t) { cpRoomsDi(t).forEach(function(room) { camereDaSbloccare.push(room); }); });
+      var rbLocale = (supabaseReady && _roomBlocksReady) ? _roomBlocksCache : DB.getObj('roomBlocks', {});
+      camereDaSbloccare.forEach(function(room) { gg.forEach(function(ds) { if (rbLocale[room.id + '|' + ds]) { delete rbLocale[room.id + '|' + ds]; sbloccate++; } }); });
+      if (!(supabaseReady && _roomBlocksReady)) DB.setObj('roomBlocks', rbLocale);
+      if (supabaseReady && supabaseClient && sbloccate) {
+        camereDaSbloccare.forEach(function(room) {
+          supabaseClient.from('room_blocks').delete().eq('room_id', room.id).in('block_date', gg).then(function(res) { if (res && res.error) { console.warn('Blocchi non rimossi per', room.name, res.error); showToast('⚠ Alcuni blocchi camera non sono stati rimossi: riprova'); } }).catch(function(err) { console.warn('Blocchi non rimossi per', room.name, err); });
+        });
+      }
+      if (sbloccate) cp._sbloccate = sbloccate;
     }
   }
 
@@ -37825,6 +37833,7 @@ async function cpApplica() {
   var primo = gg[0], ultimo = gg[gg.length - 1];
   cpRegistra('📅 <strong>' + tarNome + '</strong> · ' + gg.length + ' giorni (' + fmtDate(primo) + (gg.length > 1 ? ' → ' + fmtDate(ultimo) : '') + '): ' + pezzi.join(', '), payload);
 
+  if (typeof renderCalendario === 'function') { try { renderCalendario(); } catch(e) {} }
   cp.sel = {};
   var _senza = vuolePrezzo && !(DB.get('listinoScostamenti') || []).some(function(x) { return x.tipo === info.masterType; });
   showToast(_senza ? '⚠ Prezzo della doppia cambiato, ma 1, 3 e 4 persone NON aggiornate: imposta i Supplementi e premi Riallinea' : 'Modifiche applicate' + (saltati ? ' — ' + saltati + ' giorni senza prezzo saltati' : ''));
